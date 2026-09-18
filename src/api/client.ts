@@ -55,16 +55,16 @@ export class SentinelClient {
   }
 
   /**
-   * Fire a control GET (204 = ok, 404 = session gone). Resolves `r.ok`. A rejected
-   * fetch (network error, or an older plugin whose 204 lacks CORS headers — the
-   * command was delivered either way) resolves true; dead sessions surface via relay-pos.
+   * Fire a control GET (204 = ok, 404 = session gone). Resolves `r.ok`; a rejected
+   * fetch (network error) resolves false so the player can recover instead of
+   * believing a seek/rate change landed. (The plugin sends CORS on every reply.)
    */
   async control(path: string): Promise<boolean> {
     try {
       const r = await fetch(this.url(path), { cache: 'no-store' });
       return r.ok;
     } catch {
-      return true;
+      return false;
     }
   }
 

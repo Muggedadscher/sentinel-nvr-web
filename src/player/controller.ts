@@ -62,7 +62,7 @@ export class PlayerController {
   // frame counter / freeze
   private fc = { n: 0, tok: {} as object }; private freezeT = 0; private freezeTok: object | null = null;
   private cad = { t: 0, last: -1, lastNew: 0, stalls: 0, maxStall: 0, frames0: -1, t0: 0, gapMax: 0 };
-  private stallTimer = 0; private destroyed = false;
+  private stallTimer = 0; private destroyed = false; private liveRestartT = 0;
   private unlisten: (() => void)[] = [];
 
   private arPrefix: string;
@@ -91,6 +91,10 @@ export class PlayerController {
 
   destroy(): void {
     this.destroyed = true;
+    // no path may (re)start a stream on a destroyed controller: the 1-s live
+    // restart timer, a pending async load in the host, a visibility change …
+    this.live = false; this.recPaused = false;
+    if (this.liveRestartT) { clearTimeout(this.liveRestartT); this.liveRestartT = 0; }
     this.recWebrtcTeardown(); this.webrtcTeardown(); this.mseTeardown(); this.liveTeardown(); this.chaseAbort();
     if (this.pendingT) clearInterval(this.pendingT);
     for (const u of this.unlisten) u();
@@ -98,7 +102,7 @@ export class PlayerController {
   }
 
   setCamera(camId: string, name: string): void {
-    if (camId !== this.camId) { this.recWebrtcDisabled = false; }
+    if (camId !== this.camId) { this.recWebrtcDisabled = false; this.recoveries = 0; }
     this.camId = camId; this.camName = name;
     // last known picture aspect of this camera: the stage has the right shape before any poster/video arrives
     let ar = ''; try { ar = localStorage.getItem(this.arPrefix + camId) || ''; } catch { /* ignore */ }
@@ -180,7 +184,7 @@ export class PlayerController {
   posterEvent(ts: number): void { const cam = this.camId; const img = new Image(); img.crossOrigin = 'anonymous'; img.onload = () => { if (this.camId !== cam) return; this.freezeFromImage(img, true, !!this.rw?.active && !!this.rw.id, 'event'); }; img.src = this.api.url(`api/evframe?camera=${encodeURIComponent(cam)}&ts=${ts}`); }
   /** Camera opened: newest snapshot in front of the black stage until live plays. */
   posterFromSnapshot(): void { const cam = this.camId; const img = new Image(); img.crossOrigin = 'anonymous'; img.onload = () => { if (this.camId !== cam || this.rw?.active || this.recPaused || this.posterUp()) return; if (this.v.readyState >= 2 && this.v.videoWidth && !this.v.paused) return; this.freezeFromImage(img, true, false, 'snapshot'); }; img.src = this.api.url(`api/snapshot?camera=${encodeURIComponent(cam)}`) + `&_=${Date.now()}`; }
-  private posterShow(ts: number): void { try { if (this.posterUp()) return; if (this.v.readyState >= 2 && this.v.videoWidth) return; const i = this.clipIndexFor(ts); const c = i >= 0 ? this.clips[i] : undefined; if (!c?.thumbnailId) return; const img = new Image(); img.crossOrigin = 'anonymous'; img.onload = () => { if (!this.posterUp()) this.freezeFromImage(img, true, false, 'thumb'); }; img.src = this.api.url(`api/thumb?id=${encodeURIComponent(c.thumbnailId)}`); } catch { /* ignore */ } }
+  private posterShow(ts: number): void { try { if (this.posterUp()) return; if (this.v.readyState >= 2 && this.v.videoWidth) return; const i = this.clipIndexFor(ts); const c = i >= 0 ? this.clips[i] : undefined; if (!c?.thumbnailId) return; const cam = this.camId; const img = new Image(); img.crossOrigin = 'anonymous'; img.onload = () => { if (this.camId !== cam || this.destroyed) return; if (!this.posterUp()) this.freezeFromImage(img, true, false, 'thumb'); }; img.src = this.api.url(`api/thumb?id=${encodeURIComponent(c.thumbnailId)}`); } catch { /* ignore */ } }
 
   private safePlay(): void {
     let pr: Promise<void>; try { pr = this.v.play(); } catch { return; }
@@ -189,7 +193,7 @@ export class PlayerController {
 
   // ---- LIVE ---------------------------------------------------------------------------
   goLive(): void {
-    if (!this.camId) return;
+    if (!this.camId || this.destroyed) return;
     this.chaseAbort();
     this.freezeShow(true);
     this.exitLiveState(); this.recWebrtcTeardown(); this.recPaused = false; this.live = true; this.playIndex = -1; this.curClipId = null; this.L.restarts = 0;
@@ -203,6 +207,8 @@ export class PlayerController {
   private setMjpeg(on: boolean): void { this.img.classList.toggle('hidden', !on); this.v.classList.toggle('hidden', on); if (!on) this.img.removeAttribute('src'); }
   private webrtcTeardown(): void { this.w?.stop(); this.w = undefined; }
   private liveStartWebrtc(): void {
+    if (this.destroyed) return;
+    this.v.onloadedmetadata = null;
     this.webrtcTeardown(); this.recWebrtcTeardown(); this.mseTeardown(); this.liveTeardown();
     try { this.v.pause(); } catch { /* ignore */ } try { this.v.srcObject = null; } catch { /* ignore */ } this.v.removeAttribute('src');
     this.setMjpeg(false);
@@ -219,8 +225,10 @@ export class PlayerController {
   private liveAppend(): void { const L = this.L; if (!L.active || !L.sb || L.sb.updating || !L.queue.length) return; const buf = L.queue.shift()!; try { L.sb.appendBuffer(buf as BufferSource); } catch { this.liveRestart(); } }
   private liveTrim(): void { const L = this.L; if (!L.sb || L.sb.updating) return; try { const b = this.v.buffered; if (b.length && this.v.currentTime - b.start(0) > 30) L.sb.remove(0, this.v.currentTime - 10); } catch { /* ignore */ } }
   private liveEdge(): void { try { const b = this.v.buffered; if (!b.length) return; const end = b.end(b.length - 1); if (end - this.v.currentTime > 2.5) this.v.currentTime = end - 0.7; if (this.v.paused) this.safePlay(); } catch { /* ignore */ } }
-  private liveRestart(): void { if (!this.live || !this.L.active) return; this.liveTeardown(); this.L.restarts++; if (this.L.restarts > 5) { this.liveFallbackImg(); return; } window.setTimeout(() => { if (this.live) this.liveStartMse(); }, 1000); }
+  private liveRestart(): void { if (!this.live || !this.L.active) return; this.liveTeardown(); this.L.restarts++; if (this.L.restarts > 5) { this.liveFallbackImg(); return; } if (this.liveRestartT) clearTimeout(this.liveRestartT); this.liveRestartT = window.setTimeout(() => { this.liveRestartT = 0; if (this.live && !this.destroyed) this.liveStartMse(); }, 1000); }
   private liveStartMse(): void {
+    if (this.destroyed) return;
+    this.v.onloadedmetadata = null;
     this.liveTeardown(); this.mseTeardown();
     const L = this.L; L.active = true; this.transport = 'mse'; this.setLabel('liveMse'); this.setMjpeg(false);
     const ms = new MSCls!(); L.ms = ms; L.lastTrim = Date.now();
@@ -246,6 +254,8 @@ export class PlayerController {
   private recWebrtcOk(): boolean { return !this.recWebrtcDisabled && !!(window.RTCPeerConnection && window.WebSocket); }
   private recWebrtcTeardown(): void { this.posterUntilSeek = false; this.stopRelayPoll(); this.rw?.stop(); this.rw = undefined; this.rwBase = null; this.rwPosTs = null; this.rwScrub = false; this.rwSeekBusy = false; this.rwPending = null; this.rwLastSeekTs = null; this.rwSrate = 1; this.rwRate = 1; this.rwRateBusy = false; this.rwPendingRate = null; }
   private recWebrtcStart(ts: number): void {
+    if (this.destroyed) return;
+    this.v.onloadedmetadata = null;
     this.freezeShow(true); this.posterShow(ts);
     this.live = false;
     this.recWebrtcTeardown(); this.webrtcTeardown(); this.mseTeardown(); this.liveTeardown();
@@ -268,7 +278,14 @@ export class PlayerController {
     });
     this.rw = s; s.start(); this.startRelayPoll(); this.emit();
   }
-  private recFallbackMse(ts: number): void { rlog('rec-fallback-mse', { mseOk: this.mseSupported() }); this.recWebrtcDisabled = true; this.recWebrtcTeardown(); if (this.live || this.destroyed) return; this.playAt(ts, {}); }
+  /** Relay failed: retry the relay up to twice (transient WS/ICE hiccups), only then fall back to MSE for the rest of this camera. */
+  private recFallbackMse(ts: number): void {
+    this.recWebrtcTeardown();
+    if (this.live || this.destroyed) return;
+    this.recoveries++;
+    if (this.recoveries <= 2) { rlog('relay-retry', { n: this.recoveries }); this.recWebrtcStart(ts); return; }
+    rlog('rec-fallback-mse', { mseOk: this.mseSupported(), after: this.recoveries }); this.recWebrtcDisabled = true; this.playAt(ts, {});
+  }
   /** Hard server-side seek, coalesced: one in flight, latest wins, 150 ms floor. */
   private recRelaySeek(ts: number, rate = 1, srate = 1): void {
     const s = this.rw; if (!s?.id) return;
@@ -310,7 +327,7 @@ export class PlayerController {
     if (!this.rw?.active) return;
     const t = this.rwPosTs ?? this.rwStartMs;
     this.recoveries++; rlog('relay-recover', { n: this.recoveries });
-    if (this.recoveries > 2) { this.recFallbackMse(t); return; }
+    if (this.recoveries > 2) { this.recoveries--; this.recFallbackMse(t); return; } // hand-over: recFallbackMse counts once more
     this.recWebrtcStart(t);
   }
   private startRelayPoll(): void {
@@ -362,6 +379,7 @@ export class PlayerController {
 
   // ---- playAt: relay first, MSE/native fallback ------------------------------------------------
   playAt(ts: number, opts: { scrub?: boolean; srate?: number; noChase?: boolean } = {}): void {
+    if (this.destroyed) return;
     const idx0 = this.clipIndexFor(ts);
     if (this.recWebrtcOk()) {
       this.chaseAbort();
@@ -400,6 +418,8 @@ export class PlayerController {
   private mseTeardown(): void { const M = this.M; M.active = false; M.nextIdx = -1; M.feeding = false; M.end = 0; M.pendingSeek = null; M.q = []; M.segFirst = false; try { M.abort?.abort(); } catch { /* ignore */ } M.abort = null; if (M.sb && M.ms && M.ms.readyState === 'open') { try { M.sb.abort(); } catch { /* ignore */ } } M.sb = null; M.ms = null; }
   private bufferedContains(t: number): boolean { try { const b = this.v.buffered; for (let i = 0; i < b.length; i++) if (t >= b.start(i) - 0.3 && t <= b.end(i) + 0.3) return true; } catch { /* ignore */ } return false; }
   private mseStart(idx: number, offSec: number): void {
+    if (this.destroyed) return;
+    this.v.onloadedmetadata = null;
     this.freezeShow(); this.mseTeardown();
     const M = this.M; const ms = new MSCls!(); M.ms = ms; M.active = true; M.base = this.clips[idx]!.startTime; M.nextIdx = idx; M.end = 0; M.mmsGo = true; this.transport = 'mse';
     if ((window as any).ManagedMediaSource && ms instanceof (window as any).ManagedMediaSource) { try { (this.v as any).disableRemotePlayback = true; } catch { /* ignore */ } ms.addEventListener('startstreaming', () => { M.mmsGo = true; this.feed(); }); ms.addEventListener('endstreaming', () => { M.mmsGo = false; }); }
