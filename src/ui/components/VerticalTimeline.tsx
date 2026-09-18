@@ -140,9 +140,10 @@ export function VerticalTimeline(p: TimelineProps) {
   const steps = [60000, 300000, 600000, 900000, 1800000, 3600000, 7200000, 10800000, 21600000];
   const step = steps.find(s => s >= 70 / px) ?? steps[steps.length - 1]!;
   // the ruler runs to the very top of the content (through the future headroom above LIVE), not just to rangeEnd
-  const topTs = tsForY(0);
-  const axis: number[] = []; const a0 = Math.max(p.rangeStart, Math.floor(winStart / step) * step); for (let t = a0; t <= Math.min(topTs, winEnd); t += step) axis.push(t);
-  const q = step / 4; const ticks: number[] = []; if (q * px >= 3) { const t0 = Math.max(p.rangeStart, Math.floor(winStart / q) * q); for (let t = t0; t <= Math.min(topTs, winEnd); t += q) ticks.push(t); }
+  // px is 0 until the first layout pass → tsForY() would be Infinity and the loops unbounded
+  const topTs = px > 0 ? tsForY(0) : p.rangeEnd;
+  const axis: number[] = []; const a0 = Math.max(p.rangeStart, Math.floor(winStart / step) * step); for (let t = a0; t <= Math.min(topTs, winEnd) && axis.length < 2000; t += step) axis.push(t);
+  const q = step / 4; const ticks: number[] = []; if (q * px >= 3) { const t0 = Math.max(p.rangeStart, Math.floor(winStart / q) * q); for (let t = t0; t <= Math.min(topTs, winEnd) && ticks.length < 8000; t += q) ticks.push(t); }
   const midnights: number[] = []; for (let t = new Date(Math.max(p.rangeStart, winStart)).setHours(0, 0, 0, 0); t <= Math.min(topTs, winEnd); t += DAY) if (t > p.rangeStart) midnights.push(t);
   let lastThumbY = -1e9; const thumbGap = (window.innerWidth < 900 ? 63 : 77) + 6;
   const now = Date.now();
