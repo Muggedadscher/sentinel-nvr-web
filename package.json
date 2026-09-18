@@ -1,16 +1,21 @@
 {
-  "name": "sentinel-nvr-web",
-  "private": true,
-  "description": "Shared browser packages for the Sentinel NVR plugin for Scrypted.",
+  "name": "@sentinel-nvr/web",
+  "version": "0.1.0",
+  "description": "Shared browser code for the Sentinel NVR plugin for Scrypted: API model + client (/api), player (/player, planned) and React UI (/ui, planned). Consumed by the plugin's own web UI and the HAPulse dashboard.",
   "license": "MIT",
   "author": "Muggedadscher",
   "repository": { "type": "git", "url": "https://github.com/Muggedadscher/sentinel-nvr-web.git" },
-  "workspaces": ["packages/*"],
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist"],
+  "exports": {
+    "./api": { "types": "./dist/api/index.d.ts", "import": "./dist/api/index.js", "default": "./dist/api/index.js" }
+  },
   "engines": { "node": ">=20" },
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "release": "npm run build && changeset publish"
   },
   "devDependencies": {

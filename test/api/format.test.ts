@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { weekdayShorts, fmtMonthYear, hhmmInput } from '../src/index';
+import { weekdayShorts, fmtMonthYear, hhmmInput } from '../../src/api';
 
 describe('format (locale, TZ-independent bits)', () => {
   it('weekdayShorts returns 7 entries starting Monday', () => {

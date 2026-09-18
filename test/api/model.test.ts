@@ -4,7 +4,7 @@ import {
   sentinelClassOf, sentinelClassesOf, sentinelEventPlayTs,
   sentinelClipRuns, sentinelClipIndexFor, sentinelMergeDays, sentinelHumanBytes,
   sentinelStorageForecast, type SentinelStats, type SentinelClipsResponse,
-} from '../src/index';
+} from '../../src/api';
 
 describe('setup / URLs', () => {
   it('accepts a bare host and assumes https', () => {
