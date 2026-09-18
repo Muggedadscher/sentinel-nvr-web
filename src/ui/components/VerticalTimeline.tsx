@@ -139,9 +139,11 @@ export function VerticalTimeline(p: TimelineProps) {
   const inWin = (a: number, b = a) => b >= winStart && a <= winEnd;
   const steps = [60000, 300000, 600000, 900000, 1800000, 3600000, 7200000, 10800000, 21600000];
   const step = steps.find(s => s >= 70 / px) ?? steps[steps.length - 1]!;
-  const axis: number[] = []; const a0 = Math.max(p.rangeStart, Math.floor(winStart / step) * step); for (let t = a0; t <= Math.min(p.rangeEnd, winEnd); t += step) axis.push(t);
-  const q = step / 4; const ticks: number[] = []; if (q * px >= 3) { const t0 = Math.max(p.rangeStart, Math.floor(winStart / q) * q); for (let t = t0; t <= Math.min(p.rangeEnd, winEnd); t += q) ticks.push(t); }
-  const midnights: number[] = []; for (let t = new Date(Math.max(p.rangeStart, winStart)).setHours(0, 0, 0, 0); t <= Math.min(p.rangeEnd, winEnd); t += DAY) if (t > p.rangeStart) midnights.push(t);
+  // the ruler runs to the very top of the content (through the future headroom above LIVE), not just to rangeEnd
+  const topTs = tsForY(0);
+  const axis: number[] = []; const a0 = Math.max(p.rangeStart, Math.floor(winStart / step) * step); for (let t = a0; t <= Math.min(topTs, winEnd); t += step) axis.push(t);
+  const q = step / 4; const ticks: number[] = []; if (q * px >= 3) { const t0 = Math.max(p.rangeStart, Math.floor(winStart / q) * q); for (let t = t0; t <= Math.min(topTs, winEnd); t += q) ticks.push(t); }
+  const midnights: number[] = []; for (let t = new Date(Math.max(p.rangeStart, winStart)).setHours(0, 0, 0, 0); t <= Math.min(topTs, winEnd); t += DAY) if (t > p.rangeStart) midnights.push(t);
   let lastThumbY = -1e9; const thumbGap = (window.innerWidth < 900 ? 63 : 77) + 6;
   const now = Date.now();
   const center = VT.current.user ? clamp(centerTs(), p.rangeStart, p.rangeEnd - 1) : (p.live ? now : (p.playhead() ?? clamp(centerTs(), p.rangeStart, p.rangeEnd - 1)));
@@ -151,7 +153,7 @@ export function VerticalTimeline(p: TimelineProps) {
     <div className="nvr-vtl vtl-wrap">
       <div className="vtl-scroll" ref={scroll} onScroll={onScroll} onPointerDown={down} onTouchStart={down}>
         <div className="vtl-content" style={{ height: span * px + PAD + PAD_BOT }}>
-          <div className="vtl-daybg" style={{ top: PAD, height: span * px }} />
+          <div className="vtl-daybg" style={{ top: 0, height: span * px + PAD }} />
           {/* ruler (Scrypted's tile): a tick every quarter step — short / medium at the half / long at the label — exact per tick, only the visible window */}
           {ticks.map(t => <div key={'t' + t} className={'vtick' + (t % step === 0 ? ' vtick--l' : t % (step / 2) === 0 ? ' vtick--m' : '')} style={{ top: yFor(t) }} />)}
           {axis.map(t => <div key={t} className="vaxis nvr-data" style={{ top: yFor(t) }}>{hhmm(t)}</div>)}
