@@ -1,17 +1,33 @@
 {
   "name": "@sentinel-nvr/web",
   "version": "0.1.0",
-  "description": "Shared browser code for the Sentinel NVR plugin for Scrypted: API model + client (/api), player (/player, planned) and React UI (/ui, planned). Consumed by the plugin's own web UI and the HAPulse dashboard.",
+  "description": "Shared browser code for the Sentinel NVR plugin for Scrypted: API model + client (/api), player (/player) and React UI (/ui, planned). Consumed by the plugin's own web UI and the HAPulse dashboard.",
   "license": "MIT",
   "author": "Muggedadscher",
-  "repository": { "type": "git", "url": "https://github.com/Muggedadscher/sentinel-nvr-web.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Muggedadscher/sentinel-nvr-web.git"
+  },
   "type": "module",
   "sideEffects": false,
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "exports": {
-    "./api": { "types": "./dist/api/index.d.ts", "import": "./dist/api/index.js", "default": "./dist/api/index.js" }
+    "./api": {
+      "types": "./dist/api/index.d.ts",
+      "import": "./dist/api/index.js",
+      "default": "./dist/api/index.js"
+    },
+    "./player": {
+      "types": "./dist/player/index.d.ts",
+      "import": "./dist/player/index.js",
+      "default": "./dist/player/index.js"
+    }
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",

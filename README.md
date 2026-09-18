@@ -14,7 +14,7 @@ One npm package, **`@sentinel-nvr/web`**, with subpath entry points (one version
 | Entry point | Status | Contents |
 |---|---|---|
 | `@sentinel-nvr/web/api` | **available** | DOM-free data model + types mirroring the plugin's `docs/API.md`, URL/setup parsing, event classification, storage forecast, timeline clip-run merge, locale formatters, and a `fetch`/WebSocket `SentinelClient`. No framework deps. |
-| `@sentinel-nvr/web/player` | planned | `PlayerController`, WebRTC signaling, the no-reneg recorded-playback relay client, watchdog and the live/recorded fallback chain. |
+| `@sentinel-nvr/web/player` | **available** | `PlayerController`, WebRTC signaling, the no-reneg recorded-playback relay client, watchdog and the live/recorded fallback chain. |
 | `@sentinel-nvr/web/ui` | planned | React components (vertical timeline, class badges, event list/strip, camera tiles, date picker, stat cards), the i18n dictionaries (`nvr.*`, 7 locales) and a themeable CSS foundation (HAPulse tokens × 4 identities). |
 
 The package is published once `player` and `ui` are in. Until then, the earlier
