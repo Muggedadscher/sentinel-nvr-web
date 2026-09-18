@@ -1,7 +1,7 @@
 {
   "name": "@sentinel-nvr/web",
-  "version": "0.1.2",
-  "description": "Shared browser code for the Sentinel NVR plugin for Scrypted: API model + client (/api), player (/player) and React UI (/ui, planned). Consumed by the plugin's own web UI and the HAPulse dashboard.",
+  "version": "0.2.0",
+  "description": "Shared browser code for the Sentinel NVR plugin for Scrypted: API model + client (/api), player (/player) and React UI with i18n + themes (/ui). Consumed by the plugin's own web UI and the HAPulse dashboard.",
   "license": "MIT",
   "author": "Muggedadscher",
   "repository": {
@@ -23,13 +23,20 @@
       "types": "./dist/player/index.d.ts",
       "import": "./dist/player/index.js",
       "default": "./dist/player/index.js"
-    }
+    },
+    "./ui": {
+      "types": "./dist/ui/index.d.ts",
+      "import": "./dist/ui/index.js",
+      "default": "./dist/ui/index.js"
+    },
+    "./ui/ui.css": "./dist/ui/ui.css",
+    "./ui/locales/*": "./dist/ui/locales/*"
   },
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && mkdir -p dist/ui && cp src/ui/ui.css dist/ui/ui.css && cp -r src/ui/locales dist/ui/locales",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "release": "npm run build && changeset publish"
@@ -38,6 +45,14 @@
     "@changesets/cli": "^2.27.0",
     "tsup": "^8.3.0",
     "typescript": "^5.7.0",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "@types/react": "^19.0.0",
+    "lucide-react": "^0.469.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "peerDependencies": {
+    "lucide-react": ">=0.400.0",
+    "react": ">=18"
   }
 }
