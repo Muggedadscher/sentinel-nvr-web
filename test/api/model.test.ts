@@ -103,3 +103,15 @@ describe('storage forecast', () => {
     expect(f.status).toBe('unknown');
   });
 });
+
+describe('SentinelClient base override', () => {
+  it('defaults to the public base and accepts a custom base (proxy prefix / login path)', async () => {
+    const { SentinelClient } = await import('../../src/api');
+    const a = new SentinelClient('https://h:1', 't');
+    expect(a.base).toBe('https://h:1/endpoint/@local/sentinel-nvr/public/');
+    const b = new SentinelClient('https://h:1', '', { base: 'https://h:1/scrypted/endpoint/@local/sentinel-nvr' });
+    expect(b.base).toBe('https://h:1/scrypted/endpoint/@local/sentinel-nvr/');
+    expect(b.url('api/stats')).toBe('https://h:1/scrypted/endpoint/@local/sentinel-nvr/api/stats');
+    expect(b.signalingUrl('33')).toBe('wss://h:1/scrypted/endpoint/@local/sentinel-nvr/?camera=33&signaling=1');
+  });
+});

@@ -19,10 +19,18 @@ export class SentinelClient {
   /** fetch() can read media bodies (segments, live fMP4): the plugin sends CORS on media. */
   readonly corsMedia = true;
 
-  constructor(origin: string, token: string) {
+  /**
+   * @param origin  Scrypted origin, e.g. https://host:10443
+   * @param token   access token (empty behind a Scrypted login session)
+   * @param opts.base  override the request base: needed when the plugin is served
+   *   under a reverse-proxy prefix, or behind the Scrypted login path
+   *   (`…/endpoint/@local/sentinel-nvr/`, cookie session, no token). Defaults to
+   *   the token-guarded public base below `origin`.
+   */
+  constructor(origin: string, token: string, opts: { base?: string } = {}) {
     this.origin = origin;
     this.token = token;
-    this.base = sentinelPublicBase(origin);
+    this.base = opts.base ? opts.base.replace(/\/*$/, '/') : sentinelPublicBase(origin);
     this.entryUrl = sentinelEntryUrl(origin);
   }
 
