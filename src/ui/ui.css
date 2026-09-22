@@ -308,3 +308,41 @@
   .nvr-tabs button { padding: 0.5rem; font-size: 0.68rem; }
   .nvr-filters { padding: 0.3rem 0.4rem; min-height: 30px; }
 }
+
+/* ---- Appearance settings section (HAPulse Settings.css metrics) ------------- */
+.nvr-set__section { display: flex; flex-direction: column; gap: 0.625rem; }
+.nvr-set-card { padding: 0; gap: 0; overflow: hidden; height: auto; }
+.nvr-set__row { display: flex; flex-direction: column; gap: 0.625rem; padding: 1rem 1.375rem; border-bottom: 1px solid var(--line); }
+.nvr-set__row:last-child { border-bottom: none; }
+.nvr-set__row--inline { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; padding: 0.875rem 1.375rem; }
+.nvr-set__label { display: flex; align-items: center; gap: 0.625rem; font-size: 0.9375rem; font-weight: 500; color: var(--text); }
+.nvr-set__chip { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 7px; background: var(--bg-subtle); color: var(--text-dim); flex-shrink: 0; }
+/* segmented control (light / dark / auto) */
+.nvr-seg { display: inline-flex; gap: 0.1875rem; padding: 0.1875rem; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-control); }
+.nvr-seg__btn { flex: 1; min-width: 68px; min-height: 34px; padding: 0.375rem 0.875rem; border: none; background: transparent; color: var(--text-dim); font-family: var(--font-body); font-size: 0.875rem; font-weight: 500; border-radius: calc(var(--radius-control) - 4px); cursor: pointer; transition: background 160ms ease-out, color 160ms ease-out, box-shadow 160ms ease-out; }
+.nvr-seg__btn:hover:not(.nvr-seg__btn--active) { color: var(--text); }
+.nvr-seg__btn--active { background: var(--bg-card); color: var(--text); box-shadow: 0 1px 3px rgba(16,24,40,0.10), 0 1px 2px rgba(16,24,40,0.06); }
+.nvr-seg__btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* pill select */
+.nvr-select { position: relative; display: inline-flex; align-items: center; }
+.nvr-select__native { appearance: none; -webkit-appearance: none; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 0.5rem 2rem 0.5rem 0.875rem; font-family: var(--font-body); font-size: 0.875rem; color: var(--text); cursor: pointer; max-width: 200px; }
+.nvr-select__chevron { position: absolute; right: 0.625rem; pointer-events: none; color: var(--text-faint); }
+/* theme preview cards */
+.nvr-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.625rem; }
+@media (max-width: 480px) { .nvr-swatches { grid-template-columns: repeat(2, 1fr); } }
+.nvr-swatch { cursor: pointer; border: 2px solid transparent; border-radius: var(--radius-control); overflow: hidden; transition: border-color 160ms ease-out, transform 160ms ease-out; background: var(--bg-card); padding: 0; text-align: left; box-shadow: var(--shadow-card); }
+.nvr-swatch:active { transform: scale(0.97); }
+.nvr-swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nvr-swatch--active { border-color: var(--accent); }
+.nvr-swatch__preview { width: 100%; height: 64px; position: relative; overflow: hidden; }
+.nvr-swatch__name { display: block; padding: 0.375rem 0.625rem; font-size: 0.75rem; font-weight: 500; color: var(--text-dim); background: var(--bg-card); border-top: 1px solid var(--line); }
+.nvr-swatch--active .nvr-swatch__name { color: var(--accent); font-weight: 600; }
+/* accent hue */
+.nvr-accent { display: flex; flex-direction: column; gap: 0.625rem; }
+.nvr-accent__label { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.nvr-accent__dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; vertical-align: middle; border: 1px solid rgba(0,0,0,.10); }
+.nvr-accent__reset { padding: 0.25rem 0.75rem; font-size: 0.75rem; min-height: 32px; }
+.nvr-accent__slider { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; border-radius: 13px; outline: none; cursor: pointer; border: 1px solid var(--border); margin: 0;
+  background: linear-gradient(to right, hsl(0,80%,60%), hsl(36,80%,60%), hsl(72,80%,60%), hsl(108,80%,55%), hsl(144,80%,55%), hsl(180,80%,55%), hsl(216,80%,60%), hsl(252,80%,60%), hsl(288,80%,60%), hsl(324,80%,60%), hsl(360,80%,60%)); }
+.nvr-accent__slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 2px solid rgba(0,0,0,.20); box-shadow: 0 1px 4px rgba(0,0,0,.25); cursor: pointer; }
+.nvr-accent__slider::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 2px solid rgba(0,0,0,.20); box-shadow: 0 1px 4px rgba(0,0,0,.25); cursor: pointer; }

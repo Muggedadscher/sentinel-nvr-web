@@ -49,3 +49,6 @@ export function pickLocale(tags: readonly string[]): UiLocale {
   }
   return 'en';
 }
+
+/** Native names of the shipped locales (not translated — "Français" reads the same in every UI language). */
+export const UI_LOCALE_LABELS: Record<UiLocale, string> = { de: 'Deutsch', en: 'English', es: 'Español', fr: 'Français', it: 'Italiano', pt: 'Português', sv: 'Svenska' };

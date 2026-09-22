@@ -109,5 +109,18 @@
   "nvr.player.pip": "Image dans l’image",
   "nvr.player.fullscreen": "Plein écran",
   "nvr.home.title": "Sentinel NVR",
-  "nvr.home.viewAll": "Tout voir"
+  "nvr.home.viewAll": "Tout voir",
+  "nvr.settings.appearance": "Apparence",
+  "nvr.settings.mode": "Apparence",
+  "nvr.settings.mode.light": "Clair",
+  "nvr.settings.mode.dark": "Sombre",
+  "nvr.settings.mode.auto": "Auto",
+  "nvr.settings.language": "Langue",
+  "nvr.settings.language.auto": "Automatique",
+  "nvr.settings.theme": "Thème",
+  "nvr.settings.theme.selectAria": "Choisir le thème {name}",
+  "nvr.settings.accent": "Couleur d’accent",
+  "nvr.settings.accent.reset": "Réinitialiser",
+  "nvr.settings.accent.hueAria": "Teinte de la couleur d’accent",
+  "nvr.settings.title": "Réglages"
 }

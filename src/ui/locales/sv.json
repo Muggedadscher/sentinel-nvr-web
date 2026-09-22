@@ -109,5 +109,18 @@
   "nvr.player.pip": "Bild-i-bild",
   "nvr.player.fullscreen": "Helskärm",
   "nvr.home.title": "Sentinel NVR",
-  "nvr.home.viewAll": "Visa alla"
+  "nvr.home.viewAll": "Visa alla",
+  "nvr.settings.appearance": "Utseende",
+  "nvr.settings.mode": "Utseende",
+  "nvr.settings.mode.light": "Ljust",
+  "nvr.settings.mode.dark": "Mörkt",
+  "nvr.settings.mode.auto": "Auto",
+  "nvr.settings.language": "Språk",
+  "nvr.settings.language.auto": "Automatiskt",
+  "nvr.settings.theme": "Tema",
+  "nvr.settings.theme.selectAria": "Välj temat {name}",
+  "nvr.settings.accent": "Accentfärg",
+  "nvr.settings.accent.reset": "Återställ",
+  "nvr.settings.accent.hueAria": "Accentfärgens nyans",
+  "nvr.settings.title": "Inställningar"
 }
