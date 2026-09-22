@@ -122,5 +122,14 @@
   "nvr.settings.accent": "Cor de destaque",
   "nvr.settings.accent.reset": "Repor",
   "nvr.settings.accent.hueAria": "Tom da cor de destaque",
-  "nvr.settings.title": "Definições"
+  "nvr.settings.title": "Definições",
+  "nvr.setup.authToken": "Token de acesso",
+  "nvr.setup.authLogin": "Conta Scrypted",
+  "nvr.setup.userLabel": "Nome de utilizador",
+  "nvr.setup.passwordLabel": "Palavra-passe",
+  "nvr.setup.loginFailed": "Início de sessão recusado (401) — verifica o utilizador e a palavra-passe",
+  "nvr.setup.loginDisabled": "O acesso por token está desligado no plugin (403)",
+  "nvr.setup.loginOld": "Este Sentinel ainda não suporta o início de sessão (404) — atualiza o plugin ou introduz o token",
+  "nvr.setup.loginBusy": "Demasiadas tentativas — aguarda um momento (429)",
+  "nvr.setup.loginHint": "Inicia sessão com a tua conta Scrypted; o HAPulse obtém o token sozinho. A palavra-passe não é guardada."
 }

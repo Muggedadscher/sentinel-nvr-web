@@ -122,5 +122,14 @@
   "nvr.settings.accent": "Couleur d’accent",
   "nvr.settings.accent.reset": "Réinitialiser",
   "nvr.settings.accent.hueAria": "Teinte de la couleur d’accent",
-  "nvr.settings.title": "Réglages"
+  "nvr.settings.title": "Réglages",
+  "nvr.setup.authToken": "Jeton d’accès",
+  "nvr.setup.authLogin": "Compte Scrypted",
+  "nvr.setup.userLabel": "Nom d’utilisateur",
+  "nvr.setup.passwordLabel": "Mot de passe",
+  "nvr.setup.loginFailed": "Connexion refusée (401) — vérifiez le nom d’utilisateur et le mot de passe",
+  "nvr.setup.loginDisabled": "L’accès par jeton est désactivé dans le plugin (403)",
+  "nvr.setup.loginOld": "Ce Sentinel ne connaît pas encore la connexion par compte (404) — mettez le plugin à jour ou saisissez le jeton",
+  "nvr.setup.loginBusy": "Trop de tentatives — patientez un instant (429)",
+  "nvr.setup.loginHint": "Connectez-vous avec votre compte Scrypted ; HAPulse récupère le jeton lui-même. Le mot de passe n’est pas enregistré."
 }

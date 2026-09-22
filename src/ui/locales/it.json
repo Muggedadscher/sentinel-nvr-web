@@ -122,5 +122,14 @@
   "nvr.settings.accent": "Colore accento",
   "nvr.settings.accent.reset": "Ripristina",
   "nvr.settings.accent.hueAria": "Tonalità del colore accento",
-  "nvr.settings.title": "Impostazioni"
+  "nvr.settings.title": "Impostazioni",
+  "nvr.setup.authToken": "Token di accesso",
+  "nvr.setup.authLogin": "Account Scrypted",
+  "nvr.setup.userLabel": "Nome utente",
+  "nvr.setup.passwordLabel": "Password",
+  "nvr.setup.loginFailed": "Accesso rifiutato (401): controlla nome utente e password",
+  "nvr.setup.loginDisabled": "L’accesso con token è disattivato nel plugin (403)",
+  "nvr.setup.loginOld": "Questo Sentinel non supporta ancora l’accesso con account (404): aggiorna il plugin o inserisci il token",
+  "nvr.setup.loginBusy": "Troppi tentativi, attendi un momento (429)",
+  "nvr.setup.loginHint": "Accedi con il tuo account Scrypted; HAPulse recupera il token da solo. La password non viene salvata."
 }

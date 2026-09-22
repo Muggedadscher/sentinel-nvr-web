@@ -109,3 +109,25 @@ export class SentinelHttpError extends Error {
     this.status = status;
   }
 }
+
+/**
+ * Trade Scrypted credentials for the plugin's access token (`POST …/public/api/token-exchange`,
+ * plugin ≥ 2026-09-22). Rejects with `SentinelHttpError`: 401 wrong credentials, 403 token access
+ * switched off in the plugin, 404 plugin too old, 429 too many attempts; 0 = unreachable.
+ */
+export async function exchangeSentinelToken(origin: string, username: string, password: string, timeoutMs = 10_000): Promise<string> {
+  const path = 'api/token-exchange';
+  let r: Response;
+  try {
+    r = await fetch(sentinelPublicBase(origin) + path, {
+      method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(timeoutMs),
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }),
+    });
+  } catch {
+    throw new SentinelHttpError(0, path);
+  }
+  if (!r.ok) throw new SentinelHttpError(r.status, path);
+  const j = (await r.json()) as { token?: unknown };
+  if (typeof j.token !== 'string' || !j.token) throw new SentinelHttpError(502, path);
+  return j.token;
+}

@@ -122,5 +122,14 @@
   "nvr.settings.accent": "Accentfärg",
   "nvr.settings.accent.reset": "Återställ",
   "nvr.settings.accent.hueAria": "Accentfärgens nyans",
-  "nvr.settings.title": "Inställningar"
+  "nvr.settings.title": "Inställningar",
+  "nvr.setup.authToken": "Åtkomsttoken",
+  "nvr.setup.authLogin": "Scrypted-konto",
+  "nvr.setup.userLabel": "Användarnamn",
+  "nvr.setup.passwordLabel": "Lösenord",
+  "nvr.setup.loginFailed": "Inloggning nekad (401) – kontrollera användarnamn och lösenord",
+  "nvr.setup.loginDisabled": "Tokenåtkomst är avstängd i insticksmodulen (403)",
+  "nvr.setup.loginOld": "Den här Sentinel saknar inloggningsutbyte (404) – uppdatera insticksmodulen eller ange token",
+  "nvr.setup.loginBusy": "För många försök – vänta en stund (429)",
+  "nvr.setup.loginHint": "Logga in med ditt Scrypted-konto; HAPulse hämtar åtkomsttoken själv. Lösenordet sparas inte."
 }
