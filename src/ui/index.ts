@@ -9,3 +9,4 @@ export * from './components/EventList';
 export * from './components/DatePickerPanel';
 export * from './components/Stats';
 export * from './components/VerticalTimeline';
+export * from './components/CameraPage';

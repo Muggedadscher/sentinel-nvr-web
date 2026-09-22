@@ -15,10 +15,9 @@ One npm package, **`@sentinel-nvr/web`**, with subpath entry points (one version
 |---|---|---|
 | `@sentinel-nvr/web/api` | **available** | DOM-free data model + types mirroring the plugin's `docs/API.md`, URL/setup parsing, event classification, storage forecast, timeline clip-run merge, locale formatters, and a `fetch`/WebSocket `SentinelClient`. No framework deps. |
 | `@sentinel-nvr/web/player` | **available** | `PlayerController`, WebRTC signaling, the no-reneg recorded-playback relay client, watchdog and the live/recorded fallback chain. |
-| `@sentinel-nvr/web/ui` | planned | React components (vertical timeline, class badges, event list/strip, camera tiles, date picker, stat cards), the i18n dictionaries (`nvr.*`, 7 locales) and a themeable CSS foundation (HAPulse tokens × 4 identities). |
+| `@sentinel-nvr/web/ui` | **available** | React components — the whole **camera page** (`CameraPage`: stage, control pill, info bar, tabs, class filters, vertical timeline, events list, date chip; `CameraTitle` header row), class badges, event strip, camera tiles, date picker, stat cards — the i18n dictionaries (`nvr.*`, 7 locales) and the theme system (4 identities × light/dark/auto + accent hue). Styles in `@sentinel-nvr/web/ui/ui.css` (HAPulse tokens). |
 
-The package is published once `player` and `ui` are in. Until then, the earlier
-`@sentinel-nvr/api@0.1.0` (same code as `/api`) stays on npm as a transitional release.
+The earlier `@sentinel-nvr/api@0.1.0` is deprecated in favour of `@sentinel-nvr/web/api`.
 
 The plugin's server code (`sentinel-nvr/src`) also imports `@sentinel-nvr/api`
 for its API types, so server and both clients share one contract.
@@ -26,11 +25,13 @@ for its API types, so server and both clients share one contract.
 ## Design contracts (for `ui`)
 
 - **Theming:** components read only `--*` CSS custom properties (HAPulse token
-  names). Each host maps its own tokens; `ui` ships a `foundation.css` with the
-  four HAPulse identities × light/dark for hosts (like the Sentinel UI) that do
-  not already define them.
-- **i18n:** components take a `t(key, vars)` + `locale` via a provider. `ui` ships
-  the `nvr.*` dictionaries; hosts merge them.
+  names). `applyTheme(identity, mode, accentHue)` sets them on `<html>`; hosts that
+  already define the tokens (HAPulse) skip it. Fonts and radii are static host tokens.
+- **i18n:** components take a `t(key, vars)` + `locale` via `SentinelUiProvider`. `ui`
+  ships the `nvr.*` dictionaries (`@sentinel-nvr/web/ui/locales/<code>.json`); hosts merge them.
+- **Camera page:** hosts render `<CameraPage …/>` with `header` (their page header, e.g.
+  `<CameraTitle/>` + actions) and `renderDatePicker` (their modal around `useDatePicker`).
+  Everything visible inside comes from the package, so both consumers look identical.
 
 ## Develop
 

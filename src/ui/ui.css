@@ -163,7 +163,8 @@
 /* ---- Vertical timeline (Sentinel class names, scoped) --------------------- */
 .nvr-vtl { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .nvr-vtl .vtl-zoom { position: absolute; right: 8px; bottom: 10px; display: flex; flex-direction: column; gap: 4px; z-index: 3; }
-.nvr-vtl .tool { width: 28px; height: 28px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-dim); font-size: 1rem; box-shadow: var(--shadow-card); cursor: pointer; }
+.nvr-vtl .tool { width: 28px; height: 28px; padding: 0; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-dim); font-size: 1rem; box-shadow: var(--shadow-card); cursor: pointer; display: grid; place-items: center; }
+.nvr-vtl .tool:hover { color: var(--text); }
 .nvr-vtl .vtl-scroll { flex: 1; overflow-y: auto; position: relative; scrollbar-width: none; overscroll-behavior: contain; }
 .nvr-vtl .vtl-scroll::-webkit-scrollbar { display: none; }
 .nvr-vtl .vtl-content { position: relative; }
@@ -182,7 +183,7 @@
 .nvr-vtl .vlive-chip { position: absolute; left: 66px; transform: translateY(-50%); border: 0; background: var(--danger); color: var(--on-accent); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; padding: 2px 6px; border-radius: 6px; z-index: 2; cursor: pointer; }
 .nvr-vtl .vcenter { position: absolute; left: 0; right: 0; top: 35%; height: 2px; background: var(--accent); pointer-events: none; box-shadow: 0 0 10px var(--accent-soft); }
 .nvr-vtl .vcenter-t { position: absolute; right: 8px; top: -14px; background: var(--bg-card); border: 1px solid var(--accent); border-radius: 8px; padding: 2px 8px; font-size: 0.74rem; color: var(--text); white-space: nowrap; }
-.nvr-vtl .livejump { position: absolute; bottom: 52px; left: 10px; background: var(--bg-card); border: 1px solid var(--border); color: var(--danger); font-weight: 700; font-size: 0.74rem; letter-spacing: 0.04em; padding: 6px 14px; border-radius: var(--radius-pill); box-shadow: var(--shadow-elevated); z-index: 4; cursor: pointer; }
+.nvr-vtl .livejump { position: absolute; bottom: 52px; left: 10px; display: inline-flex; align-items: center; gap: 4px; line-height: 1; background: var(--bg-card); border: 1px solid var(--border); color: var(--danger); font-weight: 700; font-size: 0.74rem; letter-spacing: 0.04em; padding: 6px 14px; border-radius: var(--radius-pill); box-shadow: var(--shadow-elevated); z-index: 4; cursor: pointer; }
 .nvr-vtl .vtick { position: absolute; right: calc(100% - 73px); width: 3px; height: 1px; background: color-mix(in srgb, var(--text-faint) 70%, transparent); pointer-events: none; }
 .nvr-vtl .vtick--m { width: 5px; background: color-mix(in srgb, var(--text-faint) 85%, transparent); }
 .nvr-vtl .vtick--l { width: 8px; background: var(--text-dim); }
@@ -220,3 +221,90 @@
 .nvr-dt__time { flex: 1; min-height: 40px; padding: 0.375rem 0.625rem; }
 .nvr-dt__foot .nvr-btn { min-height: 40px; padding: 0.5rem 0.875rem; }
 
+
+
+/* ---- Camera page (stage + info bar + tabs/filters + date chip) ------------
+   ONE implementation for every host (CameraPage). Metrics from HAPulse. ---- */
+.nvr-cam { display: flex; flex-direction: column; gap: 1rem; }
+.nvr-cam__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.nvr-cam__title { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.nvr-cam__h1 { margin: 0; font-family: var(--font-display); font-size: clamp(1.25rem, 3vw, 1.75rem); font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nvr-cam__actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+/* ghost icon button (HAPulse IconButton variant=ghost, 36 px) */
+.nvr-iconbtn { width: 36px; height: 36px; min-width: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-faint); cursor: pointer; flex-shrink: 0; transition: background 180ms ease-out, transform 180ms ease-out; }
+.nvr-iconbtn:hover { background: var(--accent-soft); color: var(--accent); }
+.nvr-iconbtn:active { transform: scale(0.96); }
+.nvr-iconbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nvr-cam__body { display: grid; grid-template-columns: minmax(0, 1fr) 328px; gap: 1rem; align-items: stretch; }
+.nvr-cam__left { min-width: 0; display: flex; flex-direction: column; align-self: start; }
+.nvr-stage-card { overflow: hidden; display: flex; flex-direction: column; padding: 0; gap: 0; height: auto; }
+.nvr-stage-wrap { position: relative; display: block; }
+/* the picture's own aspect (set by the player as --stage-ar); max-height transfers to the width via aspect-ratio → no bars, ever */
+.nvr-stage { position: relative; width: auto; max-width: 100%; margin: 0 auto; aspect-ratio: var(--stage-ar, 16 / 9); max-height: calc(100dvh - 240px); background: color-mix(in srgb, var(--text) 92%, var(--bg)); overflow: hidden; }
+.nvr-stage:fullscreen, .nvr-stage:-webkit-full-screen { aspect-ratio: auto; width: 100%; height: 100%; }
+.nvr-stage__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+.nvr-stage__freeze { pointer-events: none; }
+.nvr-stage .hidden { display: none !important; }
+.nvr-mute { position: absolute; right: 16px; bottom: 16px; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-dim); display: grid; place-items: center; box-shadow: var(--shadow-elevated); cursor: pointer; z-index: 3; }
+.nvr-mute[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+.nvr-pill-ctl {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 2px; padding: 4px; border-radius: var(--radius-pill);
+  background: var(--nvr-overlay); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); opacity: 0; transition: opacity 0.2s; z-index: 3;
+}
+.nvr-stage:hover .nvr-pill-ctl, .nvr-stage:focus-within .nvr-pill-ctl { opacity: 1; }
+@media (hover: none) { .nvr-pill-ctl { opacity: 1; } .nvr-pill-ctl--live { opacity: 0.85; } }
+.nvr-pb { width: 40px; height: 36px; padding: 0; border-radius: 18px; border: 0; background: transparent; display: grid; place-items: center; color: var(--nvr-on-overlay); cursor: pointer; }
+.nvr-pb:hover:not(:disabled) { background: color-mix(in srgb, var(--nvr-on-overlay) 14%, transparent); }
+.nvr-pb:disabled { opacity: 0.35; cursor: default; }
+.nvr-pb--speed { font-size: 0.78rem; font-weight: 700; }
+.nvr-stage-bar { flex: none; display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 0.9rem; border-top: 1px solid var(--line); }
+.nvr-statusdot { width: 12px; height: 12px; border-radius: 50%; background: var(--text-faint); flex: none; }
+.nvr-statusdot--live { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+.nvr-stage-title { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.nvr-stage-title b { font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nvr-stage-title small { color: var(--text-dim); font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nvr-stage-actions { margin-left: auto; display: flex; gap: 0.25rem; }
+/* height: 0 + min-height: 100% → the row is sized by the stage card, the timeline card stretches to it and scrolls inside */
+.nvr-cam__right { display: flex; flex-direction: column; height: 0; min-height: 100%; position: relative; overflow: hidden; padding: 0; gap: 0; }
+.nvr-tabs { display: grid; grid-template-columns: 1fr 1fr; flex: none; }
+.nvr-tabs button { padding: 0.8rem; border: 0; background: none; cursor: pointer; font: inherit; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; color: var(--text-dim); border-bottom: 2px solid transparent; }
+.nvr-tabs button.nvr-tabs__tab--active { color: var(--text); border-bottom-color: var(--accent); }
+.nvr-filters { flex: none; display: flex; flex-wrap: wrap; gap: 0.3rem; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--line); min-height: 34px; }
+.nvr-fchip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.45rem 0.15rem 0.2rem; border: 0; border-radius: var(--radius-pill); background: var(--bg-subtle); font: inherit; font-size: 0.72rem; color: var(--text-dim); cursor: pointer; }
+.nvr-fchip--off { opacity: 0.4; }
+/* date chip: floats bottom-left over the timeline like Scrypted's date button */
+.nvr-datechip {
+  position: absolute; left: 10px; bottom: 10px; z-index: 4; display: flex; align-items: center; gap: 0.15rem;
+  background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--shadow-elevated); border-radius: var(--radius-pill); padding: 0.15rem 0.2rem; font-size: 0.78rem;
+}
+.nvr-datechip > button { width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: none; display: grid; place-items: center; color: var(--text-dim); cursor: pointer; }
+.nvr-datechip > button:hover:not(:disabled) { background: var(--bg-subtle); color: var(--text); }
+.nvr-datechip > button:disabled { opacity: 0.3; cursor: default; }
+.nvr-datechip .nvr-datechip__lbl { width: auto; display: inline-flex; align-items: center; gap: 0.3rem; padding: 0 0.4rem; border-radius: var(--radius-pill); font: inherit; font-family: var(--font-data); font-size: 0.76rem; white-space: nowrap; color: var(--text); }
+.nvr-datechip--rec { background: var(--accent); border-color: transparent; }
+.nvr-datechip--rec > button, .nvr-datechip--rec .nvr-datechip__lbl { color: var(--on-accent); }
+/* events list (tab "Events") */
+.nvr-evlist { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0.35rem; padding: 0.5rem; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.nvr-evlist__empty { padding: 2rem 1rem; justify-content: center; }
+.nvr-evlist__day { position: sticky; top: 0; z-index: 1; padding: 0.3rem 0.4rem; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); background: var(--bg-card); border-bottom: 1px solid var(--line); }
+.nvr-evrow { display: grid; grid-template-columns: 84px 1fr; gap: 0.7rem; align-items: center; padding: 0.35rem; border: 0; border-radius: 12px; background: none; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.nvr-evrow:hover { background: var(--bg-subtle); }
+.nvr-evrow__img { width: 84px; height: 56px; object-fit: cover; border-radius: 8px; background: var(--bg-subtle); display: block; }
+.nvr-evrow__text { min-width: 0; }
+.nvr-evrow__cls { display: flex; align-items: center; gap: 0.3rem; font-weight: 600; font-size: 0.85rem; color: var(--text); }
+.nvr-evrow__t { display: block; font-size: 0.72rem; color: var(--text-faint); }
+@media (max-width: 899px) {
+  .nvr-cam { gap: 0.5rem; }
+  .nvr-cam__body { display: flex; flex-direction: column; gap: 0.5rem; height: calc(100dvh - 64px - env(safe-area-inset-bottom, 0px) - 120px); min-height: 520px; }
+  .nvr-cam__left { align-self: stretch; flex: none; }
+  .nvr-stage-card { flex: none; }
+  .nvr-stage { max-height: 46vh; }
+  .nvr-stage-bar { padding: 0.4rem 0.6rem; gap: 0.5rem; }
+  .nvr-stage-title b { font-size: 0.88rem; }
+  .nvr-mute { width: 36px; height: 36px; right: 10px; bottom: 10px; }
+  .nvr-pill-ctl { bottom: 10px; }
+  .nvr-pb { width: 36px; height: 32px; }
+  .nvr-cam__right { flex: 1; height: auto; min-height: 220px; }
+  .nvr-tabs button { padding: 0.5rem; font-size: 0.68rem; }
+  .nvr-filters { padding: 0.3rem 0.4rem; min-height: 30px; }
+}
