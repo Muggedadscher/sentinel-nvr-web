@@ -6,7 +6,7 @@
   "author": "Muggedadscher",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Muggedadscher/sentinel-nvr-web.git"
+    "url": "git+https://github.com/Muggedadscher/sentinel-nvr-web.git"
   },
   "type": "module",
   "sideEffects": false,
