@@ -86,7 +86,7 @@ export function CameraPage(p: CameraPageProps) {
   const [ps, setPs] = useState<PlayerState>(IDLE);
   const [loadError, setLoadError] = useState(false);
   const [dt, setDt] = useState(false);
-  const card = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null); const video = useRef<HTMLVideoElement>(null); const freeze = useRef<HTMLCanvasElement>(null); const img = useRef<HTMLImageElement>(null);
   const ctl = useRef<PlayerController | null>(null);
   const psRef = useRef(ps); psRef.current = ps;
@@ -120,9 +120,9 @@ export function CameraPage(p: CameraPageProps) {
   }, [fetchDay, earliest, camId]);
   const onCenter = useCallback((ts: number) => { const d = dayOf(ts); setCenterDay(d); void ensureDay(d); void ensureDay(d - DAY); void ensureDay(d + DAY); }, [ensureDay]);
 
-  // the controller writes the picture's aspect (--stage-ar) on the stage; the card needs it too (its width hugs the picture)
+  // the controller writes the picture's aspect (--stage-ar) on the stage; the layout needs it on the body (column width = picture width)
   useEffect(() => {
-    const st = stage.current, cd = card.current; if (!st || !cd) return;
+    const st = stage.current, cd = body.current; if (!st || !cd) return;
     const sync = () => { const ar = st.style.getPropertyValue('--stage-ar'); if (ar) cd.style.setProperty('--stage-ar', ar); else cd.style.removeProperty('--stage-ar'); };
     sync();
     const mo = new MutationObserver(sync); mo.observe(st, { attributes: true, attributeFilter: ['style'] });
@@ -220,9 +220,9 @@ export function CameraPage(p: CameraPageProps) {
   return (
     <div className="nvr-cam">
       {p.header}
-      <div className="nvr-cam__body">
+      <div className="nvr-cam__body" ref={body}>
         <div className="nvr-cam__left">
-          <div className="nvr-card nvr-stage-card" ref={card}>
+          <div className="nvr-card nvr-stage-card">
             <div className="nvr-stage-wrap">
               <div className="nvr-stage" ref={stage}>
                 <video ref={video} playsInline autoPlay muted crossOrigin={cors} className="nvr-stage__video" />
