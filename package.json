@@ -36,7 +36,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsup && mkdir -p dist/ui && cp src/ui/ui.css dist/ui/ui.css && cp -r src/ui/locales dist/ui/locales",
+    "build": "tsup && mkdir -p dist/ui && cp src/ui/ui.css dist/ui/ui.css && rm -rf dist/ui/locales && cp -r src/ui/locales dist/ui/locales",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "release": "npm run build && changeset publish"
