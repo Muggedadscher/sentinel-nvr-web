@@ -18,10 +18,14 @@ export interface ScrubHandlers {
   begin: () => void;
   /** every scroll frame: centre, smoothed velocity (timeline-ms per wall-s), smoothed centre */
   move: (centerTs: number, vel: number, smoothTs: number) => void;
-  /** brief hold or release: land on ts at 1× */
+  /** release (pointer/touch up after a move): land on ts at 1× */
   seek: (ts: number) => void;
-  /** gesture settled → back to auto-follow */
-  idle: () => void;
+  /** brief hold (250 ms without movement) mid-gesture: slow the time-lapse to 1× at the current position; only a large
+   *  drift becomes a seek — every seek shows ~2.4 s of stale stream before the new picture, so step-wise wheel scrolling
+   *  with a seek per step made the picture run back and forth (user 23.09.) */
+  hold: (centerTs: number) => void;
+  /** gesture settled → back to auto-follow; the player lands exactly on centerTs if it drifted */
+  idle: (centerTs: number) => void;
 }
 export interface TimelineProps {
   camId: string;
@@ -98,7 +102,8 @@ export function VerticalTimeline(p: TimelineProps) {
   });
   const notifyCenter = () => { const v = VT.current; if (Date.now() - v.lastCenterCb < 400) return; v.lastCenterCb = Date.now(); p.onCenter(clamp(centerTs(), p.rangeStart, p.rangeEnd - 1)); };
   const scrubSeek = (ts?: number) => { const v = VT.current; v.previewing = true; p.scrub.seek(clamp(ts ?? centerTs(), p.rangeStart, p.rangeEnd - 1)); };
-  const userIdle = () => { VT.current.user = 0; VT.current.idleAt = Date.now(); p.scrub.idle(); };
+  const userIdle = () => { VT.current.user = 0; VT.current.idleAt = Date.now(); p.scrub.idle(clamp(centerTs(), p.rangeStart, p.rangeEnd - 1)); };
+  const scrubHold = () => { const v = VT.current; v.previewing = true; p.scrub.hold(clamp(centerTs(), p.rangeStart, p.rangeEnd - 1)); };
   const markUser = () => { const v = VT.current; if (!v.user) { v.vel = 0; v.smooth = null; v.lastC = null; p.scrub.begin(); } v.user = Date.now(); v.previewing = false; v.moved = false; };
   const release = () => { const v = VT.current; if (!v.user) return; v.down = false; clearTimeout(v.holdT); if (v.moved) scrubSeek(); clearTimeout(v.relT); v.relT = window.setTimeout(userIdle, 250); };
   useEffect(() => { for (const n of ['pointerup', 'pointercancel', 'touchend']) window.addEventListener(n, release); return () => { for (const n of ['pointerup', 'pointercancel', 'touchend']) window.removeEventListener(n, release); }; });
@@ -120,7 +125,7 @@ export function VerticalTimeline(p: TimelineProps) {
     v.smooth = v.smooth == null ? c : v.smooth + 0.45 * (c - v.smooth);
     p.scrub.move(c, v.vel, v.smooth);
     notifyCenter(); tick(n => n + 1);
-    clearTimeout(v.holdT); v.holdT = window.setTimeout(() => scrubSeek(), 250);
+    clearTimeout(v.holdT); v.holdT = window.setTimeout(() => scrubHold(), 250);
     clearTimeout(v.relT); v.relT = window.setTimeout(() => { if (!v.down) userIdle(); }, 700);
   };
   // wheel: plain = native scroll (scrub), ctrl = zoom around the pointer (non-passive listener → preventDefault works)
@@ -148,7 +153,10 @@ export function VerticalTimeline(p: TimelineProps) {
   const midnights: number[] = []; for (let t = new Date(Math.max(p.rangeStart, winStart)).setHours(0, 0, 0, 0); t <= Math.min(topTs, winEnd); t += DAY) if (t > p.rangeStart) midnights.push(t);
   let lastThumbY = -1e9; const thumbGap = (window.innerWidth < 900 ? 63 : 77) + 6;
   const now = Date.now();
-  const center = VT.current.user ? clamp(centerTs(), p.rangeStart, p.rangeEnd - 1) : (p.live ? now : (p.playhead() ?? clamp(centerTs(), p.rangeStart, p.rangeEnd - 1)));
+  // the centre label shows what the view shows: the scroll centre while the user scrubs or the view is not following
+  // (paused, scrub settling), else the playhead the view follows
+  const viewCenter = clamp(centerTs(), p.rangeStart, p.rangeEnd - 1);
+  const center = VT.current.user || !p.following() ? viewCenter : (p.live ? now : (p.playhead() ?? viewCenter));
   const centerIsToday = new Date(center).toDateString() === new Date().toDateString();
   const down = () => { VT.current.down = true; markUser(); };
   return (

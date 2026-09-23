@@ -203,7 +203,8 @@ export function CameraPage(p: CameraPageProps) {
     begin: () => ctl.current?.scrubBegin(),
     move: (c, v, s) => ctl.current?.scrubMove(c, v, s),
     seek: (ts) => ctl.current?.scrubSeek(ts),
-    idle: () => ctl.current?.scrubIdle(),
+    hold: (ts) => ctl.current?.scrubHold(ts),
+    idle: (ts) => ctl.current?.scrubIdle(ts),
   }), []);
 
   // keyboard: space play/pause, ←/→ ±10 s (shift ±60), n/p events, l live
@@ -276,7 +277,7 @@ export function CameraPage(p: CameraPageProps) {
           {tab === 'tl' ? (
             <VerticalTimeline
               camId={camId} rangeStart={merged.rangeStart} rangeEnd={merged.rangeEnd} clips={merged.clips} events={merged.events} motion={merged.motion}
-              live={ps.live} playhead={() => ctl.current?.currentTs() ?? null} following={() => !psRef.current.paused} filterOff={filterOff}
+              live={ps.live} playhead={() => ctl.current?.currentTs() ?? null} following={() => !psRef.current.paused && !ctl.current?.scrubSettling()} filterOff={filterOff}
               onEvent={playEvent} onGoLive={goLive} scrub={scrub} onCenter={onCenter} jump={jump}
             />
           ) : (

@@ -17,7 +17,7 @@ vi.mock('../../src/player', () => ({
     attach() { /* no dom */ } destroy() { /* */ }
     setCamera(id: string) { this.camId = id; }
     setClips = setClips; playAt = playAt; goLive = goLive; posterEvent = posterEvent; freezeCurrent = freezeCurrent;
-    currentTs() { return null; }
+    currentTs() { return null; } scrubSettling() { return false; }
   },
   rlog: () => { /* */ },
 }));

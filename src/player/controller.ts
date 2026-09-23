@@ -43,6 +43,8 @@ const SWAP_MS = 2600;
 /** Scrub profile (640 all-intra) → normal (1280) only after the gesture has been quiet this long: a scroll–pause–scroll pattern
  *  restarted the transcoder twice per pause (server log: profile switch every 1–2 s, 30 restarts in one session). */
 const SCRUB_OFF_DELAY_MS = 1500;
+/** hold mid-gesture: seek only if the playhead is further than this from the centre; idle: land if further than this */
+const SCRUB_HOLD_SEEK_MS = 4500, SCRUB_LAND_MS = 5000; // landing tolerance > one camera GOP (4 s): a seek lands on the keyframe BEFORE the target by design
 
 export class PlayerController {
   private v!: HTMLVideoElement; private fz!: HTMLCanvasElement; private img!: HTMLImageElement; private stage!: HTMLElement;
@@ -580,10 +582,33 @@ export class PlayerController {
   }
   /** hold / release: land exactly on the centre at 1× (or go live near now) */
   scrubSeek(ts: number, srate = 1): void { if (this.nearNow(ts)) { this.goLive(); return; } this.playAt(this.clampRange(ts), { scrub: true, srate }); }
-  /** gesture settled → back to the normal profile after SCRUB_OFF_DELAY_MS of quiet (a new gesture cancels it) */
-  scrubIdle(): void {
+  /** true between the end of a gesture and its landing/profile switch (SCRUB_OFF_DELAY_MS): the timeline must not auto-follow
+   *  the playhead in that window — the time-lapse overshot the centre, following would drag the view away and the landing
+   *  seek would drag it back (visible back-and-forth of the timeline itself) */
+  scrubSettling(): boolean { return this.scrubOffT !== 0; }
+  /** drift between the timeline centre and the playhead (null without a position) */
+  private scrubDrift(ts: number): number | null { const c = this.currentTs(); return c == null ? null : this.clampRange(ts) - c; }
+  /** brief hold mid-gesture (relay): time-lapse → 1× in place; a seek only when the picture is far off (each seek = ~2.4 s
+   *  of stale stream before the new picture — a seek per wheel step made the picture run back and forth). MSE: preview seek. */
+  scrubHold(ts: number): void {
+    if (!this.rw?.active) { this.scrubSeek(ts); return; }
+    if (!this.rw.id) return;
+    // the time-lapse overshoots the centre by (reaction time × rate) before the hold is detected — that is inherent and
+    // small next to the 2.4 s × rate the picture lags anyway; a seek here would add a visible reversal, so the drift
+    // tolerance scales with the rate like scrubMove's
+    const d = this.scrubDrift(ts);
+    if (d == null || Math.abs(d) > Math.max(SCRUB_HOLD_SEEK_MS, 1200 * Math.abs(this.rwRate))) { this.scrubSeek(ts, 1); return; }
+    if (this.rwScrub && this.rwSrate !== 1) this.recRelayRate(1);
+  }
+  /** gesture settled → after SCRUB_OFF_DELAY_MS of quiet (a new gesture cancels it): land exactly on the centre if the
+   *  time-lapse drifted, then back to the normal profile. Landing per pause would be a seek per wheel step again. */
+  scrubIdle(ts?: number): void {
     if (this.scrubOffT) clearTimeout(this.scrubOffT);
-    this.scrubOffT = window.setTimeout(() => { this.scrubOffT = 0; this.recRelayScrub(false); }, SCRUB_OFF_DELAY_MS);
+    this.scrubOffT = window.setTimeout(() => {
+      this.scrubOffT = 0;
+      if (ts != null && this.rw?.active && this.rw.id) { const d = this.scrubDrift(ts); if (d != null && Math.abs(d) > SCRUB_LAND_MS) this.scrubSeek(ts, 1); }
+      this.recRelayScrub(false);
+    }, SCRUB_OFF_DELAY_MS);
   }
 
   // ---- visibility ---------------------------------------------------------------------------
