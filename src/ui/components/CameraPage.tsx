@@ -101,7 +101,8 @@ export function CameraPage(p: CameraPageProps) {
     const rangeEnd = Math.min(todayStart() + DAY, nowTick + 20 * 60000);
     return { ...m, rangeStart, rangeEnd };
   }, [days, nowTick]);
-  const mergedRef = useRef(merged); mergedRef.current = merged;
+  /** the merged range as of NOW (from daysRef, which ensureDay updates synchronously) — for code that just awaited a load */
+  const mergedNow = useCallback(() => { const m = sentinelMergeDays(daysRef.current); return { ...m, rangeStart: m.oldestDay ?? todayStart(), rangeEnd: Math.min(todayStart() + DAY, Date.now() + 20 * 60000) }; }, []);
   useEffect(() => { ctl.current?.setClips(merged.clips, merged.codecs, merged.rangeStart, merged.rangeEnd); }, [merged]);
 
   const fetchDay = useCallback(async (ds: number): Promise<SentinelClipsResponse> => {
@@ -115,7 +116,13 @@ export function CameraPage(p: CameraPageProps) {
     if (earliest && ds + DAY < dayOf(earliest)) return;
     if (!force && (daysRef.current[ds] || loading.current.has(ds))) return;
     loading.current.add(ds);
-    try { const d = await fetchDay(ds); if (camRef.current !== camId) return; setDays((prev) => ({ ...prev, [ds]: d })); }
+    try {
+      const d = await fetchDay(ds); if (camRef.current !== camId) return;
+      // the ref is updated SYNCHRONOUSLY: callers that await ensureDay() read the merged range right after (mergedNow) —
+      // React renders the setDays() update in a later task, so a render-time ref would still miss this day (deep link → "no recording")
+      daysRef.current = { ...daysRef.current, [ds]: d };
+      setDays((prev) => ({ ...prev, [ds]: d }));
+    }
     finally { loading.current.delete(ds); }
   }, [fetchDay, earliest, camId]);
   const onCenter = useCallback((ts: number) => { const d = dayOf(ts); setCenterDay(d); void ensureDay(d); void ensureDay(d - DAY); void ensureDay(d + DAY); }, [ensureDay]);
@@ -133,7 +140,7 @@ export function CameraPage(p: CameraPageProps) {
   useEffect(() => {
     const c = new PlayerController(client, {
       onState: (s) => setPs(s),
-      onClipsRefresh: async (): Promise<SentinelClip[]> => { await ensureDay(todayStart(), true); return mergedRef.current.clips; },
+      onClipsRefresh: async (): Promise<SentinelClip[]> => { await ensureDay(todayStart(), true); return mergedNow().clips; },
       storagePrefix: p.storagePrefix,
       brand: p.brand,
     });
@@ -155,7 +162,7 @@ export function CameraPage(p: CameraPageProps) {
       .then(() => {
         if (c.camId !== camId || ctl.current !== c) return;
         setLoadError(false); // a prior failure must not stick once a load succeeds
-        const m = mergedRef.current; c.setClips(m.clips, m.codecs, m.rangeStart, m.rangeEnd);
+        const m = mergedNow(); c.setClips(m.clips, m.codecs, m.rangeStart, m.rangeEnd);
         if (startAt) { c.playAt(startAt, {}); setJump({ ts: startAt, n: Date.now() }); } else c.goLive();
       })
       .catch(() => setLoadError(true));
@@ -168,7 +175,8 @@ export function CameraPage(p: CameraPageProps) {
   const present = useMemo(() => { const m: Partial<Record<SentinelEventClass, number>> = {}; for (const e of merged.events) { const k = classOf(e); m[k] = (m[k] ?? 0) + 1; } return m; }, [merged.events]);
   const visEvents = useMemo(() => merged.events.filter((e) => !filterOff[classOf(e)]), [merged.events, filterOff]);
   const goLive = useCallback(() => { ctl.current?.goLive(); setJump({ ts: Date.now(), n: Date.now() }); }, []);
-  const playEvent = useCallback((ev: SentinelEvent) => { const c = ctl.current; if (!c) return; setTab('tl'); c.posterEvent(ev.timestamp); c.playAt(sentinelEventPlayTs(ev), {}); }, []);
+  // click → the current picture freezes at once → the event frame replaces it when loaded → the video at the target lifts it
+  const playEvent = useCallback((ev: SentinelEvent) => { const c = ctl.current; if (!c) return; setTab('tl'); c.freezeCurrent(); c.posterEvent(ev.timestamp); c.playAt(sentinelEventPlayTs(ev), {}); }, []);
   const jumpEvent = useCallback((dir: 1 | -1) => {
     const c = ctl.current; if (!c) return; const ts = c.currentTs() ?? Date.now();
     let best: SentinelEvent | undefined;
@@ -184,7 +192,7 @@ export function CameraPage(p: CameraPageProps) {
     if (ds === todayStart() && at == null) { goLive(); return; }
     const want = at ?? ds + DAY / 2;
     if (want > Date.now()) { goLive(); return; }
-    const m = mergedRef.current; c.setClips(m.clips, m.codecs, m.rangeStart, m.rangeEnd);
+    const m = mergedNow(); c.setClips(m.clips, m.codecs, m.rangeStart, m.rangeEnd);
     const inDay = m.clips.filter((x) => x.startTime >= ds && x.startTime < ds + DAY);
     const exact = c.clipIndexFor(want) >= 0;
     const pick = exact ? want : (inDay.find((x) => x.startTime >= want) || inDay[inDay.length - 1])?.startTime;

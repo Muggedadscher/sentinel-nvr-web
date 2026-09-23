@@ -35,6 +35,14 @@ export interface PlayerOptions {
 type Opts = PlayerOptions;
 
 const MSCls: typeof MediaSource | undefined = (window as any).ManagedMediaSource || window.MediaSource;
+/** Seek → picture. Measured in the lab (scripts/seek-swap-test.js + RTSP tap, 23.09.2026, 14 seeks): the relay answers a seek
+ *  after ~10 ms, the NEW position leaves mediamtx ~1.08 s later and reaches the screen after 2.2–2.6 s (sink ffmpeg + 500 ms
+ *  jitter buffer + render). Until then the OLD position keeps playing — a poster (event frame / frozen picture) must stay up that
+ *  long, else old frames flash through ("springt hin und her"). A profile switch does NOT reset this latency (measured). */
+const SWAP_MS = 2600;
+/** Scrub profile (640 all-intra) → normal (1280) only after the gesture has been quiet this long: a scroll–pause–scroll pattern
+ *  restarted the transcoder twice per pause (server log: profile switch every 1–2 s, 30 restarts in one session). */
+const SCRUB_OFF_DELAY_MS = 1500;
 
 export class PlayerController {
   private v!: HTMLVideoElement; private fz!: HTMLCanvasElement; private img!: HTMLImageElement; private stage!: HTMLElement;
@@ -48,6 +56,8 @@ export class PlayerController {
   private rwLastSeekTs: number | null = null; private rwLastSeekAt = 0; private rwRateBusy = false; private rwPendingRate: number | null = null; private rwLastRateAt = 0;
   private relayPoll: number | undefined; private wdLastCt = -1; private wdLastAt = 0; private wdDead = 0; private wdGrace = 0; private wdResumeLogged = false; private recoveries = 0;
   private posterUntilSeek = false; private seekTarget = 0;
+  // seek → visible swap (see SWAP_MS); posterFor = event the pending poster belongs to; scrubOffT = delayed profile switch
+  private swapPending = false; private swapFrames = -1; private swapT = 0; private posterFor = 0; private scrubOffT = 0;
   // relay-pos answers are only valid for the command generation they were asked under; a poll sent BEFORE a
   // seek/rate change and answered after it would drag the playhead back to the old position (and the
   // auto-follow timeline with it → visible back-and-forth). seekAt: the server may still report the pre-swap
@@ -152,27 +162,50 @@ export class PlayerController {
     const v: any = this.v;
     if (hold && v.requestVideoFrameCallback) { const tok = {}; this.freezeTok = tok; try { v.requestVideoFrameCallback(() => { if (this.freezeTok === tok && this.v.videoWidth) this.freezeHide(); }); } catch { /* ignore */ } }
   }
+  /** copy the current video picture onto the freeze canvas (false = nothing to copy yet) */
+  private drawVideo(): boolean {
+    const v = this.v, fc = this.fz;
+    if (!v.videoWidth || !v.videoHeight || v.readyState < 2) return false;
+    if (fc.width !== v.videoWidth) fc.width = v.videoWidth;
+    if (fc.height !== v.videoHeight) fc.height = v.videoHeight;
+    fc.getContext('2d')!.drawImage(v, 0, 0, fc.width, fc.height);
+    fc.classList.remove('hidden'); fc.dataset.src = 'video';
+    return true;
+  }
   freezeShow(hold = false): void {
-    try {
-      const v = this.v, fc = this.fz;
-      if (!v.videoWidth || !v.videoHeight || v.readyState < 2) return;
-      if (fc.width !== v.videoWidth) fc.width = v.videoWidth;
-      if (fc.height !== v.videoHeight) fc.height = v.videoHeight;
-      fc.getContext('2d')!.drawImage(v, 0, 0, fc.width, fc.height);
-      fc.classList.remove('hidden'); fc.dataset.src = 'video';
-      this.freezeArm(hold);
-    } catch { /* ignore */ }
+    try { if (this.drawVideo()) this.freezeArm(hold); } catch { /* ignore */ }
+  }
+  /** poster/freeze stays until the seek's picture is visible (swapVisible), 6 s safety net */
+  private holdUntilSwap(): void {
+    if (this.freezeT) clearTimeout(this.freezeT); this.freezeTok = null;
+    this.posterUntilSeek = true; this.freezeT = window.setTimeout(() => this.swapVisible(), 6000);
+  }
+  /** Event click inside a running relay session: the current picture stands still at once (the old position must not keep
+   *  playing while the event frame loads); the event frame replaces it, the picture at the target lifts it. */
+  freezeCurrent(): void {
+    if (!this.rw?.active || !this.rw.id) return; // no session yet: playAt's own freeze/poster path applies
+    try { if (this.drawVideo()) this.holdUntilSwap(); } catch { /* ignore */ }
+  }
+  /** the picture of the last seek is on screen: lift a held poster, report playing */
+  private swapVisible(): void {
+    if (this.swapT) { clearTimeout(this.swapT); this.swapT = 0; }
+    this.swapPending = false;
+    if (this.posterUntilSeek) this.freezeHide();
+    if (this.label === 'loading' && this.rw?.active) this.setLabel('playing');
+  }
+  /** seek answered: the new picture is on screen SWAP_MS later (plus proof of a presented frame) */
+  private swapArm(): void {
+    if (this.swapT) clearTimeout(this.swapT);
+    this.swapFrames = this.presentedFrames();
+    const check = () => { this.swapT = 0; if (!this.swapPending || !this.rw?.active) return; if (this.presentedFrames() > this.swapFrames) this.swapVisible(); else this.swapT = window.setTimeout(check, 100); };
+    this.swapT = window.setTimeout(check, SWAP_MS);
   }
   freezeFromImage(img: HTMLImageElement, hold: boolean, untilSeek = false, kind = 'image'): boolean {
     try {
       if (!img.naturalWidth || !img.naturalHeight) return false;
       const fc = this.fz; fc.width = img.naturalWidth; fc.height = img.naturalHeight; fc.getContext('2d')!.drawImage(img, 0, 0); fc.classList.remove('hidden'); fc.dataset.src = kind;
       this.setAspect(img.naturalWidth, img.naturalHeight);
-      if (untilSeek) {
-        if (this.freezeT) clearTimeout(this.freezeT); this.freezeTok = null;
-        // stays until relay-pos reports the picture AT the target (see startRelayPoll); 6 s safety net
-        this.posterUntilSeek = true; this.freezeT = window.setTimeout(() => this.freezeHide(), 6000);
-      }
+      if (untilSeek) this.holdUntilSwap(); // stays until the seek's picture is visible (see startRelayPoll)
       else this.freezeArm(hold);
       return true;
     } catch { return false; }
@@ -181,7 +214,16 @@ export class PlayerController {
   private posterUp(): boolean { return !this.fz.classList.contains('hidden'); }
   freezeHold(): void { if (this.freezeT) { clearTimeout(this.freezeT); this.freezeT = window.setTimeout(() => this.freezeHide(), 5000); } }
   /** Event click: the stored frame is the poster until the seek lands. */
-  posterEvent(ts: number): void { const cam = this.camId; const img = new Image(); img.crossOrigin = 'anonymous'; img.onload = () => { if (this.camId !== cam) return; this.freezeFromImage(img, true, !!this.rw?.active && !!this.rw.id, 'event'); }; img.src = this.api.url(`api/evframe?camera=${encodeURIComponent(cam)}&ts=${ts}`); }
+  posterEvent(ts: number): void {
+    const cam = this.camId; this.posterFor = ts; const img = new Image(); img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (this.camId !== cam || this.posterFor !== ts || this.destroyed) return;
+      const inSession = !!this.rw?.active && !!this.rw.id;
+      if (inSession && !this.swapPending) return; // arrived after the seek's picture is already on screen — don't cover it
+      this.freezeFromImage(img, true, inSession, 'event');
+    };
+    img.src = this.api.url(`api/evframe?camera=${encodeURIComponent(cam)}&ts=${ts}`);
+  }
   /** Camera opened: newest snapshot in front of the black stage until live plays. */
   posterFromSnapshot(): void { const cam = this.camId; const img = new Image(); img.crossOrigin = 'anonymous'; img.onload = () => { if (this.camId !== cam || this.rw?.active || this.recPaused || this.posterUp()) return; if (this.v.readyState >= 2 && this.v.videoWidth && !this.v.paused) return; this.freezeFromImage(img, true, false, 'snapshot'); }; img.src = this.api.url(`api/snapshot?camera=${encodeURIComponent(cam)}`) + `&_=${Date.now()}`; }
   private posterShow(ts: number): void { try { if (this.posterUp()) return; if (this.v.readyState >= 2 && this.v.videoWidth) return; const i = this.clipIndexFor(ts); const c = i >= 0 ? this.clips[i] : undefined; if (!c?.thumbnailId) return; const cam = this.camId; const img = new Image(); img.crossOrigin = 'anonymous'; img.onload = () => { if (this.camId !== cam || this.destroyed) return; if (!this.posterUp()) this.freezeFromImage(img, true, false, 'thumb'); }; img.src = this.api.url(`api/thumb?id=${encodeURIComponent(c.thumbnailId)}`); } catch { /* ignore */ } }
@@ -252,7 +294,7 @@ export class PlayerController {
 
   // ---- RECORDED via relay -----------------------------------------------------------------
   private recWebrtcOk(): boolean { return !this.recWebrtcDisabled && !!(window.RTCPeerConnection && window.WebSocket); }
-  private recWebrtcTeardown(): void { this.posterUntilSeek = false; this.stopRelayPoll(); this.rw?.stop(); this.rw = undefined; this.rwBase = null; this.rwPosTs = null; this.rwScrub = false; this.rwSeekBusy = false; this.rwPending = null; this.rwLastSeekTs = null; this.rwSrate = 1; this.rwRate = 1; this.rwRateBusy = false; this.rwPendingRate = null; }
+  private recWebrtcTeardown(): void { this.posterUntilSeek = false; this.swapPending = false; if (this.swapT) { clearTimeout(this.swapT); this.swapT = 0; } if (this.scrubOffT) { clearTimeout(this.scrubOffT); this.scrubOffT = 0; } this.stopRelayPoll(); this.rw?.stop(); this.rw = undefined; this.rwBase = null; this.rwPosTs = null; this.rwScrub = false; this.rwSeekBusy = false; this.rwPending = null; this.rwLastSeekTs = null; this.rwSrate = 1; this.rwRate = 1; this.rwRateBusy = false; this.rwPendingRate = null; }
   private recWebrtcStart(ts: number): void {
     if (this.destroyed) return;
     this.v.onloadedmetadata = null;
@@ -296,10 +338,11 @@ export class PlayerController {
     this.rwStartMs = ts; this.rwSrate = srate; this.rwRate = this.rwScrub ? srate : rate; this.rwPendingRate = null; this.rwLastSeekTs = ts; this.rwLastSeekAt = Date.now();
     this.cad.lastNew = Date.now(); this.wdLastCt = -1; this.wdLastAt = Date.now(); this.wdGrace = Date.now() + 5000;
     this.rwPosTs = ts; this.rwPosAt = Date.now();
-    this.setLabel('loading');
+    this.setLabel(this.rwScrub ? 'scrub' : 'loading'); // scrubbing seeks constantly — no "loading" flicker there
     this.rwSeekBusy = true;
     this.seekTarget = ts; this.seekAt = Date.now(); this.cmdSeq++;
-    const done = (ok: boolean) => { this.rwSeekBusy = false; if (!ok) { this.relayRecover(); return; } const p = this.rwPending; this.rwPending = null; if (p && this.rw?.id) this.recRelaySeek(p.ts, p.rate, p.srate); };
+    this.swapPending = true; if (this.swapT) { clearTimeout(this.swapT); this.swapT = 0; }
+    const done = (ok: boolean) => { this.rwSeekBusy = false; if (!ok) { this.relayRecover(); return; } if (this.swapPending) this.swapArm(); const p = this.rwPending; this.rwPending = null; if (p && this.rw?.id) this.recRelaySeek(p.ts, p.rate, p.srate); };
     this.api.control(`api/relay-seek?session=${encodeURIComponent(s.id)}&start=${Math.round(ts)}&rate=${rate}&srate=${srate}`).then(ok => done(ok));
   }
   /** Scrub time-lapse rate, coalesced (120 ms floor, 15 % hysteresis). */
@@ -319,7 +362,7 @@ export class PlayerController {
     const s = this.rw; if (!s?.active || !s.id || this.rwScrub === on) return;
     this.rwScrub = on;
     this.cmdSeq++;
-    if (!on) { const c = this.currentTs(); this.rwSrate = 1; this.rwRate = this.rate; this.rwPendingRate = null; if (c != null) { this.rwPosTs = c; this.rwPosAt = Date.now(); } }
+    if (!on) { const c = this.currentTs(); this.rwSrate = 1; this.rwRate = this.rate; this.rwPendingRate = null; if (c != null) { this.rwPosTs = c; this.rwPosAt = Date.now(); } if (this.label === 'scrub') this.setLabel('playing'); }
     this.wdLastCt = -1; this.wdLastAt = Date.now(); this.wdGrace = Date.now() + 5000; this.cad.lastNew = Date.now();
     this.api.control(`api/relay-scrub?session=${encodeURIComponent(s.id)}&on=${on ? 1 : 0}`).then(ok => { if (!ok) this.relayRecover(); });
   }
@@ -338,7 +381,7 @@ export class PlayerController {
       const q = this.presentedFrames();
       if (v.paused && !this.recPaused && !document.hidden) { if (!this.wdResumeLogged) { this.wdResumeLogged = true; rlog('auto-resume', { rs: v.readyState }); } this.safePlay(); } else if (!v.paused) this.wdResumeLogged = false;
       if (!v.paused && !document.hidden && this.rwBase != null) {
-        if (q !== this.wdLastCt) { this.wdLastCt = q; this.wdLastAt = Date.now(); this.recoveries = 0; if (!this.posterUntilSeek) this.freezeHide(); if (this.label === 'loading') this.setLabel('playing'); }
+        if (q !== this.wdLastCt) { this.wdLastCt = q; this.wdLastAt = Date.now(); this.recoveries = 0; if (!this.posterUntilSeek) this.freezeHide(); if (this.label === 'loading' && !this.swapPending) this.setLabel('playing'); }
         else if (this.rwScrub) this.wdLastAt = Date.now();
         else if (Date.now() - this.wdLastAt > 4000 && Date.now() > this.wdGrace) {
           this.wdLastAt = Date.now();
@@ -351,7 +394,7 @@ export class PlayerController {
       fetch(this.api.url(`api/relay-pos?session=${encodeURIComponent(s.id)}`), { cache: 'no-store' }).then(r => r.json()).then((d: any) => {
         if (seq !== this.cmdSeq) return; // answered across a seek/rate change → stale
         if (d && d.t > 0 && Date.now() - this.seekAt < 2500 && Math.abs(d.t - this.seekTarget) > 5000) return; // pre-swap position
-        if (d && d.t > 0) { this.wdDead = 0; this.rwPosTs = d.t; this.rwPosAt = Date.now(); if (this.posterUntilSeek && Math.abs(d.t - this.seekTarget) < 4000 && !this.rwSeekBusy && !this.rwPending) this.freezeHide(); this.emit(); }
+        if (d && d.t > 0) { this.wdDead = 0; this.rwPosTs = d.t; this.rwPosAt = Date.now(); this.emit(); }
         else if (d && d.t <= 0) { if (++this.wdDead >= 3) { this.wdDead = 0; this.relayRecover(); } }
       }).catch(() => { /* ignore */ });
     }, 600);
@@ -515,7 +558,12 @@ export class PlayerController {
 
   // ---- scrub (timeline gesture) ------------------------------------------------------------
   /** first gesture: scrub profile on (relay); MSE: freeze + pause */
-  scrubBegin(): void { this.chaseAbort(); if (!this.rw?.active) { this.freezeShow(); if (!this.live) { try { this.v.pause(); } catch { /* ignore */ } } } this.recRelayScrub(true); }
+  scrubBegin(): void {
+    this.chaseAbort();
+    if (this.scrubOffT) { clearTimeout(this.scrubOffT); this.scrubOffT = 0; } // gesture continues → stay in the scrub profile
+    if (!this.rw?.active) { this.freezeShow(); if (!this.live) { try { this.v.pause(); } catch { /* ignore */ } } }
+    // the scrub profile is entered by scrubMove on the first real movement (a single wheel notch = one in-place seek, no restarts)
+  }
   /** scroll position + velocity (timeline-ms per wall-s) while the gesture runs */
   scrubMove(_centerTs: number, vel: number, smoothTs: number): void {
     if (!this.rw?.active) { this.freezeHold(); return; }
@@ -524,6 +572,7 @@ export class PlayerController {
     if (Math.abs(r) < 0.1) return;
     r = Math.min(3000, Math.max(-3000, r));
     r = Math.abs(r) >= 10 ? Math.round(r) : Math.round(r * 10) / 10;
+    this.recRelayScrub(true);
     const tgt = this.clampRange(smoothTs), cur = this.currentTs();
     const drift = cur == null ? null : tgt - cur;
     if (drift == null || Math.abs(drift) > Math.max(4500, 1200 * Math.abs(r))) this.scrubSeek(tgt, r);
@@ -531,8 +580,11 @@ export class PlayerController {
   }
   /** hold / release: land exactly on the centre at 1× (or go live near now) */
   scrubSeek(ts: number, srate = 1): void { if (this.nearNow(ts)) { this.goLive(); return; } this.playAt(this.clampRange(ts), { scrub: true, srate }); }
-  /** gesture settled → normal profile, base rate */
-  scrubIdle(): void { this.recRelayScrub(false); }
+  /** gesture settled → back to the normal profile after SCRUB_OFF_DELAY_MS of quiet (a new gesture cancels it) */
+  scrubIdle(): void {
+    if (this.scrubOffT) clearTimeout(this.scrubOffT);
+    this.scrubOffT = window.setTimeout(() => { this.scrubOffT = 0; this.recRelayScrub(false); }, SCRUB_OFF_DELAY_MS);
+  }
 
   // ---- visibility ---------------------------------------------------------------------------
   private hiddenTs: number | null = null;

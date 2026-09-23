@@ -85,9 +85,10 @@ export function VerticalTimeline(p: TimelineProps) {
       if (!v.user) {
         const ts = p.live ? Date.now() : (p.following() ? p.playhead() : null);
         if (ts != null) {
-          // diagnostics: a follow step that moves the centre by > 3 s is a visible jump — log why (user report "springt vor und zurück")
+          // diagnostics: a follow step that moves the centre by > 3 s AND > 1.5 px is a visible jump — log why (user report "springt vor
+          // und zurück"); the pixel floor keeps Safari's integer scrollTop at day zoom (1 px ≈ 12 s) out of the log
           const cur = centerTs(); const d = ts - cur;
-          if (Math.abs(d) > 3000 && Date.now() - v.lastJumpLog > 1000) { v.lastJumpLog = Date.now(); rlog('follow-jump', { dSec: Math.round(d / 100) / 10, live: p.live, sinceIdle: v.idleAt ? Date.now() - v.idleAt : -1, px: Math.round(px * 1e6) / 1e6 }); }
+          if (Math.abs(d) > 3000 && Math.abs(d * px) > 1.5 && Date.now() - v.lastJumpLog > 1000) { v.lastJumpLog = Date.now(); rlog('follow-jump', { dSec: Math.round(d / 100) / 10, live: p.live, sinceIdle: v.idleAt ? Date.now() - v.idleAt : -1, px: Math.round(px * 1e6) / 1e6 }); }
           scrollCenter(ts);
         }
       }
