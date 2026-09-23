@@ -43,12 +43,11 @@ const SWAP_MS = 2600;
 /** Scrub profile (640 all-intra) → normal (1280) only after the gesture has been quiet this long: a scroll–pause–scroll pattern
  *  restarted the transcoder twice per pause (server log: profile switch every 1–2 s, 30 restarts in one session). */
 const SCRUB_OFF_DELAY_MS = 1500;
-/** exact landing on the centre this long after the gesture went quiet — LATER than the ~2.4 s the stale stream keeps running:
- *  a user who re-scrolls when the fast run visibly ends must cancel the landing, else the landing seek (in flight, invisible
- *  for 2.4 s) drags the picture back to the pause position right after they resumed ("faengt nochmal von da an") */
-const SCRUB_LAND_DELAY_MS = 3000;
 /** hold mid-gesture: seek only if the playhead is further than this from the centre; idle: land if further than this */
-const SCRUB_HOLD_SEEK_MS = 4500, SCRUB_LAND_MS = 5000; // landing tolerance > one camera GOP (4 s): a seek lands on the keyframe BEFORE the target by design
+/** Scrub by TARGET (since 0.7.0): while the user scrubs, the client sends the timeline centre (api/relay-target, coalesced) and
+ *  the server's feeder steers its cursor onto it and stops there. No client-side rate estimate, no hold/landing seeks — those
+ *  overshot by (reaction time × rate) and then jumped back, and every seek shows 2.4 s of stale stream first. */
+const TARGET_FLOOR_MS = 120, TARGET_MIN_STEP_MS = 250;
 
 export class PlayerController {
   private v!: HTMLVideoElement; private fz!: HTMLCanvasElement; private img!: HTMLImageElement; private stage!: HTMLElement;
@@ -59,11 +58,12 @@ export class PlayerController {
   // relay session (RW)
   private rw: WebRtcSession | undefined; private rwStartMs = 0; private rwBase: number | null = null; private rwPosTs: number | null = null; private rwPosAt = 0;
   private rwRate = 1; private rwSrate = 1; private rwScrub = false; private rwSeekBusy = false; private rwPending: { ts: number; rate: number; srate: number } | null = null;
-  private rwLastSeekTs: number | null = null; private rwLastSeekAt = 0; private rwRateBusy = false; private rwPendingRate: number | null = null; private rwLastRateAt = 0;
+  private rwLastSeekTs: number | null = null; private rwLastSeekAt = 0;
   private relayPoll: number | undefined; private wdLastCt = -1; private wdLastAt = 0; private wdDead = 0; private wdGrace = 0; private wdResumeLogged = false; private recoveries = 0;
   private posterUntilSeek = false; private seekTarget = 0;
   // seek → visible swap (see SWAP_MS); posterFor = event the pending poster belongs to; scrubOffT = delayed profile switch
-  private swapPending = false; private swapFrames = -1; private swapT = 0; private posterFor = 0; private scrubOffT = 0; private scrubLandT = 0;
+  private swapPending = false; private swapFrames = -1; private swapT = 0; private posterFor = 0; private scrubOffT = 0;
+  private scrubMoves = 0; private rwTargetBusy = false; private rwPendingTarget: number | null = null; private rwLastTarget = 0; private rwLastTargetAt = 0;
   // relay-pos answers are only valid for the command generation they were asked under; a poll sent BEFORE a
   // seek/rate change and answered after it would drag the playhead back to the old position (and the
   // auto-follow timeline with it → visible back-and-forth). seekAt: the server may still report the pre-swap
@@ -310,7 +310,7 @@ export class PlayerController {
 
   // ---- RECORDED via relay -----------------------------------------------------------------
   private recWebrtcOk(): boolean { return !this.recWebrtcDisabled && !!(window.RTCPeerConnection && window.WebSocket); }
-  private recWebrtcTeardown(): void { this.posterUntilSeek = false; this.swapPending = false; if (this.swapT) { clearTimeout(this.swapT); this.swapT = 0; } if (this.scrubOffT) { clearTimeout(this.scrubOffT); this.scrubOffT = 0; } if (this.scrubLandT) { clearTimeout(this.scrubLandT); this.scrubLandT = 0; } this.stopRelayPoll(); this.rw?.stop(); this.rw = undefined; this.rwBase = null; this.rwPosTs = null; this.rwScrub = false; this.rwSeekBusy = false; this.rwPending = null; this.rwLastSeekTs = null; this.rwSrate = 1; this.rwRate = 1; this.rwRateBusy = false; this.rwPendingRate = null; }
+  private recWebrtcTeardown(): void { this.posterUntilSeek = false; this.swapPending = false; if (this.swapT) { clearTimeout(this.swapT); this.swapT = 0; } if (this.scrubOffT) { clearTimeout(this.scrubOffT); this.scrubOffT = 0; } this.rwTargetBusy = false; this.rwPendingTarget = null; this.rwLastTarget = 0; this.stopRelayPoll(); this.rw?.stop(); this.rw = undefined; this.rwBase = null; this.rwPosTs = null; this.rwScrub = false; this.rwSeekBusy = false; this.rwPending = null; this.rwLastSeekTs = null; this.rwSrate = 1; this.rwRate = 1; }
   private recWebrtcStart(ts: number): void {
     if (this.destroyed) return;
     this.v.onloadedmetadata = null;
@@ -351,7 +351,7 @@ export class PlayerController {
     if (this.rwLastSeekTs === ts && this.rwRate === rate && this.rwSrate === srate && Date.now() - this.rwLastSeekAt < 1000) return;
     const wait = 150 - (Date.now() - this.rwLastSeekAt);
     if (wait > 0) { this.rwSeekBusy = true; this.rwPending = { ts, rate, srate }; window.setTimeout(() => { this.rwSeekBusy = false; const p = this.rwPending; this.rwPending = null; if (p && this.rw?.id) this.recRelaySeek(p.ts, p.rate, p.srate); }, wait); return; }
-    this.rwStartMs = ts; this.rwSrate = srate; this.rwRate = this.rwScrub ? srate : rate; this.rwPendingRate = null; this.rwLastSeekTs = ts; this.rwLastSeekAt = Date.now();
+    this.rwStartMs = ts; this.rwSrate = srate; this.rwRate = this.rwScrub ? srate : rate; this.rwLastSeekTs = ts; this.rwLastSeekAt = Date.now();
     this.cad.lastNew = Date.now(); this.wdLastCt = -1; this.wdLastAt = Date.now(); this.wdGrace = Date.now() + 5000;
     this.rwPosTs = ts; this.rwPosAt = Date.now();
     this.setLabel(this.rwScrub ? 'scrub' : 'loading'); // scrubbing seeks constantly — no "loading" flicker there
@@ -361,24 +361,26 @@ export class PlayerController {
     const done = (ok: boolean) => { this.rwSeekBusy = false; if (!ok) { this.relayRecover(); return; } if (this.swapPending) this.swapArm(); const p = this.rwPending; this.rwPending = null; if (p && this.rw?.id) this.recRelaySeek(p.ts, p.rate, p.srate); };
     this.api.control(`api/relay-seek?session=${encodeURIComponent(s.id)}&start=${Math.round(ts)}&rate=${rate}&srate=${srate}`).then(ok => done(ok));
   }
-  /** Scrub time-lapse rate, coalesced (120 ms floor, 15 % hysteresis). */
-  private recRelayRate(r: number): void {
-    const s = this.rw; if (!s?.active || !s.id || !this.rwScrub) return;
-    if (this.rwRateBusy) { this.rwPendingRate = r; return; }
-    if (this.rwSrate === r) return;
-    if (this.rwSrate !== 1 && (r > 0) === (this.rwSrate > 0) && Math.abs(r - this.rwSrate) < 0.15 * Math.abs(this.rwSrate)) return;
-    const wait = 120 - (Date.now() - this.rwLastRateAt);
-    if (wait > 0) { this.rwRateBusy = true; this.rwPendingRate = r; window.setTimeout(() => { this.rwRateBusy = false; const p = this.rwPendingRate; this.rwPendingRate = null; if (p != null && this.rw?.id) this.recRelayRate(p); }, wait); return; }
-    const c = this.currentTs(); this.rwSrate = r; this.rwRate = r; this.rwLastRateAt = Date.now(); this.cmdSeq++; if (c != null) { this.rwPosTs = c; this.rwPosAt = Date.now(); }
+  /** Scrub target (timeline centre), coalesced: one in flight, latest wins, 120 ms floor, 250 ms minimum step. */
+  private recRelayTarget(ts: number): void {
+    const s = this.rw; if (!s?.active || !s.id) return;
+    if (this.rwTargetBusy) { this.rwPendingTarget = ts; return; }
+    if (Math.abs(ts - this.rwLastTarget) < TARGET_MIN_STEP_MS) return;
+    const wait = TARGET_FLOOR_MS - (Date.now() - this.rwLastTargetAt);
+    if (wait > 0) { this.rwTargetBusy = true; this.rwPendingTarget = ts; window.setTimeout(() => { this.rwTargetBusy = false; const p = this.rwPendingTarget; this.rwPendingTarget = null; if (p != null && this.rw?.id) this.recRelayTarget(p); }, wait); return; }
+    this.rwLastTarget = ts; this.rwLastTargetAt = Date.now(); this.cmdSeq++;
     this.wdGrace = Date.now() + 8000; this.cad.lastNew = Date.now();
-    this.rwRateBusy = true;
-    this.api.control(`api/relay-rate?session=${encodeURIComponent(s.id)}&rate=${r}`).then(ok => { if (!ok) this.relayRecover(); }).then(() => { this.rwRateBusy = false; const p = this.rwPendingRate; this.rwPendingRate = null; if (p != null && this.rw?.id && p !== this.rwSrate) this.recRelayRate(p); });
+    this.rwTargetBusy = true;
+    this.api.control(`api/relay-target?session=${encodeURIComponent(s.id)}&ts=${Math.round(ts)}`).then(ok => { if (!ok) this.relayRecover(); }).then(() => { this.rwTargetBusy = false; const p = this.rwPendingTarget; this.rwPendingTarget = null; if (p != null && this.rw?.id && Math.abs(p - this.rwLastTarget) >= TARGET_MIN_STEP_MS) this.recRelayTarget(p); });
   }
-  private recRelayScrub(on: boolean): void {
-    const s = this.rw; if (!s?.active || !s.id || this.rwScrub === on) return;
+  /** profile on/off; `off` also ends the server's target steering, so it is sent even when the profile was never entered
+   *  (single-notch gesture) as long as the gesture steered (`force`) */
+  private recRelayScrub(on: boolean, force = false): void {
+    const s = this.rw; if (!s?.active || !s.id) return;
+    if (this.rwScrub === on && !(force && !on)) return;
     this.rwScrub = on;
     this.cmdSeq++;
-    if (!on) { const c = this.currentTs(); this.rwSrate = 1; this.rwRate = this.rate; this.rwPendingRate = null; if (c != null) { this.rwPosTs = c; this.rwPosAt = Date.now(); } if (this.label === 'scrub') this.setLabel('playing'); }
+    if (!on) { const c = this.currentTs(); this.rwSrate = 1; this.rwRate = this.rate; if (c != null) { this.rwPosTs = c; this.rwPosAt = Date.now(); } if (this.label === 'scrub') this.setLabel('playing'); }
     this.wdLastCt = -1; this.wdLastAt = Date.now(); this.wdGrace = Date.now() + 5000; this.cad.lastNew = Date.now();
     this.api.control(`api/relay-scrub?session=${encodeURIComponent(s.id)}&on=${on ? 1 : 0}`).then(ok => { if (!ok) this.relayRecover(); });
   }
@@ -410,7 +412,7 @@ export class PlayerController {
       fetch(this.api.url(`api/relay-pos?session=${encodeURIComponent(s.id)}`), { cache: 'no-store' }).then(r => r.json()).then((d: any) => {
         if (seq !== this.cmdSeq) return; // answered across a seek/rate change → stale
         if (d && d.t > 0 && Date.now() - this.seekAt < 2500 && Math.abs(d.t - this.seekTarget) > 5000) return; // pre-swap position
-        if (d && d.t > 0) { this.wdDead = 0; this.rwPosTs = d.t; this.rwPosAt = Date.now(); this.emit(); }
+        if (d && d.t > 0) { this.wdDead = 0; this.rwPosTs = d.t; this.rwPosAt = Date.now(); if (this.rwScrub && typeof d.r === 'number' && isFinite(d.r) && d.r) this.rwRate = d.r; this.emit(); }
         else if (d && d.t <= 0) { if (++this.wdDead >= 3) { this.wdDead = 0; this.relayRecover(); } }
       }).catch(() => { /* ignore */ });
     }, 600);
@@ -577,54 +579,37 @@ export class PlayerController {
   scrubBegin(): void {
     this.chaseAbort();
     if (this.scrubOffT) { clearTimeout(this.scrubOffT); this.scrubOffT = 0; } // gesture continues → stay in the scrub profile
-    if (this.scrubLandT) { clearTimeout(this.scrubLandT); this.scrubLandT = 0; } // … and no landing on the old centre
+    this.scrubMoves = 0;
     if (!this.rw?.active) { this.freezeShow(); if (!this.live) { try { this.v.pause(); } catch { /* ignore */ } } }
     // the scrub profile is entered by scrubMove on the first real movement (a single wheel notch = one in-place seek, no restarts)
   }
-  /** scroll position + velocity (timeline-ms per wall-s) while the gesture runs */
-  scrubMove(_centerTs: number, vel: number, smoothTs: number): void {
+  /** true between the end of a gesture and the profile switch back (SCRUB_OFF_DELAY_MS): the timeline must not auto-follow
+   *  the playhead in that window — the servo is still converging on the centre the user left */
+  scrubSettling(): boolean { return this.scrubOffT !== 0; }
+  /** scroll position while the gesture runs: the centre becomes the server's steering target (velocity unused since 0.7.0) */
+  scrubMove(centerTs: number, _vel: number, _smoothTs: number): void {
     if (!this.rw?.active) { this.freezeHold(); return; }
     if (!this.rw.id) return;
-    let r = vel / 1000;
-    if (Math.abs(r) < 0.1) return;
-    r = Math.min(3000, Math.max(-3000, r));
-    r = Math.abs(r) >= 10 ? Math.round(r) : Math.round(r * 10) / 10;
-    this.recRelayScrub(true);
-    const tgt = this.clampRange(smoothTs), cur = this.currentTs();
-    const drift = cur == null ? null : tgt - cur;
-    if (drift == null || Math.abs(drift) > Math.max(4500, 1200 * Math.abs(r))) this.scrubSeek(tgt, r);
-    else this.recRelayRate(r);
+    // the 640 all-intra profile (two transcoder restarts per gesture) only for real scrubbing: a second movement of the
+    // gesture or a big jump — a single wheel notch is steered in the normal profile
+    const c = this.currentTs();
+    if (++this.scrubMoves >= 2 || (c != null && Math.abs(centerTs - c) > 60000)) this.recRelayScrub(true);
+    this.recRelayTarget(this.clampRange(centerTs));
   }
-  /** hold / release: land exactly on the centre at 1× (or go live near now) */
-  scrubSeek(ts: number, srate = 1): void { if (this.nearNow(ts)) { this.goLive(); return; } this.playAt(this.clampRange(ts), { scrub: true, srate }); }
-  /** true between the end of a gesture and its landing/profile switch (SCRUB_OFF_DELAY_MS): the timeline must not auto-follow
-   *  the playhead in that window — the time-lapse overshot the centre, following would drag the view away and the landing
-   *  seek would drag it back (visible back-and-forth of the timeline itself) */
-  scrubSettling(): boolean { return this.scrubOffT !== 0 || this.scrubLandT !== 0; }
-  /** drift between the timeline centre and the playhead (null without a position) */
-  private scrubDrift(ts: number): number | null { const c = this.currentTs(); return c == null ? null : this.clampRange(ts) - c; }
-  /** brief hold mid-gesture (relay): time-lapse → 1× in place; a seek only when the picture is far off (each seek = ~2.4 s
-   *  of stale stream before the new picture — a seek per wheel step made the picture run back and forth). MSE: preview seek. */
-  scrubHold(ts: number): void {
-    if (!this.rw?.active) { this.scrubSeek(ts); return; }
-    if (!this.rw.id) return;
-    // the time-lapse overshoots the centre by (reaction time × rate) before the hold is detected — that is inherent and
-    // small next to the 2.4 s × rate the picture lags anyway; a seek here would add a visible reversal, so the drift
-    // tolerance scales with the rate like scrubMove's
-    const d = this.scrubDrift(ts);
-    if (d == null || Math.abs(d) > Math.max(SCRUB_HOLD_SEEK_MS, 1200 * Math.abs(this.rwRate))) { this.scrubSeek(ts, 1); return; }
-    if (this.rwScrub && this.rwSrate !== 1) this.recRelayRate(1);
+  /** release / hard landing: near now → live; relay in scrub → just the final target (no seek: the servo stops there);
+   *  MSE / no session → preview seek */
+  scrubSeek(ts: number, srate = 1): void {
+    if (this.nearNow(ts)) { this.goLive(); return; }
+    if (this.rw?.active && this.rw.id && this.scrubMoves > 0) { this.recRelayTarget(this.clampRange(ts)); return; }
+    this.playAt(this.clampRange(ts), { scrub: true, srate });
   }
-  /** gesture settled → after SCRUB_OFF_DELAY_MS of quiet (a new gesture cancels it): land exactly on the centre if the
-   *  time-lapse drifted, then back to the normal profile. Landing per pause would be a seek per wheel step again. */
+  /** brief hold mid-gesture: nothing to do on the relay (the target already stands), MSE: preview seek */
+  scrubHold(ts: number): void { if (!this.rw?.active) this.scrubSeek(ts); else if (this.rw.id) this.recRelayTarget(this.clampRange(ts)); }
+  /** gesture settled → final target, then back to the normal profile after SCRUB_OFF_DELAY_MS of quiet (a new gesture cancels it) */
   scrubIdle(ts?: number): void {
+    if (ts != null && this.rw?.active && this.rw.id && this.scrubMoves > 0) this.recRelayTarget(this.clampRange(ts));
     if (this.scrubOffT) clearTimeout(this.scrubOffT);
-    this.scrubOffT = window.setTimeout(() => { this.scrubOffT = 0; this.recRelayScrub(false); }, SCRUB_OFF_DELAY_MS);
-    if (this.scrubLandT) clearTimeout(this.scrubLandT);
-    this.scrubLandT = window.setTimeout(() => {
-      this.scrubLandT = 0;
-      if (ts != null && this.rw?.active && this.rw.id) { const d = this.scrubDrift(ts); if (d != null && Math.abs(d) > SCRUB_LAND_MS) this.scrubSeek(ts, 1); }
-    }, SCRUB_LAND_DELAY_MS);
+    this.scrubOffT = window.setTimeout(() => { this.scrubOffT = 0; const steered = this.scrubMoves > 0; this.scrubMoves = 0; this.recRelayScrub(false, steered); }, SCRUB_OFF_DELAY_MS);
   }
 
   // ---- visibility ---------------------------------------------------------------------------
