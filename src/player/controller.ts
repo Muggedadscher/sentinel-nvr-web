@@ -43,6 +43,10 @@ const SWAP_MS = 2600;
 /** Scrub profile (640 all-intra) → normal (1280) only after the gesture has been quiet this long: a scroll–pause–scroll pattern
  *  restarted the transcoder twice per pause (server log: profile switch every 1–2 s, 30 restarts in one session). */
 const SCRUB_OFF_DELAY_MS = 1500;
+/** exact landing on the centre this long after the gesture went quiet — LATER than the ~2.4 s the stale stream keeps running:
+ *  a user who re-scrolls when the fast run visibly ends must cancel the landing, else the landing seek (in flight, invisible
+ *  for 2.4 s) drags the picture back to the pause position right after they resumed ("faengt nochmal von da an") */
+const SCRUB_LAND_DELAY_MS = 3000;
 /** hold mid-gesture: seek only if the playhead is further than this from the centre; idle: land if further than this */
 const SCRUB_HOLD_SEEK_MS = 4500, SCRUB_LAND_MS = 5000; // landing tolerance > one camera GOP (4 s): a seek lands on the keyframe BEFORE the target by design
 
@@ -59,7 +63,7 @@ export class PlayerController {
   private relayPoll: number | undefined; private wdLastCt = -1; private wdLastAt = 0; private wdDead = 0; private wdGrace = 0; private wdResumeLogged = false; private recoveries = 0;
   private posterUntilSeek = false; private seekTarget = 0;
   // seek → visible swap (see SWAP_MS); posterFor = event the pending poster belongs to; scrubOffT = delayed profile switch
-  private swapPending = false; private swapFrames = -1; private swapT = 0; private posterFor = 0; private scrubOffT = 0;
+  private swapPending = false; private swapFrames = -1; private swapT = 0; private posterFor = 0; private scrubOffT = 0; private scrubLandT = 0;
   // relay-pos answers are only valid for the command generation they were asked under; a poll sent BEFORE a
   // seek/rate change and answered after it would drag the playhead back to the old position (and the
   // auto-follow timeline with it → visible back-and-forth). seekAt: the server may still report the pre-swap
@@ -226,8 +230,18 @@ export class PlayerController {
     };
     img.src = this.api.url(`api/evframe?camera=${encodeURIComponent(cam)}&ts=${ts}`);
   }
-  /** Camera opened: newest snapshot in front of the black stage until live plays. */
-  posterFromSnapshot(): void { const cam = this.camId; const img = new Image(); img.crossOrigin = 'anonymous'; img.onload = () => { if (this.camId !== cam || this.rw?.active || this.recPaused || this.posterUp()) return; if (this.v.readyState >= 2 && this.v.videoWidth && !this.v.paused) return; this.freezeFromImage(img, true, false, 'snapshot'); }; img.src = this.api.url(`api/snapshot?camera=${encodeURIComponent(cam)}`) + `&_=${Date.now()}`; }
+  /** Camera opened: a picture in front of the black stage until live plays — the overview tile's snapshot when the host
+   *  remembers one (browser cache → instant), else a fresh api/snapshot (1–3 s). */
+  posterFromSnapshot(tileUrl?: string): void {
+    const cam = this.camId;
+    const load = (src: string, fresh: boolean) => {
+      const img = new Image(); img.crossOrigin = 'anonymous';
+      img.onload = () => { if (this.camId !== cam || this.rw?.active || this.recPaused || this.posterUp()) return; if (this.v.readyState >= 2 && this.v.videoWidth && !this.v.paused) return; this.freezeFromImage(img, true, false, 'snapshot'); };
+      if (!fresh) img.onerror = () => load(this.api.url(`api/snapshot?camera=${encodeURIComponent(cam)}`) + `&_=${Date.now()}`, true);
+      img.src = src;
+    };
+    if (tileUrl) load(tileUrl, false); else load(this.api.url(`api/snapshot?camera=${encodeURIComponent(cam)}`) + `&_=${Date.now()}`, true);
+  }
   private posterShow(ts: number): void { try { if (this.posterUp()) return; if (this.v.readyState >= 2 && this.v.videoWidth) return; const i = this.clipIndexFor(ts); const c = i >= 0 ? this.clips[i] : undefined; if (!c?.thumbnailId) return; const cam = this.camId; const img = new Image(); img.crossOrigin = 'anonymous'; img.onload = () => { if (this.camId !== cam || this.destroyed) return; if (!this.posterUp()) this.freezeFromImage(img, true, false, 'thumb'); }; img.src = this.api.url(`api/thumb?id=${encodeURIComponent(c.thumbnailId)}`); } catch { /* ignore */ } }
 
   private safePlay(): void {
@@ -296,7 +310,7 @@ export class PlayerController {
 
   // ---- RECORDED via relay -----------------------------------------------------------------
   private recWebrtcOk(): boolean { return !this.recWebrtcDisabled && !!(window.RTCPeerConnection && window.WebSocket); }
-  private recWebrtcTeardown(): void { this.posterUntilSeek = false; this.swapPending = false; if (this.swapT) { clearTimeout(this.swapT); this.swapT = 0; } if (this.scrubOffT) { clearTimeout(this.scrubOffT); this.scrubOffT = 0; } this.stopRelayPoll(); this.rw?.stop(); this.rw = undefined; this.rwBase = null; this.rwPosTs = null; this.rwScrub = false; this.rwSeekBusy = false; this.rwPending = null; this.rwLastSeekTs = null; this.rwSrate = 1; this.rwRate = 1; this.rwRateBusy = false; this.rwPendingRate = null; }
+  private recWebrtcTeardown(): void { this.posterUntilSeek = false; this.swapPending = false; if (this.swapT) { clearTimeout(this.swapT); this.swapT = 0; } if (this.scrubOffT) { clearTimeout(this.scrubOffT); this.scrubOffT = 0; } if (this.scrubLandT) { clearTimeout(this.scrubLandT); this.scrubLandT = 0; } this.stopRelayPoll(); this.rw?.stop(); this.rw = undefined; this.rwBase = null; this.rwPosTs = null; this.rwScrub = false; this.rwSeekBusy = false; this.rwPending = null; this.rwLastSeekTs = null; this.rwSrate = 1; this.rwRate = 1; this.rwRateBusy = false; this.rwPendingRate = null; }
   private recWebrtcStart(ts: number): void {
     if (this.destroyed) return;
     this.v.onloadedmetadata = null;
@@ -563,6 +577,7 @@ export class PlayerController {
   scrubBegin(): void {
     this.chaseAbort();
     if (this.scrubOffT) { clearTimeout(this.scrubOffT); this.scrubOffT = 0; } // gesture continues → stay in the scrub profile
+    if (this.scrubLandT) { clearTimeout(this.scrubLandT); this.scrubLandT = 0; } // … and no landing on the old centre
     if (!this.rw?.active) { this.freezeShow(); if (!this.live) { try { this.v.pause(); } catch { /* ignore */ } } }
     // the scrub profile is entered by scrubMove on the first real movement (a single wheel notch = one in-place seek, no restarts)
   }
@@ -585,7 +600,7 @@ export class PlayerController {
   /** true between the end of a gesture and its landing/profile switch (SCRUB_OFF_DELAY_MS): the timeline must not auto-follow
    *  the playhead in that window — the time-lapse overshot the centre, following would drag the view away and the landing
    *  seek would drag it back (visible back-and-forth of the timeline itself) */
-  scrubSettling(): boolean { return this.scrubOffT !== 0; }
+  scrubSettling(): boolean { return this.scrubOffT !== 0 || this.scrubLandT !== 0; }
   /** drift between the timeline centre and the playhead (null without a position) */
   private scrubDrift(ts: number): number | null { const c = this.currentTs(); return c == null ? null : this.clampRange(ts) - c; }
   /** brief hold mid-gesture (relay): time-lapse → 1× in place; a seek only when the picture is far off (each seek = ~2.4 s
@@ -604,11 +619,12 @@ export class PlayerController {
    *  time-lapse drifted, then back to the normal profile. Landing per pause would be a seek per wheel step again. */
   scrubIdle(ts?: number): void {
     if (this.scrubOffT) clearTimeout(this.scrubOffT);
-    this.scrubOffT = window.setTimeout(() => {
-      this.scrubOffT = 0;
+    this.scrubOffT = window.setTimeout(() => { this.scrubOffT = 0; this.recRelayScrub(false); }, SCRUB_OFF_DELAY_MS);
+    if (this.scrubLandT) clearTimeout(this.scrubLandT);
+    this.scrubLandT = window.setTimeout(() => {
+      this.scrubLandT = 0;
       if (ts != null && this.rw?.active && this.rw.id) { const d = this.scrubDrift(ts); if (d != null && Math.abs(d) > SCRUB_LAND_MS) this.scrubSeek(ts, 1); }
-      this.recRelayScrub(false);
-    }, SCRUB_OFF_DELAY_MS);
+    }, SCRUB_LAND_DELAY_MS);
   }
 
   // ---- visibility ---------------------------------------------------------------------------

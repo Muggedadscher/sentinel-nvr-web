@@ -22,6 +22,7 @@ import {
 import { PlayerController, type PlayerState } from '../../player';
 import { useSentinelUi } from '../context';
 import { dateChipNav, stageStatus } from '../camera-logic';
+import { lastTileSnapshot } from '../snapshot-cache';
 import { ClassBadge, classLabel } from './ClassBadge';
 import { EventList } from './EventList';
 import { VerticalTimeline, type ScrubHandlers } from './VerticalTimeline';
@@ -156,7 +157,7 @@ export function CameraPage(p: CameraPageProps) {
     const c = ctl.current; if (!c || !camId) return;
     c.setCamera(camId, name);
     setDays({}); daysRef.current = {}; setFilterOff({}); setTab('tl'); setLoadError(false); loading.current.clear();
-    if (startAt) c.posterEvent(posterTs || startAt); else c.posterFromSnapshot();
+    if (startAt) c.posterEvent(posterTs || startAt); else c.posterFromSnapshot(lastTileSnapshot(camId));
     const t0 = todayStart(); const target = startAt ? dayOf(startAt) : t0;
     Promise.all([ensureDay(target), ensureDay(target - DAY), target !== t0 ? ensureDay(t0) : Promise.resolve(), target === t0 ? Promise.resolve() : ensureDay(target + DAY)])
       .then(() => {
