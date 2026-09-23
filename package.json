@@ -1,6 +1,6 @@
 {
   "name": "@sentinel-nvr/web",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "Shared browser code for the Sentinel NVR plugin for Scrypted: API model + client (/api), player (/player) and React UI with i18n + themes (/ui). Consumed by the plugin's own web UI and the HAPulse dashboard.",
   "license": "MIT",
   "author": "Muggedadscher",
