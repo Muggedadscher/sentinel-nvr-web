@@ -246,7 +246,11 @@
 /* the picture's own aspect (set by the player as --stage-ar); max-height transfers to the width via aspect-ratio → no bars, ever */
 .nvr-stage { position: relative; width: 100%; aspect-ratio: var(--stage-ar, 16 / 9); max-height: var(--stage-maxh, calc(100dvh - 240px)); background: color-mix(in srgb, var(--text) 92%, var(--bg)); overflow: hidden; }
 .nvr-stage:fullscreen, .nvr-stage:-webkit-full-screen { aspect-ratio: auto; width: 100%; height: 100%; }
-.nvr-stage__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+/* the stage box already has the picture's aspect → cover (not contain): a contained picture leaves a sub-pixel
+   sliver of stage background at one edge = a hairline; cover crops at most that fraction. Fullscreen boxes are
+   the screen's aspect, so there contain is right. */
+.nvr-stage__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.nvr-stage:fullscreen .nvr-stage__video, .nvr-stage:-webkit-full-screen .nvr-stage__video { object-fit: contain; }
 .nvr-stage__freeze { pointer-events: none; }
 .nvr-stage .hidden { display: none !important; }
 .nvr-mute { position: absolute; right: 16px; bottom: 16px; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-dim); display: grid; place-items: center; box-shadow: var(--shadow-elevated); cursor: pointer; z-index: 3; }
@@ -261,7 +265,7 @@
 .nvr-pb:hover:not(:disabled) { background: color-mix(in srgb, var(--nvr-on-overlay) 14%, transparent); }
 .nvr-pb:disabled { opacity: 0.35; cursor: default; }
 .nvr-pb--speed { font-size: 0.78rem; font-weight: 700; }
-.nvr-stage-bar { flex: none; display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 0.9rem; }
+.nvr-stage-bar { flex: none; display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 0.9rem; border-top: 1px solid var(--line); }
 .nvr-statusdot { width: 12px; height: 12px; border-radius: 50%; background: var(--text-faint); flex: none; }
 .nvr-statusdot--live { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
 .nvr-stage-title { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
