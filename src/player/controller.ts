@@ -35,11 +35,13 @@ export interface PlayerOptions {
 type Opts = PlayerOptions;
 
 const MSCls: typeof MediaSource | undefined = (window as any).ManagedMediaSource || window.MediaSource;
-/** Seek → picture. Measured in the lab (scripts/seek-swap-test.js + RTSP tap, 23.09.2026, 14 seeks): the relay answers a seek
- *  after ~10 ms, the NEW position leaves mediamtx ~1.08 s later and reaches the screen after 2.2–2.6 s (sink ffmpeg + 500 ms
- *  jitter buffer + render). Until then the OLD position keeps playing — a poster (event frame / frozen picture) must stay up that
- *  long, else old frames flash through ("springt hin und her"). A profile switch does NOT reset this latency (measured). */
+/** Seek → picture. After a jump the OLD position keeps playing until the new one has crossed the pipeline (measured 24.09.2026,
+ *  sink passthrough: 1.3–1.4 s on the LAN, more on slow links). A still picture (event frame / frozen picture) covers that and
+ *  is lifted on the EXACT first frame of the new position: the server restarts its transcoder with a marker width it names in
+ *  the relay-seek answer ({w}); the first presented frame of that width (rVFC metadata / `resize`) is the new position.
+ *  Servers without markers (plain 204): lifted SWAP_MS after the answer plus one presented frame. MARK_CAP_MS = safety net. */
 const SWAP_MS = 2600;
+const MARK_CAP_MS = 12000;
 /** Scrub profile (640 all-intra) → normal (1280) only after the gesture has been quiet this long: a scroll–pause–scroll pattern
  *  restarted the transcoder twice per pause (server log: profile switch every 1–2 s, 30 restarts in one session). */
 const SCRUB_OFF_DELAY_MS = 1500;
@@ -57,12 +59,14 @@ export class PlayerController {
   recWebrtcDisabled = false; label: PlayerLabel = ''; transport: PlayerState['transport'] = 'none';
   // relay session (RW)
   private rw: WebRtcSession | undefined; private rwStartMs = 0; private rwBase: number | null = null; private rwPosTs: number | null = null; private rwPosAt = 0;
-  private rwRate = 1; private rwSrate = 1; private rwScrub = false; private rwSeekBusy = false; private rwPending: { ts: number; rate: number; srate: number } | null = null;
+  private rwRate = 1; private rwSrate = 1; private rwScrub = false; private rwSeekBusy = false; private rwPending: { ts: number; rate: number; srate: number; mark?: boolean } | null = null;
   private rwLastSeekTs: number | null = null; private rwLastSeekAt = 0;
   private relayPoll: number | undefined; private wdLastCt = -1; private wdLastAt = 0; private wdDead = 0; private wdGrace = 0; private wdResumeLogged = false; private recoveries = 0;
   private posterUntilSeek = false; private seekTarget = 0;
   // seek → visible swap (see SWAP_MS); posterFor = event the pending poster belongs to; scrubOffT = delayed profile switch
   private swapPending = false; private swapFrames = -1; private swapT = 0; private posterFor = 0; private scrubOffT = 0;
+  // marked seek: width the new position arrives with (0 = timer path), send time (telemetry); presented width / frames at session start
+  private swapW = 0; private swapAt = 0; private shownW = 0; private sessFrames0 = 0;
   private scrubMoves = 0; private rwTargetBusy = false; private rwPendingTarget: number | null = null; private rwLastTarget = 0; private rwLastTargetAt = 0;
   // relay-pos answers are only valid for the command generation they were asked under; a poll sent BEFORE a
   // seek/rate change and answered after it would drag the playhead back to the old position (and the
@@ -91,12 +95,12 @@ export class PlayerController {
     on('timeupdate', () => { if (this.live) return; if (this.rw?.active && this.rwBase == null && v.currentTime > 0) this.rwBase = v.currentTime; const ts = this.currentTs(); if (ts == null) return; if (this.M.active || this.rw?.active) { const i = this.clipIndexFor(ts); if (i >= 0) this.playIndex = i; } this.feed(); this.emit(); });
     on('waiting', () => { if (this.live) { if (this.L.active && !this.L.stallT) this.L.stallT = window.setTimeout(() => { this.L.stallT = 0; if (this.live && this.L.active && v.readyState < 3) this.liveRestart(); }, 4000); return; } if (!this.rw?.active) this.setLabel('loading'); if (!this.M.active || this.stallTimer) return; this.stallTimer = window.setTimeout(() => { this.stallTimer = 0; this.handleStall(); }, 600); });
     on('seeking', () => { if (!this.live && !this.rw?.active) this.setLabel('loading'); });
-    for (const n of ['loadeddata', 'playing', 'canplay', 'seeked']) on(n, () => { if (v.videoWidth) this.freezeHide(); if (!this.live && this.label === 'loading') this.setLabel('playing'); if (this.L.stallT) { clearTimeout(this.L.stallT); this.L.stallT = 0; } this.emit(); });
+    for (const n of ['loadeddata', 'playing', 'canplay', 'seeked']) on(n, () => { if (v.videoWidth && !v.srcObject && !this.posterUntilSeek) this.freezeHide(); /* WebRTC: presented frames decide (rVFC), not these events */ if (!this.live && this.label === 'loading') this.setLabel('playing'); if (this.L.stallT) { clearTimeout(this.L.stallT); this.L.stallT = 0; } this.emit(); });
     on('pause', () => { if (this.L.stallT) { clearTimeout(this.L.stallT); this.L.stallT = 0; } this.emit(); });
     on('play', () => this.emit());
     // the stage box follows the picture's real aspect where the layout uses it (mobile: no letterbox bars for 4:3 cameras)
     on('loadedmetadata', () => this.setAspect(this.v.videoWidth, this.v.videoHeight));
-    on('resize', () => this.setAspect(this.v.videoWidth, this.v.videoHeight));
+    on('resize', () => { this.setAspect(this.v.videoWidth, this.v.videoHeight); if (this.v.videoWidth && !(this.v as any).requestVideoFrameCallback) this.markerCheck(this.v.videoWidth); });
     on('volumechange', () => this.emit());
     on('error', () => { const e = v.error; rlog('video-error', { code: e?.code, msg: e?.message?.slice(0, 120), src: v.getAttribute('src') ? 'src' : 'srcObject' }); });
     on('ended', () => { if (this.live || this.M.active || this.rw?.active) return; const n = this.playIndex + 1; if (n < this.clips.length) { const c = this.clips[n]!; this.curClipId = c.id; this.playIndex = n; v.src = this.api.url(`api/segment?id=${encodeURIComponent(c.videoId || c.id)}`); v.load(); v.onloadedmetadata = () => { v.playbackRate = this.rate; try { v.currentTime = 0; } catch { /* ignore */ } this.safePlay(); }; this.setLabel('playing'); } });
@@ -148,7 +152,12 @@ export class PlayerController {
   /** Wall-clock position of the picture on screen (Scrypted's getRecordingStreamCurrentTime). */
   currentTs(): number | null {
     if (this.rw?.active) {
-      if (this.rwPosTs != null) return this.rwPosTs + (Date.now() - this.rwPosAt) * (this.rwRate || 1);
+      if (this.rwPosTs != null) {
+        const v = this.rwPosTs + (Date.now() - this.rwPosAt) * (this.rwRate || 1);
+        // while the server steers onto a target its rate changes every 100 ms — never extrapolate past the target
+        if ((this.rwScrub || this.scrubMoves > 0) && this.rwLastTarget) { const lo = Math.min(this.rwPosTs, this.rwLastTarget), hi = Math.max(this.rwPosTs, this.rwLastTarget); return Math.min(hi, Math.max(lo, v)); }
+        return v;
+      }
       if (this.rwBase != null && this.v.currentTime > 0) return this.rwStartMs + (this.v.currentTime - this.rwBase) * 1000 * (this.rwRate || 1);
       return this.rwStartMs;
     }
@@ -160,11 +169,21 @@ export class PlayerController {
   }
 
   // ---- presented frames / freeze / poster -----------------------------------------
-  private fcArm(): void { const v: any = this.v; if (!v.requestVideoFrameCallback) return; const tok = {}; this.fc.tok = tok; const tick = () => { if (this.fc.tok !== tok) return; this.fc.n++; try { v.requestVideoFrameCallback(tick); } catch { /* ignore */ } }; try { v.requestVideoFrameCallback(tick); } catch { /* ignore */ } }
+  private fcArm(): void {
+    const v: any = this.v; if (!v.requestVideoFrameCallback) return; const tok = {}; this.fc.tok = tok;
+    const tick = (_now: number, md?: { width?: number }) => {
+      if (this.fc.tok !== tok) return; this.fc.n++;
+      const w = (md && md.width) || this.v.videoWidth; if (w) { this.shownW = w; this.markerCheck(w); }
+      try { v.requestVideoFrameCallback(tick); } catch { /* ignore */ }
+    };
+    try { v.requestVideoFrameCallback(tick); } catch { /* ignore */ }
+  }
+  /** a presented frame of width w: is it the first frame of the marked seek's new position? */
+  private markerCheck(w: number): void { if (this.swapPending && this.swapW && w === this.swapW) this.swapVisible('marker'); }
   presentedFrames(): number { if ((this.v as any).requestVideoFrameCallback) return this.fc.n; try { return this.v.getVideoPlaybackQuality().totalVideoFrames; } catch { return -1; } }
   private freezeArm(hold: boolean): void {
     if (this.freezeT) clearTimeout(this.freezeT);
-    this.freezeT = window.setTimeout(() => this.freezeHide(), hold ? 90000 : 5000);
+    this.freezeT = window.setTimeout(() => this.freezeHide(), 90000); // safety net only — a still stays until the video really runs
     const v: any = this.v;
     if (hold && v.requestVideoFrameCallback) { const tok = {}; this.freezeTok = tok; try { v.requestVideoFrameCallback(() => { if (this.freezeTok === tok && this.v.videoWidth) this.freezeHide(); }); } catch { /* ignore */ } }
   }
@@ -178,24 +197,28 @@ export class PlayerController {
     fc.classList.remove('hidden'); fc.dataset.src = 'video';
     return true;
   }
+  /** Freeze the current picture. A still that is already visible stays (redrawing would copy from an element whose stream
+   *  may already be gone → black) — it is only re-armed. */
   freezeShow(hold = false): void {
-    try { if (this.drawVideo()) this.freezeArm(hold); } catch { /* ignore */ }
+    try { if (this.posterUp()) { if (!this.posterUntilSeek) this.freezeArm(hold); return; } if (this.drawVideo()) this.freezeArm(hold); } catch { /* ignore */ }
   }
-  /** poster/freeze stays until the seek's picture is visible (swapVisible), 6 s safety net */
+  /** poster/freeze stays until the seek's picture is visible (swapVisible); safety net MARK_CAP_MS */
   private holdUntilSwap(): void {
     if (this.freezeT) clearTimeout(this.freezeT); this.freezeTok = null;
-    this.posterUntilSeek = true; this.freezeT = window.setTimeout(() => this.swapVisible(), 6000);
+    this.posterUntilSeek = true; this.freezeT = window.setTimeout(() => this.swapVisible('cap'), MARK_CAP_MS);
   }
-  /** Event click inside a running relay session: the current picture stands still at once (the old position must not keep
-   *  playing while the event frame loads); the event frame replaces it, the picture at the target lifts it. */
+  /** A jump inside a running relay session: the current picture stands still at once (the old position must not keep playing
+   *  while the new one crosses the pipeline); an already visible still (event frame) is kept. Lifted by swapVisible. */
   freezeCurrent(): void {
     if (!this.rw?.active || !this.rw.id) return; // no session yet: playAt's own freeze/poster path applies
-    try { if (this.drawVideo()) this.holdUntilSwap(); } catch { /* ignore */ }
+    try { if (this.posterUp() || this.drawVideo()) this.holdUntilSwap(); } catch { /* ignore */ }
   }
   /** the picture of the last seek is on screen: lift a held poster, report playing */
-  private swapVisible(): void {
+  private swapVisible(how: 'marker' | 'timer' | 'cap' = 'timer'): void {
     if (this.swapT) { clearTimeout(this.swapT); this.swapT = 0; }
-    this.swapPending = false;
+    const was = this.swapPending; this.swapPending = false; this.swapW = 0;
+    if (was && this.swapAt) rlog('swap', { how, ms: Date.now() - this.swapAt, w: this.shownW });
+    this.swapAt = 0;
     if (this.posterUntilSeek) this.freezeHide();
     if (this.label === 'loading' && this.rw?.active) this.setLabel('playing');
   }
@@ -218,15 +241,17 @@ export class PlayerController {
   }
   freezeHide(): void { if (this.freezeT) { clearTimeout(this.freezeT); this.freezeT = 0; } this.posterUntilSeek = false; this.fz.classList.add('hidden'); delete this.fz.dataset.src; }
   private posterUp(): boolean { return !this.fz.classList.contains('hidden'); }
-  freezeHold(): void { if (this.freezeT) { clearTimeout(this.freezeT); this.freezeT = window.setTimeout(() => this.freezeHide(), 5000); } }
+  /** scrub on MSE: the still stays while the gesture runs (lifted by the seek's `seeked`/`playing`) */
+  freezeHold(): void { if (this.freezeT) { clearTimeout(this.freezeT); this.freezeT = window.setTimeout(() => this.freezeHide(), 90000); } }
   /** Event click: the stored frame is the poster until the seek lands. */
   posterEvent(ts: number): void {
     const cam = this.camId; this.posterFor = ts; const img = new Image(); img.crossOrigin = 'anonymous';
     img.onload = () => {
       if (this.camId !== cam || this.posterFor !== ts || this.destroyed) return;
-      const inSession = !!this.rw?.active && !!this.rw.id;
-      if (inSession && !this.swapPending) return; // arrived after the seek's picture is already on screen — don't cover it
-      this.freezeFromImage(img, true, inSession, 'event');
+      const firstFramePending = !!this.rw?.active && this.presentedFrames() <= this.sessFrames0;
+      if (this.swapPending) this.freezeFromImage(img, true, true, 'event');                // a jump is under way → until its picture
+      else if (firstFramePending || !this.rw?.active) this.freezeFromImage(img, true, false, 'event'); // new session → until its first frame
+      // else: the target picture is already on screen — don't cover it
     };
     img.src = this.api.url(`api/evframe?camera=${encodeURIComponent(cam)}&ts=${ts}`);
   }
@@ -306,11 +331,11 @@ export class PlayerController {
     try { this.v.srcObject = null; } catch { /* ignore */ }
     this.v.src = u; this.v.playbackRate = 1; this.v.muted = true; this.safePlay();
   }
-  private liveFallbackImg(): void { this.liveTeardown(); if (!this.live) return; try { this.v.pause(); } catch { /* ignore */ } this.freezeHide(); this.transport = 'mjpeg'; this.setLabel('liveMjpeg'); this.setMjpeg(true); this.img.src = this.api.url(`api/live?camera=${encodeURIComponent(this.camId)}`) + `&_=${Date.now()}`; }
+  private liveFallbackImg(): void { this.liveTeardown(); if (!this.live) return; try { this.v.pause(); } catch { /* ignore */ } this.img.onload = () => { this.img.onload = null; if (this.live) this.freezeHide(); }; this.transport = 'mjpeg'; this.setLabel('liveMjpeg'); this.setMjpeg(true); this.img.src = this.api.url(`api/live?camera=${encodeURIComponent(this.camId)}`) + `&_=${Date.now()}`; }
 
   // ---- RECORDED via relay -----------------------------------------------------------------
   private recWebrtcOk(): boolean { return !this.recWebrtcDisabled && !!(window.RTCPeerConnection && window.WebSocket); }
-  private recWebrtcTeardown(): void { this.posterUntilSeek = false; this.swapPending = false; if (this.swapT) { clearTimeout(this.swapT); this.swapT = 0; } if (this.scrubOffT) { clearTimeout(this.scrubOffT); this.scrubOffT = 0; } this.rwTargetBusy = false; this.rwPendingTarget = null; this.rwLastTarget = 0; this.stopRelayPoll(); this.rw?.stop(); this.rw = undefined; this.rwBase = null; this.rwPosTs = null; this.rwScrub = false; this.rwSeekBusy = false; this.rwPending = null; this.rwLastSeekTs = null; this.rwSrate = 1; this.rwRate = 1; }
+  private recWebrtcTeardown(): void { const seekStill = this.posterUntilSeek && this.posterUp(); this.posterUntilSeek = false; this.swapPending = false; this.swapW = 0; if (seekStill) this.freezeArm(true); /* still over a jump → now until the NEXT stream's first frame */ if (this.swapT) { clearTimeout(this.swapT); this.swapT = 0; } if (this.scrubOffT) { clearTimeout(this.scrubOffT); this.scrubOffT = 0; } this.rwTargetBusy = false; this.rwPendingTarget = null; this.rwLastTarget = 0; this.stopRelayPoll(); this.rw?.stop(); this.rw = undefined; this.rwBase = null; this.rwPosTs = null; this.rwScrub = false; this.rwSeekBusy = false; this.rwPending = null; this.rwLastSeekTs = null; this.rwSrate = 1; this.rwRate = 1; }
   private recWebrtcStart(ts: number): void {
     if (this.destroyed) return;
     this.v.onloadedmetadata = null;
@@ -332,8 +357,9 @@ export class PlayerController {
         this.fcArm(); this.rwBase = null; this.safePlay(); this.setLabel('playing');
       },
       onFail: () => { if (this.rw === s) this.recFallbackMse(ts); },
-      onSessionId: () => { if (this.rw === s && this.rwPending) { const p = this.rwPending; this.rwPending = null; if (Math.abs(p.ts - this.rwStartMs) > 1500) this.recRelaySeek(p.ts, p.rate, p.srate); } },
+      onSessionId: () => { if (this.rw === s && this.rwPending) { const p = this.rwPending; this.rwPending = null; if (Math.abs(p.ts - this.rwStartMs) > 1500) { if (p.mark) this.freezeCurrent(); this.recRelaySeek(p.ts, p.rate, p.srate, p.mark); } } },
     });
+    this.sessFrames0 = this.presentedFrames(); this.shownW = 0;
     this.rw = s; s.start(); this.startRelayPoll(); this.emit();
   }
   /** Relay failed: retry the relay up to twice (transient WS/ICE hiccups), only then fall back to MSE for the rest of this camera. */
@@ -344,22 +370,35 @@ export class PlayerController {
     if (this.recoveries <= 2) { rlog('relay-retry', { n: this.recoveries }); this.recWebrtcStart(ts); return; }
     rlog('rec-fallback-mse', { mseOk: this.mseSupported(), after: this.recoveries }); this.recWebrtcDisabled = true; this.playAt(ts, {});
   }
-  /** Hard server-side seek, coalesced: one in flight, latest wins, 150 ms floor. */
-  private recRelaySeek(ts: number, rate = 1, srate = 1): void {
+  /** Hard server-side seek, coalesced: one in flight, latest wins, 150 ms floor. `mark` = a user jump with a still picture
+   *  (see SWAP_MS): the server answers with the marker width the new position arrives with. */
+  private recRelaySeek(ts: number, rate = 1, srate = 1, mark = false): void {
     const s = this.rw; if (!s?.id) return;
-    if (this.rwSeekBusy) { this.rwPending = { ts, rate, srate }; return; }
-    if (this.rwLastSeekTs === ts && this.rwRate === rate && this.rwSrate === srate && Date.now() - this.rwLastSeekAt < 1000) return;
+    if (this.rwSeekBusy) { this.rwPending = { ts, rate, srate, mark: mark || !!this.rwPending?.mark }; return; }
+    if (!mark && this.rwLastSeekTs === ts && this.rwRate === rate && this.rwSrate === srate && Date.now() - this.rwLastSeekAt < 1000) return;
     const wait = 150 - (Date.now() - this.rwLastSeekAt);
-    if (wait > 0) { this.rwSeekBusy = true; this.rwPending = { ts, rate, srate }; window.setTimeout(() => { this.rwSeekBusy = false; const p = this.rwPending; this.rwPending = null; if (p && this.rw?.id) this.recRelaySeek(p.ts, p.rate, p.srate); }, wait); return; }
+    if (wait > 0) { this.rwSeekBusy = true; this.rwPending = { ts, rate, srate, mark: mark || !!this.rwPending?.mark }; window.setTimeout(() => { this.rwSeekBusy = false; const p = this.rwPending; this.rwPending = null; if (p && this.rw?.id) this.recRelaySeek(p.ts, p.rate, p.srate, p.mark); }, wait); return; }
+    if (mark) { this.rwScrub = false; if (this.scrubOffT) { clearTimeout(this.scrubOffT); this.scrubOffT = 0; } this.scrubMoves = 0; } // the server leaves the scrub profile for a marked seek
     this.rwStartMs = ts; this.rwSrate = srate; this.rwRate = this.rwScrub ? srate : rate; this.rwLastSeekTs = ts; this.rwLastSeekAt = Date.now();
     this.cad.lastNew = Date.now(); this.wdLastCt = -1; this.wdLastAt = Date.now(); this.wdGrace = Date.now() + 5000;
     this.rwPosTs = ts; this.rwPosAt = Date.now();
     this.setLabel(this.rwScrub ? 'scrub' : 'loading'); // scrubbing seeks constantly — no "loading" flicker there
     this.rwSeekBusy = true;
     this.seekTarget = ts; this.seekAt = Date.now(); this.cmdSeq++;
-    this.swapPending = true; if (this.swapT) { clearTimeout(this.swapT); this.swapT = 0; }
-    const done = (ok: boolean) => { this.rwSeekBusy = false; if (!ok) { this.relayRecover(); return; } if (this.swapPending) this.swapArm(); const p = this.rwPending; this.rwPending = null; if (p && this.rw?.id) this.recRelaySeek(p.ts, p.rate, p.srate); };
-    this.api.control(`api/relay-seek?session=${encodeURIComponent(s.id)}&start=${Math.round(ts)}&rate=${rate}&srate=${srate}`).then(ok => done(ok));
+    this.swapPending = true; this.swapW = 0; this.swapAt = Date.now(); if (this.swapT) { clearTimeout(this.swapT); this.swapT = 0; }
+    const seq = this.cmdSeq;
+    const done = (ok: boolean, w: number) => {
+      this.rwSeekBusy = false; if (!ok) { this.relayRecover(); return; }
+      if (this.swapPending && seq === this.cmdSeq) {
+        if (w) { this.swapW = w; if (this.shownW === w) this.swapVisible('marker'); } // marker path (see SWAP_MS)
+        else this.swapArm();                                                         // server without markers: timer
+      }
+      const p = this.rwPending; this.rwPending = null; if (p && this.rw?.id) this.recRelaySeek(p.ts, p.rate, p.srate, p.mark);
+    };
+    const q = `api/relay-seek?session=${encodeURIComponent(s.id)}&start=${Math.round(ts)}&rate=${rate}&srate=${srate}` + (mark ? `&mark=1&avoid=${this.shownW || this.v.videoWidth || 0}` : '');
+    fetch(this.api.url(q), { cache: 'no-store' })
+      .then(r => { if (!r.ok) return done(false, 0); if (r.status === 200) return r.json().then((j: any) => done(true, Number(j?.w) || 0), () => done(true, 0)); return done(true, 0); })
+      .catch(() => done(false, 0));
   }
   /** Scrub target (timeline centre), coalesced: one in flight, latest wins, 120 ms floor, 250 ms minimum step. */
   private recRelayTarget(ts: number): void {
@@ -368,7 +407,7 @@ export class PlayerController {
     if (Math.abs(ts - this.rwLastTarget) < TARGET_MIN_STEP_MS) return;
     const wait = TARGET_FLOOR_MS - (Date.now() - this.rwLastTargetAt);
     if (wait > 0) { this.rwTargetBusy = true; this.rwPendingTarget = ts; window.setTimeout(() => { this.rwTargetBusy = false; const p = this.rwPendingTarget; this.rwPendingTarget = null; if (p != null && this.rw?.id) this.recRelayTarget(p); }, wait); return; }
-    this.rwLastTarget = ts; this.rwLastTargetAt = Date.now(); this.cmdSeq++;
+    this.rwLastTarget = ts; this.rwLastTargetAt = Date.now(); // no cmdSeq bump: the position moves continuously, polls stay valid
     this.wdGrace = Date.now() + 8000; this.cad.lastNew = Date.now();
     this.rwTargetBusy = true;
     this.api.control(`api/relay-target?session=${encodeURIComponent(s.id)}&ts=${Math.round(ts)}`).then(ok => { if (!ok) this.relayRecover(); }).then(() => { this.rwTargetBusy = false; const p = this.rwPendingTarget; this.rwPendingTarget = null; if (p != null && this.rw?.id && Math.abs(p - this.rwLastTarget) >= TARGET_MIN_STEP_MS) this.recRelayTarget(p); });
@@ -412,7 +451,7 @@ export class PlayerController {
       fetch(this.api.url(`api/relay-pos?session=${encodeURIComponent(s.id)}`), { cache: 'no-store' }).then(r => r.json()).then((d: any) => {
         if (seq !== this.cmdSeq) return; // answered across a seek/rate change → stale
         if (d && d.t > 0 && Date.now() - this.seekAt < 2500 && Math.abs(d.t - this.seekTarget) > 5000) return; // pre-swap position
-        if (d && d.t > 0) { this.wdDead = 0; this.rwPosTs = d.t; this.rwPosAt = Date.now(); if (this.rwScrub && typeof d.r === 'number' && isFinite(d.r) && d.r) this.rwRate = d.r; this.emit(); }
+        if (d && d.t > 0) { this.wdDead = 0; this.rwPosTs = d.t; this.rwPosAt = Date.now(); if ((this.rwScrub || this.scrubMoves > 0) && typeof d.r === 'number' && isFinite(d.r) && d.r) this.rwRate = d.r; this.emit(); }
         else if (d && d.t <= 0) { if (++this.wdDead >= 3) { this.wdDead = 0; this.relayRecover(); } }
       }).catch(() => { /* ignore */ });
     }, 600);
@@ -447,8 +486,9 @@ export class PlayerController {
       if (idx0 < 0) { this.setLabel('noRecording'); return; }
       this.recPaused = false;
       const t0 = Math.max(ts, this.clips[idx0]!.startTime);
-      if (this.rw?.active && this.rw.id) this.recRelaySeek(t0, this.rate || 1, opts.srate || 1);
-      else if (this.rw?.active && !this.live) this.rwPending = { ts: t0, rate: this.rate || 1, srate: opts.srate || 1 };
+      const jump = !opts.scrub; // a user jump (event, ±15 s, keys, date) — scrub landings are steered, not jumped
+      if (this.rw?.active && this.rw.id) { if (jump) this.freezeCurrent(); this.recRelaySeek(t0, this.rate || 1, opts.srate || 1, jump); }
+      else if (this.rw?.active && !this.live) this.rwPending = { ts: t0, rate: this.rate || 1, srate: opts.srate || 1, mark: jump };
       else { if (this.live) { this.freezeShow(true); this.exitLiveState(); } this.recWebrtcStart(t0); }
       return;
     }
@@ -533,7 +573,7 @@ export class PlayerController {
     if (this.live) return;
     if (this.CH.active) { this.chaseAbort(); try { this.v.pause(); } catch { /* ignore */ } this.emit(); return; }
     if (this.recPaused) { this.recPaused = false; const t = this.recPausedTs ?? (this.currentTs() ?? Date.now() - 1000); this.playAt(t, {}); return; }
-    if (this.rw?.active) { this.recPausedTs = this.currentTs(); this.freezeShow(); if (this.freezeT) { clearTimeout(this.freezeT); this.freezeT = 0; } this.recWebrtcTeardown(); try { this.v.pause(); } catch { /* ignore */ } this.recPaused = true; this.transport = 'none'; this.setLabel('paused'); return; }
+    if (this.rw?.active) { this.recPausedTs = this.currentTs(); this.freezeShow(); this.recWebrtcTeardown(); if (this.freezeT) { clearTimeout(this.freezeT); this.freezeT = 0; } this.freezeTok = null; /* the pause still stays until play */ try { this.v.pause(); } catch { /* ignore */ } this.recPaused = true; this.transport = 'none'; this.setLabel('paused'); return; }
     if (this.v.paused) this.safePlay(); else this.v.pause();
   }
   skip(ms: number): void { const ts = this.live ? Date.now() + ms : ((this.currentTs() ?? Date.now()) + ms); if (this.live && ms > 0) return; this.playAt(ts, {}); }
@@ -618,7 +658,9 @@ export class PlayerController {
     if (document.visibilityState === 'hidden') {
       // don't pin a camera stream in the background; live is simply restarted on return
       if (this.live) { this.hiddenTs = null; this.webrtcTeardown(); this.liveTeardown(); if (this.transport === 'mjpeg') this.img.removeAttribute('src'); }
-      else if (this.rw?.active) { this.hiddenTs = this.currentTs(); this.freezeShow(true); this.recWebrtcTeardown(); }
+      // the still stays while hidden (like pause): a hold-until-next-frame would be lifted by the last frame the torn-down
+      // stream still presents, and the return would then copy a black picture from the dead element
+      else if (this.rw?.active) { this.hiddenTs = this.currentTs(); this.freezeShow(); this.recWebrtcTeardown(); if (this.freezeT) { clearTimeout(this.freezeT); this.freezeT = 0; } this.freezeTok = null; }
     } else {
       if (this.live) this.goLive(); // also covers goLive() issued while hidden (background tab)
       else if (this.hiddenTs != null && !this.recPaused) { const t = this.hiddenTs; this.hiddenTs = null; this.playAt(t, {}); }
