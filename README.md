@@ -19,6 +19,20 @@ One npm package, **`@sentinel-nvr/web`**, with subpath entry points (one version
 
 The earlier `@sentinel-nvr/api@0.1.0` is deprecated in favour of `@sentinel-nvr/web/api`.
 
+### Server compatibility (recorded playback)
+
+The player talks to the plugin's relay endpoints (`docs/API.md` in `sentinel-nvr`). Newer packages degrade gracefully
+on older servers, but only get their full behaviour with the matching plugin:
+
+| Package | Needs plugin from | Relay feature |
+|---|---|---|
+| 0.7.x | 2026-09-23 | scrub by target: `api/relay-target` (server-side servo stops at the timeline centre), `relay-pos` returns `{t, r}` |
+| 0.8.x | 2026-09-24 | jumps with a still picture: `relay-seek&mark=1&avoid=W` answers `{w}`; the still is lifted on the first frame of that width (older servers: timer) |
+| 0.9.x | 2026-09-25 | speed buttons in place: `api/relay-speed` (older servers: a seek to the displayed position); stills fade out two frames after the video runs |
+
+Lab note: headless Chromium reports an 800×600 screen unless `screenWidth/screenHeight` are emulated; the Scrypted
+sink then transcodes every stream to 800 px / 15 fps, which distorts latency and resolution measurements.
+
 The plugin's server code (`sentinel-nvr/src`) also imports `@sentinel-nvr/api`
 for its API types, so server and both clients share one contract.
 
