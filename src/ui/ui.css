@@ -251,7 +251,9 @@
    the screen's aspect, so there contain is right. */
 .nvr-stage__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .nvr-stage:fullscreen .nvr-stage__video, .nvr-stage:-webkit-full-screen .nvr-stage__video { object-fit: contain; }
-.nvr-stage__freeze { pointer-events: none; }
+.nvr-stage__freeze { pointer-events: none; transition: opacity 120ms linear; }
+/* lifting a still: fade out over the running video (see LIFT_FADE_MS in the player) */
+.nvr-stage__freeze--fade { opacity: 0; }
 .nvr-stage .hidden { display: none !important; }
 .nvr-mute { position: absolute; right: 16px; bottom: 16px; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-dim); display: grid; place-items: center; box-shadow: var(--shadow-elevated); cursor: pointer; z-index: 3; }
 .nvr-mute[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: transparent; }

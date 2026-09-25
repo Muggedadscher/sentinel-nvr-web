@@ -42,6 +42,11 @@ const MSCls: typeof MediaSource | undefined = (window as any).ManagedMediaSource
  *  Servers without markers (plain 204): lifted SWAP_MS after the answer plus one presented frame. MARK_CAP_MS = safety net. */
 const SWAP_MS = 2600;
 const MARK_CAP_MS = 12000;
+/** Lifting a still: wait this many further presented frames after the "new content" signal, then fade it out. iOS/Safari
+ *  draw video on a separate layer that may still be empty for a moment after the frame callback — hiding the still at
+ *  once let the grey stage background flash through (user 25.09.2026, iPhone). ~100 ms + 120 ms fade at 20 fps. */
+const LIFT_FRAMES = 2;
+const LIFT_FADE_MS = 120;
 /** Scrub profile (640 all-intra) → normal (1280) only after the gesture has been quiet this long: a scroll–pause–scroll pattern
  *  restarted the transcoder twice per pause (server log: profile switch every 1–2 s, 30 restarts in one session). */
 const SCRUB_OFF_DELAY_MS = 1500;
@@ -67,6 +72,7 @@ export class PlayerController {
   private swapPending = false; private swapFrames = -1; private swapT = 0; private posterFor = 0; private scrubOffT = 0;
   // marked seek: width the new position arrives with (0 = timer path), send time (telemetry); presented width / frames at session start
   private swapW = 0; private swapAt = 0; private shownW = 0; private sessFrames0 = 0;
+  private liftTok: object | null = null; // a pending lift (frames → fade → hide); any new still cancels it
   private scrubMoves = 0; private rwTargetBusy = false; private rwPendingTarget: number | null = null; private rwLastTarget = 0; private rwLastTargetAt = 0;
   // relay-pos answers are only valid for the command generation they were asked under; a poll sent BEFORE a
   // seek/rate change and answered after it would drag the playhead back to the old position (and the
@@ -95,7 +101,7 @@ export class PlayerController {
     on('timeupdate', () => { if (this.live) return; if (this.rw?.active && this.rwBase == null && v.currentTime > 0) this.rwBase = v.currentTime; const ts = this.currentTs(); if (ts == null) return; if (this.M.active || this.rw?.active) { const i = this.clipIndexFor(ts); if (i >= 0) this.playIndex = i; } this.feed(); this.emit(); });
     on('waiting', () => { if (this.live) { if (this.L.active && !this.L.stallT) this.L.stallT = window.setTimeout(() => { this.L.stallT = 0; if (this.live && this.L.active && v.readyState < 3) this.liveRestart(); }, 4000); return; } if (!this.rw?.active) this.setLabel('loading'); if (!this.M.active || this.stallTimer) return; this.stallTimer = window.setTimeout(() => { this.stallTimer = 0; this.handleStall(); }, 600); });
     on('seeking', () => { if (!this.live && !this.rw?.active) this.setLabel('loading'); });
-    for (const n of ['loadeddata', 'playing', 'canplay', 'seeked']) on(n, () => { if (v.videoWidth && !v.srcObject && !this.posterUntilSeek) this.freezeHide(); /* WebRTC: presented frames decide (rVFC), not these events */ if (!this.live && this.label === 'loading') this.setLabel('playing'); if (this.L.stallT) { clearTimeout(this.L.stallT); this.L.stallT = 0; } this.emit(); });
+    for (const n of ['loadeddata', 'playing', 'canplay', 'seeked']) on(n, () => { if (v.videoWidth && !v.srcObject && !this.posterUntilSeek) this.freezeLift(); /* WebRTC: presented frames decide (rVFC), not these events */ if (!this.live && this.label === 'loading') this.setLabel('playing'); if (this.L.stallT) { clearTimeout(this.L.stallT); this.L.stallT = 0; } this.emit(); });
     on('pause', () => { if (this.L.stallT) { clearTimeout(this.L.stallT); this.L.stallT = 0; } this.emit(); });
     on('play', () => this.emit());
     // the stage box follows the picture's real aspect where the layout uses it (mobile: no letterbox bars for 4:3 cameras)
@@ -185,7 +191,25 @@ export class PlayerController {
     if (this.freezeT) clearTimeout(this.freezeT);
     this.freezeT = window.setTimeout(() => this.freezeHide(), 90000); // safety net only — a still stays until the video really runs
     const v: any = this.v;
-    if (hold && v.requestVideoFrameCallback) { const tok = {}; this.freezeTok = tok; try { v.requestVideoFrameCallback(() => { if (this.freezeTok === tok && this.v.videoWidth) this.freezeHide(); }); } catch { /* ignore */ } }
+    if (hold && v.requestVideoFrameCallback) { const tok = {}; this.freezeTok = tok; try { v.requestVideoFrameCallback(() => { if (this.freezeTok === tok && this.v.videoWidth) this.freezeLift(); }); } catch { /* ignore */ } }
+  }
+  /** a still is shown (again): cancel a pending lift, full opacity */
+  private stillUp(): void { this.liftTok = null; this.fz.classList.remove('nvr-stage__freeze--fade'); this.fz.classList.remove('hidden'); }
+  /** New content is being presented → lift the still after LIFT_FRAMES more presented frames with a short fade (see
+   *  LIFT_FRAMES). `frames` 0 = fade right away (MJPEG image loaded). A lift already under way is not restarted. */
+  private freezeLift(frames = LIFT_FRAMES): void {
+    if (!this.posterUp() || this.liftTok) return;
+    const tok = {}; this.liftTok = tok; const v: any = this.v;
+    const fade = () => {
+      if (this.liftTok !== tok) return;
+      this.fz.classList.add('nvr-stage__freeze--fade');
+      window.setTimeout(() => { if (this.liftTok === tok) this.freezeHide(); }, LIFT_FADE_MS);
+    };
+    if (frames > 0 && v.requestVideoFrameCallback) {
+      let n = 0;
+      const tick = () => { if (this.liftTok !== tok) return; if (++n >= frames) fade(); else { try { v.requestVideoFrameCallback(tick); } catch { fade(); } } };
+      try { v.requestVideoFrameCallback(tick); } catch { fade(); }
+    } else window.setTimeout(fade, frames > 0 ? 100 : 0);
   }
   /** copy the current video picture onto the freeze canvas (false = nothing to copy yet) */
   private drawVideo(): boolean {
@@ -194,7 +218,7 @@ export class PlayerController {
     if (fc.width !== v.videoWidth) fc.width = v.videoWidth;
     if (fc.height !== v.videoHeight) fc.height = v.videoHeight;
     fc.getContext('2d')!.drawImage(v, 0, 0, fc.width, fc.height);
-    fc.classList.remove('hidden'); fc.dataset.src = 'video';
+    this.stillUp(); fc.dataset.src = 'video';
     return true;
   }
   /** Freeze the current picture. A still that is already visible stays (redrawing would copy from an element whose stream
@@ -205,6 +229,7 @@ export class PlayerController {
   /** poster/freeze stays until the seek's picture is visible (swapVisible); safety net MARK_CAP_MS */
   private holdUntilSwap(): void {
     if (this.freezeT) clearTimeout(this.freezeT); this.freezeTok = null;
+    if (this.posterUp()) this.stillUp(); // a lift in progress is cancelled — this still now waits for the jump
     this.posterUntilSeek = true; this.freezeT = window.setTimeout(() => this.swapVisible('cap'), MARK_CAP_MS);
   }
   /** A jump inside a running relay session: the current picture stands still at once (the old position must not keep playing
@@ -219,7 +244,7 @@ export class PlayerController {
     const was = this.swapPending; this.swapPending = false; this.swapW = 0;
     if (was && this.swapAt) rlog('swap', { how, ms: Date.now() - this.swapAt, w: this.shownW });
     this.swapAt = 0;
-    if (this.posterUntilSeek) this.freezeHide();
+    if (this.posterUntilSeek) { this.posterUntilSeek = false; if (this.freezeT) { clearTimeout(this.freezeT); this.freezeT = 0; } this.freezeLift(); }
     if (this.label === 'loading' && this.rw?.active) this.setLabel('playing');
   }
   /** seek answered: the new picture is on screen SWAP_MS later (plus proof of a presented frame) */
@@ -232,14 +257,14 @@ export class PlayerController {
   freezeFromImage(img: HTMLImageElement, hold: boolean, untilSeek = false, kind = 'image'): boolean {
     try {
       if (!img.naturalWidth || !img.naturalHeight) return false;
-      const fc = this.fz; fc.width = img.naturalWidth; fc.height = img.naturalHeight; fc.getContext('2d')!.drawImage(img, 0, 0); fc.classList.remove('hidden'); fc.dataset.src = kind;
+      const fc = this.fz; fc.width = img.naturalWidth; fc.height = img.naturalHeight; fc.getContext('2d')!.drawImage(img, 0, 0); this.stillUp(); fc.dataset.src = kind;
       this.setAspect(img.naturalWidth, img.naturalHeight);
       if (untilSeek) this.holdUntilSwap(); // stays until the seek's picture is visible (see startRelayPoll)
       else this.freezeArm(hold);
       return true;
     } catch { return false; }
   }
-  freezeHide(): void { if (this.freezeT) { clearTimeout(this.freezeT); this.freezeT = 0; } this.posterUntilSeek = false; this.fz.classList.add('hidden'); delete this.fz.dataset.src; }
+  freezeHide(): void { if (this.freezeT) { clearTimeout(this.freezeT); this.freezeT = 0; } this.liftTok = null; this.posterUntilSeek = false; this.fz.classList.add('hidden'); this.fz.classList.remove('nvr-stage__freeze--fade'); delete this.fz.dataset.src; }
   private posterUp(): boolean { return !this.fz.classList.contains('hidden'); }
   /** scrub on MSE: the still stays while the gesture runs (lifted by the seek's `seeked`/`playing`) */
   freezeHold(): void { if (this.freezeT) { clearTimeout(this.freezeT); this.freezeT = window.setTimeout(() => this.freezeHide(), 90000); } }
@@ -331,7 +356,7 @@ export class PlayerController {
     try { this.v.srcObject = null; } catch { /* ignore */ }
     this.v.src = u; this.v.playbackRate = 1; this.v.muted = true; this.safePlay();
   }
-  private liveFallbackImg(): void { this.liveTeardown(); if (!this.live) return; try { this.v.pause(); } catch { /* ignore */ } this.img.onload = () => { this.img.onload = null; if (this.live) this.freezeHide(); }; this.transport = 'mjpeg'; this.setLabel('liveMjpeg'); this.setMjpeg(true); this.img.src = this.api.url(`api/live?camera=${encodeURIComponent(this.camId)}`) + `&_=${Date.now()}`; }
+  private liveFallbackImg(): void { this.liveTeardown(); if (!this.live) return; try { this.v.pause(); } catch { /* ignore */ } this.img.onload = () => { this.img.onload = null; if (this.live) this.freezeLift(0); }; this.transport = 'mjpeg'; this.setLabel('liveMjpeg'); this.setMjpeg(true); this.img.src = this.api.url(`api/live?camera=${encodeURIComponent(this.camId)}`) + `&_=${Date.now()}`; }
 
   // ---- RECORDED via relay -----------------------------------------------------------------
   private recWebrtcOk(): boolean { return !this.recWebrtcDisabled && !!(window.RTCPeerConnection && window.WebSocket); }
@@ -400,6 +425,15 @@ export class PlayerController {
       .then(r => { if (!r.ok) return done(false, 0); if (r.status === 200) return r.json().then((j: any) => done(true, Number(j?.w) || 0), () => done(true, 0)); return done(true, 0); })
       .catch(() => done(false, 0));
   }
+  /** Speed button: the server changes its base rate in place (api/relay-speed) — no reposition, no "loading", no still.
+   *  Servers without the endpoint (404) get the former seek to the displayed position. */
+  private recRelaySpeed(r: number): void {
+    const s = this.rw; if (!s?.id) return;
+    const c = this.currentTs(); if (c != null) { this.rwPosTs = c; this.rwPosAt = Date.now(); }
+    if (!this.rwScrub) this.rwRate = r;
+    this.cmdSeq++; this.wdGrace = Date.now() + 5000; this.cad.lastNew = Date.now();
+    this.api.control(`api/relay-speed?session=${encodeURIComponent(s.id)}&rate=${r}`).then(ok => { if (!ok && this.rw === s && s.id) this.recRelaySeek(c ?? this.rwStartMs, r); });
+  }
   /** Scrub target (timeline centre), coalesced: one in flight, latest wins, 120 ms floor, 250 ms minimum step. */
   private recRelayTarget(ts: number): void {
     const s = this.rw; if (!s?.active || !s.id) return;
@@ -438,7 +472,7 @@ export class PlayerController {
       const q = this.presentedFrames();
       if (v.paused && !this.recPaused && !document.hidden) { if (!this.wdResumeLogged) { this.wdResumeLogged = true; rlog('auto-resume', { rs: v.readyState }); } this.safePlay(); } else if (!v.paused) this.wdResumeLogged = false;
       if (!v.paused && !document.hidden && this.rwBase != null) {
-        if (q !== this.wdLastCt) { this.wdLastCt = q; this.wdLastAt = Date.now(); this.recoveries = 0; if (!this.posterUntilSeek) this.freezeHide(); if (this.label === 'loading' && !this.swapPending) this.setLabel('playing'); }
+        if (q !== this.wdLastCt) { this.wdLastCt = q; this.wdLastAt = Date.now(); this.recoveries = 0; if (!this.posterUntilSeek) this.freezeLift(); if (this.label === 'loading' && !this.swapPending) this.setLabel('playing'); }
         else if (this.rwScrub) this.wdLastAt = Date.now();
         else if (Date.now() - this.wdLastAt > 4000 && Date.now() > this.wdGrace) {
           this.wdLastAt = Date.now();
@@ -580,7 +614,7 @@ export class PlayerController {
   cycleSpeed(): number {
     if (this.live) return this.rate;
     const rates = [1, 2, 4, 8]; this.rate = rates[(rates.indexOf(this.rate) + 1) % rates.length] ?? 1;
-    if (this.rw?.active && this.rw.id) { const c = this.currentTs(); this.recRelaySeek(c ?? this.rwStartMs, this.rate); this.v.muted = !this.soundOn || this.rate !== 1; }
+    if (this.rw?.active && this.rw.id) { this.recRelaySpeed(this.rate); this.v.muted = !this.soundOn || this.rate !== 1; }
     else this.v.playbackRate = this.rate;
     this.emit(); return this.rate;
   }
