@@ -40,7 +40,10 @@ export function Hero({ cameras, stats }: { cameras: SentinelCamera[]; stats: Sen
     <div className="nvr-card nvr-hero">
       <div className="nvr-hero__head">
         <CardTitle icon={<Gauge size={16} strokeWidth={1.75} />} title={t('nvr.hero.title')} sub={t('nvr.hero.sub')} />
-        <span className={`nvr-pill ${offline > 0 ? 'nvr-pill--danger' : 'nvr-pill--positive'}`}><span className="nvr-pill__dot" aria-hidden="true" />{offline > 0 ? t('nvr.hero.offline', { count: offline }) : t('nvr.hero.allOnline')}</span>
+        {stats.storageOk === false
+          // storage guard: the share is gone — nothing is recorded until it is back (outranks the camera status)
+          ? <span className="nvr-pill nvr-pill--danger" title={stats.storageProblem}><span className="nvr-pill__dot" aria-hidden="true" />{t('nvr.hero.storageProblem')}</span>
+          : <span className={`nvr-pill ${offline > 0 ? 'nvr-pill--danger' : 'nvr-pill--positive'}`}><span className="nvr-pill__dot" aria-hidden="true" />{offline > 0 ? t('nvr.hero.offline', { count: offline }) : t('nvr.hero.allOnline')}</span>}
       </div>
       <div className="nvr-hero__primary">
         <span className="nvr-hero__primary-label"><Zap size={14} strokeWidth={2} />{t('nvr.hero.eventsToday')}</span>

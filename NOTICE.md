@@ -1,12 +1,13 @@
 # Third-party notices
 
-The forthcoming `@sentinel-nvr/ui` package ships a design foundation (CSS custom
-properties / base classes) whose token values and conventions derive from
-**HAPulse** (https://github.com/jlnbln/HAPulse), MIT-licensed, Copyright (c) 2026
-Julian. That MIT copyright notice is retained where those values are reused.
+The `/ui` part of `@sentinel-nvr/web` (themes, design tokens, base classes in
+`ui/ui.css` and `src/ui/themes-data.ts`) derives its token values and conventions
+from **HAPulse** (https://github.com/jlnbln/HAPulse), MIT-licensed:
 
-`@sentinel-nvr/api` contains no HAPulse-authored code: it is the Sentinel NVR
-client model, originally written for the Sentinel integration.
+    MIT License — Copyright (c) 2026 Julian
+
+That notice is retained here and in the source files where those values are reused.
+The `/api` and `/player` parts contain no HAPulse-authored code.
 
 "Scrypted" is used descriptively to identify the platform the Sentinel NVR plugin
 runs on. This project is not affiliated with or endorsed by Scrypted.

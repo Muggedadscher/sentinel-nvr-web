@@ -13,7 +13,7 @@
  * RECORDED = WebRTC relay (server-seekable, scrub time-lapse in place) →
  * MSE fallback (progressive segments, trick-play chase) → native <video src>.
  */
-import type { SentinelClip as Clip, SentinelClient } from '../api';
+import { timeoutSignal, type SentinelClip as Clip, type SentinelClient } from '../api';
 import { rlog, setRlogClient } from './rlog';
 import { WebRtcSession, mobileClient } from './webrtc';
 
@@ -89,6 +89,8 @@ export class PlayerController {
   private fc = { n: 0, tok: {} as object }; private freezeT = 0; private freezeTok: object | null = null;
   private cad = { t: 0, last: -1, lastNew: 0, stalls: 0, maxStall: 0, frames0: -1, t0: 0, gapMax: 0 };
   private stallTimer = 0; private destroyed = false; private liveRestartT = 0;
+  // live watchdog (presented frames), MJPEG retry, periodic WebRTC retry out of a fallback, relay-pos in flight
+  private liveWd = { last: -1, at: 0, since: 0 }; private mjpegRetries = 0; private mjpegRetryT = 0; private liveUpgradeAt = 0; private liveUpgradeN = 0; private rwPosBusy = false;
   private unlisten: (() => void)[] = [];
 
   private arPrefix: string;
@@ -112,7 +114,7 @@ export class PlayerController {
     on('ended', () => { if (this.live || this.M.active || this.rw?.active) return; const n = this.playIndex + 1; if (n < this.clips.length) { const c = this.clips[n]!; this.curClipId = c.id; this.playIndex = n; v.src = this.api.url(`api/segment?id=${encodeURIComponent(c.videoId || c.id)}`); v.load(); v.onloadedmetadata = () => { v.playbackRate = this.rate; try { v.currentTime = 0; } catch { /* ignore */ } this.safePlay(); }; this.setLabel('playing'); } });
     this.pendingT = window.setInterval(() => { if (this.pendingTs != null && Date.now() - this.lastLoad >= 200) { const t = this.pendingTs; this.pendingTs = null; this.playAt(t, { scrub: true }); } }, 120);
     const vis = () => this.onVisibility(); document.addEventListener('visibilitychange', vis); this.unlisten.push(() => document.removeEventListener('visibilitychange', vis));
-    const edge = window.setInterval(() => { if (this.live && this.L.active) this.liveEdge(); }, 1000); this.unlisten.push(() => clearInterval(edge));
+    const edge = window.setInterval(() => { if (this.live && this.L.active) this.liveEdge(); if (this.live) this.liveWatch(); }, 1000); this.unlisten.push(() => clearInterval(edge));
   }
 
   destroy(): void {
@@ -121,18 +123,35 @@ export class PlayerController {
     // restart timer, a pending async load in the host, a visibility change …
     this.live = false; this.recPaused = false;
     if (this.liveRestartT) { clearTimeout(this.liveRestartT); this.liveRestartT = 0; }
+    if (this.mjpegRetryT) { clearTimeout(this.mjpegRetryT); this.mjpegRetryT = 0; }
     this.recWebrtcTeardown(); this.webrtcTeardown(); this.mseTeardown(); this.liveTeardown(); this.chaseAbort();
     if (this.pendingT) clearInterval(this.pendingT);
+    if (this.freezeT) { clearTimeout(this.freezeT); this.freezeT = 0; } // the 90-s safety timer held the controller + DOM
     for (const u of this.unlisten) u();
-    try { this.v.pause(); this.v.srcObject = null; this.v.removeAttribute('src'); } catch { /* ignore */ }
+    try { this.v.pause(); this.v.srcObject = null; this.v.removeAttribute('src'); this.v.onloadedmetadata = null; } catch { /* ignore */ }
+    try { this.img.onload = null; this.img.onerror = null; this.img.removeAttribute('src'); } catch { /* ignore */ } // ends the MJPEG stream
   }
 
   setCamera(camId: string, name: string): void {
-    if (camId !== this.camId) { this.recWebrtcDisabled = false; this.recoveries = 0; }
+    if (camId !== this.camId) {
+      this.recWebrtcDisabled = false; this.recoveries = 0;
+      // the previous camera's stream must not keep playing under the new name while the host loads the new days
+      if (this.camId) this.stopStreams();
+    }
     this.camId = camId; this.camName = name;
     // last known picture aspect of this camera: the stage has the right shape before any poster/video arrives
     let ar = ''; try { ar = localStorage.getItem(this.arPrefix + camId) || ''; } catch { /* ignore */ }
     if (ar) this.stage.style.setProperty('--stage-ar', ar); else this.stage.style.removeProperty('--stage-ar');
+  }
+  /** Stop every stream and clear the stage (camera switch): no picture of the old camera stays. */
+  private stopStreams(): void {
+    this.chaseAbort();
+    if (this.liveRestartT) { clearTimeout(this.liveRestartT); this.liveRestartT = 0; }
+    if (this.mjpegRetryT) { clearTimeout(this.mjpegRetryT); this.mjpegRetryT = 0; }
+    this.recWebrtcTeardown(); this.webrtcTeardown(); this.mseTeardown(); this.liveTeardown();
+    this.live = false; this.recPaused = false; this.recPausedTs = null; this.hiddenTs = null; this.playIndex = -1; this.curClipId = null;
+    try { this.v.pause(); this.v.srcObject = null; this.v.removeAttribute('src'); this.v.onloadedmetadata = null; } catch { /* ignore */ }
+    this.setMjpeg(false); this.freezeHide(); this.transport = 'none'; this.setLabel('loading');
   }
   /** picture aspect → stage box (mobile layout uses it); posters and video both report it */
   private setAspect(w: number, h: number): void {
@@ -312,7 +331,7 @@ export class PlayerController {
     else { try { this.v.pause(); } catch { /* ignore */ } this.liveFallbackImg(); }
   }
   private exitLiveState(): void { if (this.live) { this.live = false; this.webrtcTeardown(); this.liveTeardown(); try { this.v.srcObject = null; } catch { /* ignore */ } this.setMjpeg(false); } }
-  private setMjpeg(on: boolean): void { this.img.classList.toggle('hidden', !on); this.v.classList.toggle('hidden', on); if (!on) this.img.removeAttribute('src'); }
+  private setMjpeg(on: boolean): void { this.img.classList.toggle('hidden', !on); this.v.classList.toggle('hidden', on); if (!on) { this.img.onerror = null; this.img.removeAttribute('src'); } }
   private webrtcTeardown(): void { this.w?.stop(); this.w = undefined; }
   private liveStartWebrtc(): void {
     if (this.destroyed) return;
@@ -321,10 +340,39 @@ export class PlayerController {
     try { this.v.pause(); } catch { /* ignore */ } try { this.v.srcObject = null; } catch { /* ignore */ } this.v.removeAttribute('src');
     this.setMjpeg(false);
     const s = new WebRtcSession(this.api, { camId: this.camId, mode: 'live' }, {
-      onStream: (ms) => { if (!this.live || this.w !== s) return; this.setMjpeg(false); this.v.muted = !this.soundOn; try { this.v.removeAttribute('src'); } catch { /* ignore */ } try { this.v.srcObject = ms; } catch { /* ignore */ } this.fcArm(); this.safePlay(); this.transport = 'webrtc'; this.setLabel('liveWebrtc'); },
+      onStream: (ms) => { if (!this.live || this.w !== s) return; this.setMjpeg(false); this.v.muted = !this.soundOn; try { this.v.removeAttribute('src'); } catch { /* ignore */ } try { this.v.srcObject = ms; } catch { /* ignore */ } this.fcArm(); this.safePlay(); this.transport = 'webrtc'; this.setLabel('liveWebrtc'); this.liveWd = { last: this.presentedFrames(), at: Date.now() + 8000 /* first frame grace */, since: Date.now() }; },
       onFail: () => { if (this.w === s) this.liveFallbackMse(); },
     });
     this.w = s; this.transport = 'webrtc'; s.start();
+  }
+  /**
+   * Live health, once a second while live and visible:
+   * - WebRTC: no presented frame for 8 s (a 'disconnected' ICE that never turns 'failed' froze the picture under the
+   *   "Live" label) → restart, after 3 restarts in a row the MSE/MJPEG fallback;
+   * - 30 s of flowing frames reset the restart counter (it only ever grew → MJPEG for good after 5 hiccups);
+   * - in a fallback (MSE/MJPEG) WebRTC is tried again every 2 minutes.
+   */
+  private liveWatch(): void {
+    if (document.visibilityState === 'hidden' || this.destroyed) return;
+    const now = Date.now();
+    if (this.transport === 'webrtc' && this.w?.active && this.v.srcObject) {
+      const q = this.presentedFrames(); const W = this.liveWd;
+      if (q !== W.last) { W.last = q; if (now > W.at) W.at = now; if (now - W.since > 30000) { this.L.restarts = 0; this.liveUpgradeN = 0; W.since = now; } return; }
+      if (now - W.at > 8000) {
+        this.L.restarts++; rlog('live-stall', { n: this.L.restarts, pf: q, ice: this.w.pc?.iceConnectionState });
+        if (this.L.restarts > 3) this.liveFallbackMse(); else this.liveStartWebrtc();
+      }
+      return;
+    }
+    if ((this.transport === 'mse' || this.transport === 'mjpeg') && window.RTCPeerConnection && window.WebSocket && !this.w) {
+      // back-off 2 → 5 → 15 min: a WebRTC path that stays broken must not blink the picture every 2 minutes
+      if (!this.liveUpgradeAt) this.liveUpgradeAt = now + [120000, 300000, 900000][Math.min(this.liveUpgradeN, 2)]!;
+      else if (now > this.liveUpgradeAt) {
+        this.liveUpgradeAt = 0; this.liveUpgradeN++; this.L.restarts = 0; rlog('live-upgrade', { from: this.transport, n: this.liveUpgradeN });
+        if (this.transport === 'mjpeg') this.freezeFromImage(this.img, true, false, 'mjpeg'); else this.freezeShow(true); // a still until WebRTC shows its first frame
+        this.liveStartWebrtc();
+      }
+    } else this.liveUpgradeAt = 0;
   }
   private liveFallbackMse(): void { this.webrtcTeardown(); if (!this.live) return; try { this.v.srcObject = null; } catch { /* ignore */ } if (this.liveMseOk()) this.liveStartMse(); else this.liveFallbackImg(); }
   private liveCodec(): string | null { return this.codecs ? (this.codecs.split(',')[0] ?? null) : null; }
@@ -356,7 +404,19 @@ export class PlayerController {
     try { this.v.srcObject = null; } catch { /* ignore */ }
     this.v.src = u; this.v.playbackRate = 1; this.v.muted = true; this.safePlay();
   }
-  private liveFallbackImg(): void { this.liveTeardown(); if (!this.live) return; try { this.v.pause(); } catch { /* ignore */ } this.img.onload = () => { this.img.onload = null; if (this.live) this.freezeLift(0); }; this.transport = 'mjpeg'; this.setLabel('liveMjpeg'); this.setMjpeg(true); this.img.src = this.api.url(`api/live?camera=${encodeURIComponent(this.camId)}`) + `&_=${Date.now()}`; }
+  private liveFallbackImg(): void {
+    this.liveTeardown(); if (!this.live) return; try { this.v.pause(); } catch { /* ignore */ }
+    const cam = this.camId;
+    this.img.onload = () => { this.img.onload = null; this.mjpegRetries = 0; if (this.live) this.freezeLift(0); };
+    // the MJPEG stream ends or fails (429 busy, network): retry with back-off, 3 times in a row at most
+    this.img.onerror = () => {
+      if (!this.live || this.camId !== cam || this.transport !== 'mjpeg' || this.destroyed || this.mjpegRetries >= 3) return;
+      const wait = 2000 * 2 ** this.mjpegRetries++; rlog('mjpeg-retry', { n: this.mjpegRetries });
+      if (this.mjpegRetryT) clearTimeout(this.mjpegRetryT);
+      this.mjpegRetryT = window.setTimeout(() => { this.mjpegRetryT = 0; if (this.live && this.camId === cam && this.transport === 'mjpeg') this.img.src = this.api.url(`api/live?camera=${encodeURIComponent(cam)}`) + `&_=${Date.now()}`; }, wait);
+    };
+    this.transport = 'mjpeg'; this.setLabel('liveMjpeg'); this.setMjpeg(true); this.img.src = this.api.url(`api/live?camera=${encodeURIComponent(cam)}`) + `&_=${Date.now()}`;
+  }
 
   // ---- RECORDED via relay -----------------------------------------------------------------
   private recWebrtcOk(): boolean { return !this.recWebrtcDisabled && !!(window.RTCPeerConnection && window.WebSocket); }
@@ -370,7 +430,8 @@ export class PlayerController {
     try { this.v.pause(); } catch { /* ignore */ } try { this.v.removeAttribute('src'); this.v.srcObject = null; } catch { /* ignore */ }
     this.setMjpeg(false); this.transport = 'relay';
     this.setLabel('loading');
-    this.rwStartMs = ts; this.rwBase = null; this.rwRate = this.rate; this.rwSrate = 1; this.seekTarget = ts; // event poster clears when relay-pos reaches here
+    // a new session starts at 1× on the server — the chosen speed is sent once the session id is known (onSessionId)
+    this.rwStartMs = ts; this.rwBase = null; this.rwRate = 1; this.rwSrate = 1; this.seekTarget = ts; this.cmdSeq++; // event poster clears when relay-pos reaches here
     const compat = mobileClient();
     if (compat) rlog('rec-compat-start', { ts: Math.round(ts) });
     const s = new WebRtcSession(this.api, { camId: this.camId, mode: 'recorded', startMs: ts, compat }, {
@@ -382,7 +443,12 @@ export class PlayerController {
         this.fcArm(); this.rwBase = null; this.safePlay(); this.setLabel('playing');
       },
       onFail: () => { if (this.rw === s) this.recFallbackMse(ts); },
-      onSessionId: () => { if (this.rw === s && this.rwPending) { const p = this.rwPending; this.rwPending = null; if (Math.abs(p.ts - this.rwStartMs) > 1500) { if (p.mark) this.freezeCurrent(); this.recRelaySeek(p.ts, p.rate, p.srate, p.mark); } } },
+      onSessionId: () => {
+        if (this.rw !== s) return;
+        const p = this.rwPending; this.rwPending = null;
+        if (p && Math.abs(p.ts - this.rwStartMs) > 1500) { if (p.mark) this.freezeCurrent(); this.recRelaySeek(p.ts, p.rate, p.srate, p.mark); } // carries the rate
+        else if (this.rate !== 1) this.recRelaySpeed(this.rate); // pause/play, tab switch, recovery: keep the chosen speed
+      },
     });
     this.sessFrames0 = this.presentedFrames(); this.shownW = 0;
     this.rw = s; s.start(); this.startRelayPoll(); this.emit();
@@ -413,6 +479,7 @@ export class PlayerController {
     this.swapPending = true; this.swapW = 0; this.swapAt = Date.now(); if (this.swapT) { clearTimeout(this.swapT); this.swapT = 0; }
     const seq = this.cmdSeq;
     const done = (ok: boolean, w: number) => {
+      if (this.rw !== s) return; // answer of a session that is gone: must not touch (or recover) the current one
       this.rwSeekBusy = false; if (!ok) { this.relayRecover(); return; }
       if (this.swapPending && seq === this.cmdSeq) {
         if (w) { this.swapW = w; if (this.shownW === w) this.swapVisible('marker'); } // marker path (see SWAP_MS)
@@ -421,7 +488,7 @@ export class PlayerController {
       const p = this.rwPending; this.rwPending = null; if (p && this.rw?.id) this.recRelaySeek(p.ts, p.rate, p.srate, p.mark);
     };
     const q = `api/relay-seek?session=${encodeURIComponent(s.id)}&start=${Math.round(ts)}&rate=${rate}&srate=${srate}` + (mark ? `&mark=1&avoid=${this.shownW || this.v.videoWidth || 0}` : '');
-    fetch(this.api.url(q), { cache: 'no-store' })
+    fetch(this.api.url(q), { cache: 'no-store', signal: timeoutSignal(10000) }) // bounded: a hanging seek blocked every later jump
       .then(r => { if (!r.ok) return done(false, 0); if (r.status === 200) return r.json().then((j: any) => done(true, Number(j?.w) || 0), () => done(true, 0)); return done(true, 0); })
       .catch(() => done(false, 0));
   }
@@ -444,7 +511,7 @@ export class PlayerController {
     this.rwLastTarget = ts; this.rwLastTargetAt = Date.now(); // no cmdSeq bump: the position moves continuously, polls stay valid
     this.wdGrace = Date.now() + 8000; this.cad.lastNew = Date.now();
     this.rwTargetBusy = true;
-    this.api.control(`api/relay-target?session=${encodeURIComponent(s.id)}&ts=${Math.round(ts)}`).then(ok => { if (!ok) this.relayRecover(); }).then(() => { this.rwTargetBusy = false; const p = this.rwPendingTarget; this.rwPendingTarget = null; if (p != null && this.rw?.id && Math.abs(p - this.rwLastTarget) >= TARGET_MIN_STEP_MS) this.recRelayTarget(p); });
+    this.api.control(`api/relay-target?session=${encodeURIComponent(s.id)}&ts=${Math.round(ts)}`).then(ok => { if (this.rw !== s) return; if (!ok) this.relayRecover(); }).then(() => { if (this.rw !== s) return; this.rwTargetBusy = false; const p = this.rwPendingTarget; this.rwPendingTarget = null; if (p != null && this.rw?.id && Math.abs(p - this.rwLastTarget) >= TARGET_MIN_STEP_MS) this.recRelayTarget(p); });
   }
   /** profile on/off; `off` also ends the server's target steering, so it is sent even when the profile was never entered
    *  (single-notch gesture) as long as the gesture steered (`force`) */
@@ -455,7 +522,7 @@ export class PlayerController {
     this.cmdSeq++;
     if (!on) { const c = this.currentTs(); this.rwSrate = 1; this.rwRate = this.rate; if (c != null) { this.rwPosTs = c; this.rwPosAt = Date.now(); } if (this.label === 'scrub') this.setLabel('playing'); }
     this.wdLastCt = -1; this.wdLastAt = Date.now(); this.wdGrace = Date.now() + 5000; this.cad.lastNew = Date.now();
-    this.api.control(`api/relay-scrub?session=${encodeURIComponent(s.id)}&on=${on ? 1 : 0}`).then(ok => { if (!ok) this.relayRecover(); });
+    this.api.control(`api/relay-scrub?session=${encodeURIComponent(s.id)}&on=${on ? 1 : 0}`).then(ok => { if (this.rw === s && !ok) this.relayRecover(); });
   }
   private relayRecover(): void {
     if (!this.rw?.active) return;
@@ -481,16 +548,17 @@ export class PlayerController {
           this.relayRecover(); return;
         }
       } else { this.wdLastCt = q; this.wdLastAt = Date.now(); }
-      const seq = this.cmdSeq;
-      fetch(this.api.url(`api/relay-pos?session=${encodeURIComponent(s.id)}`), { cache: 'no-store' }).then(r => r.json()).then((d: any) => {
-        if (seq !== this.cmdSeq) return; // answered across a seek/rate change → stale
+      if (this.rwPosBusy) return; // one poll at a time: hanging polls would fill the browser's connection pool (HTTP/1.1: 6 per host)
+      const seq = this.cmdSeq; this.rwPosBusy = true;
+      fetch(this.api.url(`api/relay-pos?session=${encodeURIComponent(s.id)}`), { cache: 'no-store', signal: timeoutSignal(3000) }).then(r => r.json()).then((d: any) => {
+        if (this.rw !== s || seq !== this.cmdSeq) return; // other session, or answered across a seek/rate change → stale
         if (d && d.t > 0 && Date.now() - this.seekAt < 2500 && Math.abs(d.t - this.seekTarget) > 5000) return; // pre-swap position
         if (d && d.t > 0) { this.wdDead = 0; this.rwPosTs = d.t; this.rwPosAt = Date.now(); if ((this.rwScrub || this.scrubMoves > 0) && typeof d.r === 'number' && isFinite(d.r) && d.r) this.rwRate = d.r; this.emit(); }
         else if (d && d.t <= 0) { if (++this.wdDead >= 3) { this.wdDead = 0; this.relayRecover(); } }
-      }).catch(() => { /* ignore */ });
+      }).catch(() => { /* ignore */ }).finally(() => { this.rwPosBusy = false; });
     }, 600);
   }
-  private stopRelayPoll(): void { this.cadStop(); if (this.relayPoll) { clearInterval(this.relayPoll); this.relayPoll = undefined; } }
+  private stopRelayPoll(): void { this.cadStop(); if (this.relayPoll) { clearInterval(this.relayPoll); this.relayPoll = undefined; } this.rwPosBusy = false; }
   private cadStart(): void {
     this.cadStop(); const C = this.cad; C.last = -1; C.frames0 = -1; C.stalls = 0; C.maxStall = 0; C.gapMax = 0; C.t0 = Date.now();
     C.t = window.setInterval(() => {

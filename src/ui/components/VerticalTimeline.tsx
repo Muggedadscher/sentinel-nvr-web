@@ -82,9 +82,10 @@ export function VerticalTimeline(p: TimelineProps) {
   useEffect(() => { const d = p.rangeEnd - prevEnd.current; prevEnd.current = p.rangeEnd; const el = scroll.current; if (d && el && px) setTop(el, el.scrollTop + d * px, 'range'); }, [p.rangeEnd, px]);
   useEffect(() => { if (p.jump && px) scrollCenter(p.jump.ts, 'jump'); }, [p.jump?.n, px]);
   useEffect(() => { const on = () => { VT.current.touching = true; }; const off = () => { VT.current.touching = false; }; document.addEventListener('touchstart', on, { passive: true }); document.addEventListener('touchend', off); document.addEventListener('touchcancel', off); return () => { document.removeEventListener('touchstart', on); document.removeEventListener('touchend', off); document.removeEventListener('touchcancel', off); }; }, []);
-  // auto-follow (live: now; playback: playhead) while the user is not interacting; re-render the centre time
-  useEffect(() => {
-    const t = setInterval(() => {
+  // auto-follow (live: now; playback: playhead) while the user is not interacting; re-render the centre time.
+  // Registered ONCE; the tick reads the current render's values through a ref (re-registering the interval and the
+  // listeners below on every render — every 100 ms — was pure churn, and wheel events could fall into the gap).
+  const followTick = () => {
       const v = VT.current;
       if (!v.user) {
         const ts = p.live ? Date.now() : (p.following() ? p.playhead() : null);
@@ -97,16 +98,17 @@ export function VerticalTimeline(p: TimelineProps) {
         }
       }
       notifyCenter(); tick(n => n + 1);
-    }, 100);
-    return () => clearInterval(t);
-  });
+  };
+  const followRef = useRef(followTick); followRef.current = followTick;
+  useEffect(() => { const t = setInterval(() => followRef.current(), 100); return () => clearInterval(t); }, []);
   const notifyCenter = () => { const v = VT.current; if (Date.now() - v.lastCenterCb < 400) return; v.lastCenterCb = Date.now(); p.onCenter(clamp(centerTs(), p.rangeStart, p.rangeEnd - 1)); };
   const scrubSeek = (ts?: number) => { const v = VT.current; v.previewing = true; p.scrub.seek(clamp(ts ?? centerTs(), p.rangeStart, p.rangeEnd - 1)); };
   const userIdle = () => { VT.current.user = 0; VT.current.idleAt = Date.now(); p.scrub.idle(clamp(centerTs(), p.rangeStart, p.rangeEnd - 1)); };
   const scrubHold = () => { const v = VT.current; v.previewing = true; p.scrub.hold(clamp(centerTs(), p.rangeStart, p.rangeEnd - 1)); };
   const markUser = () => { const v = VT.current; if (!v.user) { v.vel = 0; v.smooth = null; v.lastC = null; p.scrub.begin(); } v.user = Date.now(); v.previewing = false; v.moved = false; };
   const release = () => { const v = VT.current; if (!v.user) return; v.down = false; clearTimeout(v.holdT); if (v.moved) scrubSeek(); clearTimeout(v.relT); v.relT = window.setTimeout(userIdle, 250); };
-  useEffect(() => { for (const n of ['pointerup', 'pointercancel', 'touchend']) window.addEventListener(n, release); return () => { for (const n of ['pointerup', 'pointercancel', 'touchend']) window.removeEventListener(n, release); }; });
+  const releaseRef = useRef(release); releaseRef.current = release;
+  useEffect(() => { const h = () => releaseRef.current(); for (const n of ['pointerup', 'pointercancel', 'touchend']) window.addEventListener(n, h); return () => { for (const n of ['pointerup', 'pointercancel', 'touchend']) window.removeEventListener(n, h); }; }, []);
   const onScroll = () => {
     const v = VT.current; const el = scroll.current!;
     if (!v.user) {
@@ -129,11 +131,13 @@ export function VerticalTimeline(p: TimelineProps) {
     clearTimeout(v.relT); v.relT = window.setTimeout(() => { if (!v.down) userIdle(); }, 700);
   };
   // wheel: plain = native scroll (scrub), ctrl = zoom around the pointer (non-passive listener → preventDefault works)
+  const onWheel = (e: globalThis.WheelEvent) => { const el = scroll.current!; if (!e.ctrlKey) { markUser(); return; } e.preventDefault(); const r = el.getBoundingClientRect(); const y = e.clientY - r.top; applyZoom(px * Math.exp(-e.deltaY * 0.002), tsForY(el.scrollTop + y), y); };
+  const wheelRef = useRef(onWheel); wheelRef.current = onWheel;
   useEffect(() => {
     const el = scroll.current!;
-    const onWheel = (e: globalThis.WheelEvent) => { if (!e.ctrlKey) { markUser(); return; } e.preventDefault(); const r = el.getBoundingClientRect(); const y = e.clientY - r.top; applyZoom(px * Math.exp(-e.deltaY * 0.002), tsForY(el.scrollTop + y), y); };
-    el.addEventListener('wheel', onWheel, { passive: false }); return () => el.removeEventListener('wheel', onWheel);
-  });
+    const h = (e: globalThis.WheelEvent) => wheelRef.current(e);
+    el.addEventListener('wheel', h, { passive: false }); return () => el.removeEventListener('wheel', h);
+  }, []);
   const applyZoom = (npx: number, anchor: number, anchorY: number) => { const c = clamp(npx, minPx, maxPx); setPx(c); requestAnimationFrame(() => { const el = scroll.current; if (el) setTop(el, PAD + (p.rangeEnd - anchor) * c - anchorY, 'zoom'); }); };
   const zoomStep = (f: number) => { const a = p.live ? Date.now() : (p.playhead() ?? centerTs()); applyZoom(px * f, a, vh * HEAD); };
 

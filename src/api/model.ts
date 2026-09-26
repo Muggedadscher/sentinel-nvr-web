@@ -47,6 +47,10 @@ export interface SentinelStats {
   diskFree: number;
   diskTotal: number;
   minFreeBytes: number;
+  /** plugin ≥ 2026-09-26: storage root usable (storage guard); false = not recording, nothing deleted. */
+  storageOk?: boolean;
+  /** why not: 'marker' (share not mounted), 'missing', 'error', 'timeout' */
+  storageProblem?: string;
 }
 
 /** `api/recent-events` entry (short form). */

@@ -1,3 +1,4 @@
+/*! Theme tokens derived from HAPulse (https://github.com/jlnbln/HAPulse) — MIT License, Copyright (c) 2026 Julian */
 /**
  * Theme tokens: the four colour identities (aurora / sunset / ocean / forest),
  * each with light + dark token sets, plus the pure mode/accent maths.
