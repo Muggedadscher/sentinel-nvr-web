@@ -16,6 +16,7 @@
 import { timeoutSignal, type SentinelClip as Clip, type SentinelClient } from '../api';
 import { rlog, setRlogClient } from './rlog';
 import { WebRtcSession, mobileClient } from './webrtc';
+import { skipTarget } from './skip';
 
 /** `label` is an i18n key suffix: nvr.player.<label> */
 export type PlayerLabel =
@@ -2080,9 +2081,9 @@ export class PlayerController {
     else this.v.pause();
   }
   skip(ms: number): void {
-    const ts = this.live ? Date.now() + ms : (this.currentTs() ?? Date.now()) + ms;
-    if (this.live && ms > 0) return;
-    this.playAt(ts, {});
+    const d = skipTarget(this.live, this.currentTs(), ms, Date.now());
+    if (d === 'live') this.goLive();
+    else if (d != null) this.playAt(d, {});
   }
   cycleSpeed(): number {
     if (this.live) return this.rate;
