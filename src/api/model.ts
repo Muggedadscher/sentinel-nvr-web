@@ -110,6 +110,12 @@ export interface SentinelSetup {
   origin: string;
   /** Access token found in the pasted URL (`?token=`), if any. */
   token: string | null;
+  /**
+   * Reverse-proxy path prefix in front of Scrypted's `/endpoint/…` (e.g. `/scrypted` for
+   * `https://proxy/scrypted/endpoint/@local/sentinel-nvr/public/`), `''` without one.
+   * Only derived when the pasted URL contains `/endpoint/`. Since 0.10.0.
+   */
+  prefix: string;
 }
 
 /**
@@ -130,12 +136,14 @@ export function parseSentinelSetup(input: string | null | undefined): SentinelSe
   }
   if (!u.hostname) return null;
   const token = u.searchParams.get('token');
-  return { origin: u.origin, token: token && token.trim() ? token.trim() : null };
+  const at = u.pathname.indexOf('/endpoint/');
+  const prefix = at > 0 ? u.pathname.slice(0, at).replace(/\/+$/, '') : '';
+  return { origin: u.origin, token: token && token.trim() ? token.trim() : null, prefix };
 }
 
-/** Token-guarded machine base (`…/public/`), always with a trailing slash. */
-export function sentinelPublicBase(origin: string): string {
-  return `${origin.replace(/\/+$/, '')}${SENTINEL_ENDPOINT_PATH}/public/`;
+/** Token-guarded machine base (`…/public/`), always with a trailing slash; `prefix` = reverse-proxy path prefix. */
+export function sentinelPublicBase(origin: string, prefix = ''): string {
+  return `${origin.replace(/\/+$/, '')}${prefix.replace(/\/+$/, '')}${SENTINEL_ENDPOINT_PATH}/public/`;
 }
 
 /**
@@ -291,21 +299,100 @@ export function sentinelDayOf(ts: number): number {
   return new Date(ts).setHours(0, 0, 0, 0);
 }
 
-/** Merge per-day clip responses into one sorted, continuous data set. */
+// Calendar-day arithmetic. A local day is 23 or 25 hours long on DST change days, so
+// "day ± 24 h" lands an hour off midnight there (a second key for the same day, requests
+// shifted by an hour, "next day" staying on the same date). Always step calendar days:
+
+/** Local midnight `n` calendar days from the day of `ts`. */
+export function sentinelAddDays(ts: number, n: number): number {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + n);
+  return d.getTime();
+}
+
+/** End of the local day of `ts` (= next local midnight). */
+export function sentinelDayEnd(ts: number): number {
+  return sentinelAddDays(ts, 1);
+}
+
+/** Wall-clock time h:m on the local day of `ts` (not `midnight + h·3600 s`, which is an hour off on DST days). */
+export function sentinelAtTime(ts: number, h: number, m: number, s = 0): number {
+  const d = new Date(ts);
+  d.setHours(h, m, s, 0);
+  return d.getTime();
+}
+
+/**
+ * Timestamps of local wall-clock marks every `step` ms (a divisor of a day: 15 s … 6 h) within [from, to],
+ * ascending: a 3-h step marks 00:00/03:00/06:00 local time in every time zone (UTC-aligned steps showed
+ * 02:00/05:00/08:00 in CEST). On DST days a mark that does not exist is skipped, a repeated hour marked once.
+ */
+export function sentinelWallMarks(from: number, to: number, step: number, max = 8000): number[] {
+  const stepSec = Math.max(1, Math.round(step / 1000));
+  const out: number[] = [];
+  for (let day = sentinelDayOf(from); day <= to && out.length < max; day = sentinelAddDays(day, 1)) {
+    const end = sentinelDayEnd(day);
+    const regular = end - day === SENTINEL_DAY_MS;
+    // only the marks near the window (+1 h slack on DST days)
+    const k0 = Math.max(0, Math.floor((from - day - 3600_000) / (stepSec * 1000)));
+    const k1 = Math.min(Math.floor(86400 / stepSec), Math.ceil((to - day + 3600_000) / (stepSec * 1000)));
+    for (let k = k0; k <= k1 && out.length < max; k++) {
+      const sec = k * stepSec;
+      if (sec >= 86400) break;
+      let t: number;
+      if (regular) t = day + sec * 1000;
+      else {
+        const d = new Date(day);
+        d.setHours(Math.floor(sec / 3600), Math.floor((sec % 3600) / 60), sec % 60, 0);
+        // a wall time that does not exist (spring gap) normalises to another hour: skip it
+        if (d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds() !== sec) continue;
+        t = d.getTime();
+      }
+      if (t >= from && t <= to && (!out.length || t > out[out.length - 1]!)) out.push(t);
+    }
+  }
+  return out;
+}
+
+/** Local wall-clock seconds since midnight (for "is this mark on a label step?"). */
+export function sentinelWallSeconds(ts: number): number {
+  const d = new Date(ts);
+  return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+}
+
+/**
+ * Merge per-day clip responses into one sorted, continuous data set. A clip or motion span that
+ * crosses midnight comes with both days — kept once (by id / by interval).
+ */
 export function sentinelMergeDays(days: Record<number, SentinelClipsResponse>): {
   clips: SentinelClip[]; events: SentinelEvent[]; motion: [number, number][]; codecs: string | null; oldestDay: number | null;
 } {
   const keys = Object.keys(days).map(Number).sort((a, b) => a - b);
-  const clips: SentinelClip[] = [], events: SentinelEvent[] = [], motion: [number, number][] = [];
+  const clips = new Map<string, SentinelClip>(), events = new Map<string, SentinelEvent>();
+  const motionRaw: [number, number][] = [];
   let codecs: string | null = null;
   for (const k of keys) {
     const d = days[k]!;
-    clips.push(...d.clips); events.push(...d.events); motion.push(...d.motion);
+    for (const c of d.clips) clips.set(c.id, c);
+    for (const e of d.events) events.set(e.id || `${e.timestamp}`, e);
+    motionRaw.push(...d.motion);
     if (d.codecs) codecs = d.codecs;
   }
-  clips.sort((a, b) => a.startTime - b.startTime);
-  events.sort((a, b) => a.timestamp - b.timestamp);
-  return { clips, events, motion, codecs, oldestDay: keys.length ? keys[0]! : null };
+  motionRaw.sort((a, b) => a[0] - b[0]);
+  const motion: [number, number][] = [];
+  for (const m of motionRaw) {
+    const last = motion[motion.length - 1];
+    if (last && m[0] <= last[1]) last[1] = Math.max(last[1], m[1]);
+    else motion.push([m[0], m[1]]);
+  }
+  return {
+    clips: [...clips.values()].sort((a, b) => a.startTime - b.startTime),
+    events: [...events.values()].sort((a, b) => a.timestamp - b.timestamp),
+    motion,
+    codecs,
+    oldestDay: keys.length ? keys[0]! : null,
+  };
 }
 
 /** Human-readable byte size split into value + unit (binary steps). */

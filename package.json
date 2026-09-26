@@ -1,6 +1,6 @@
 {
   "name": "@sentinel-nvr/web",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Shared browser code for the Sentinel NVR plugin for Scrypted: API model + client (/api), player (/player) and React UI with i18n + themes (/ui). Consumed by the plugin's own web UI and the HAPulse dashboard.",
   "license": "MIT",
   "author": "Muggedadscher",
@@ -39,6 +39,7 @@
     "build": "tsup && mkdir -p dist/ui && cp src/ui/ui.css dist/ui/ui.css && rm -rf dist/ui/locales && cp -r src/ui/locales dist/ui/locales",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:tz": "TZ=UTC vitest run && TZ=Europe/Berlin vitest run && TZ=America/New_York vitest run",
     "release": "npm run build && changeset publish"
   },
   "devDependencies": {

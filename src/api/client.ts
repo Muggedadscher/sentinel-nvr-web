@@ -113,13 +113,15 @@ export class SentinelHttpError extends Error {
 /**
  * Trade Scrypted credentials for the plugin's access token (`POST …/public/api/token-exchange`,
  * plugin ≥ 2026-09-22). Rejects with `SentinelHttpError`: 401 wrong credentials, 403 token access
- * switched off in the plugin, 404 plugin too old, 429 too many attempts; 0 = unreachable.
+ * switched off in the plugin or (plugin ≥ 2026-09-26) not a Scrypted admin, 404 plugin too old,
+ * 429 too many attempts, 503 Scrypted login unavailable; 0 = unreachable. `prefix` = reverse-proxy
+ * path prefix (SentinelSetup.prefix, since 0.10.0).
  */
-export async function exchangeSentinelToken(origin: string, username: string, password: string, timeoutMs = 10_000): Promise<string> {
+export async function exchangeSentinelToken(origin: string, username: string, password: string, timeoutMs = 10_000, prefix = ''): Promise<string> {
   const path = 'api/token-exchange';
   let r: Response;
   try {
-    r = await fetch(sentinelPublicBase(origin) + path, {
+    r = await fetch(sentinelPublicBase(origin, prefix) + path, {
       method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(timeoutMs),
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }),
     });
