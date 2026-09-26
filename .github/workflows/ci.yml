@@ -11,5 +11,6 @@ jobs:
         with: { node-version: '22', cache: npm }
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm run test:tz   # UTC, Europe/Berlin, America/New_York (calendar days, DST)
       - run: npm run build
