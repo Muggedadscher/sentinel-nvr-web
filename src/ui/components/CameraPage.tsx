@@ -372,7 +372,7 @@ export function CameraPage(p: CameraPageProps) {
       if (pick != null) c.playAt(pick, {});
       else setPs((s) => ({ ...s, live: false, label: 'noRecording', playhead: null }));
     },
-    [ensureDay, camId, goLive],
+    [ensureDay, camId, goLive, mergedNow],
   );
   const scrub = useMemo<ScrubHandlers>(
     () => ({

@@ -152,6 +152,8 @@ export function VerticalTimeline(p: TimelineProps) {
     if (!px || init.current) return;
     init.current = true;
     scrollCenter(Date.now());
+    // runs once, when the scale is known (scrollCenter reads the current render's values)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [px]);
   const prevEnd = useRef(p.rangeEnd);
   useEffect(() => {
@@ -159,9 +161,13 @@ export function VerticalTimeline(p: TimelineProps) {
     prevEnd.current = p.rangeEnd;
     const el = scroll.current;
     if (d && el && px) setTop(el, el.scrollTop + d * px, 'range');
+    // only when the range end moves (setTop is a plain helper of this render)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.rangeEnd, px]);
   useEffect(() => {
     if (p.jump && px) scrollCenter(p.jump.ts, 'jump');
+    // only for a new jump request (p.jump.n), not when the object identity changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.jump?.n, px]);
   useEffect(() => {
     const on = () => {
