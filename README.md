@@ -58,8 +58,9 @@ npm test
 npm run build
 ```
 
-Releases use [Changesets](https://github.com/changesets/changesets):
-`npx changeset` to record a change, then the release workflow publishes to npm.
+Releases: bump `version` in `package.json`, add a `CHANGELOG.md` entry, merge, tag `v<version>` on `main`,
+then publish from the tag with the maintainer's `snvrweb-publish.sh <version>` (clean checkout, typecheck, lint,
+format check, tests in three time zones, build, then `npm publish`; `prepublishOnly` refuses any other route).
 
 ## License
 

@@ -25,5 +25,5 @@ export default tseslint.config(
     plugins: { 'react-hooks': reactHooks },
     rules: { 'react-hooks/rules-of-hooks': 'error', 'react-hooks/exhaustive-deps': 'warn' },
   },
-  { files: ['test/**', '*.config.*'], languageOptions: { globals: { ...globals.node } } },
+  { files: ['test/**', 'scripts/**', '*.config.*'], languageOptions: { globals: { ...globals.node } } },
 );
