@@ -16,7 +16,12 @@ export interface SessionCallbacks {
 }
 export interface SessionOptions { camId: string; mode: 'live' | 'recorded'; startMs?: number; compat?: boolean; forceRelay?: boolean; kind?: string; }
 
-let forceRelayGlobal = false;
+/** After a connect timeout / media blackhole the next sessions use TURN relay only — for 10 minutes, not for the rest of
+ *  the page's life (one mobile-network hiccup would otherwise force relay forever; without a TURN server every later
+ *  session would fail and the player end up on MSE/MJPEG). */
+let forceRelayUntil = 0;
+const FORCE_RELAY_MS = 10 * 60_000;
+const relayForced = (): boolean => Date.now() < forceRelayUntil;
 
 export function mobileClient(): boolean {
   return /iPhone|iPod|Android|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(screen.width || 9999, screen.height || 9999) < 920);
@@ -43,7 +48,7 @@ export class WebRtcSession {
     this.connectT = window.setTimeout(() => {
       if (this.active && this.ws === ws && !this.connected) {
         rlog('connect-timeout', { kind: this.opts.mode, ice: this.pc?.iceConnectionState });
-        if (!forceRelayGlobal) { forceRelayGlobal = true; rlog('retry-relay-only', { kind: this.opts.mode }); this.stop(); this.start(); return; }
+        if (!relayForced()) { forceRelayUntil = Date.now() + FORCE_RELAY_MS; rlog('retry-relay-only', { kind: this.opts.mode }); this.stop(); this.start(); return; }
         this.fail('timeout');
       }
     }, 12000);
@@ -73,7 +78,7 @@ export class WebRtcSession {
   private ensurePc(setup: any): RTCPeerConnection {
     if (this.pc) return this.pc;
     let cfg: RTCConfiguration = (setup && setup.configuration) || { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-    if (forceRelayGlobal) cfg = { ...cfg, iceTransportPolicy: 'relay' };
+    if (relayForced()) cfg = { ...cfg, iceTransportPolicy: 'relay' };
     const pc = new RTCPeerConnection(cfg);
     this.pc = pc;
     if (setup?.datachannel) { try { const dc = pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict); dc.binaryType = 'arraybuffer'; } catch { /* ignore */ } }
@@ -103,11 +108,11 @@ export class WebRtcSession {
               if (r.type === 'inbound-rtp' && (r.kind || r.mediaType) === 'audio') aBytes = r.bytesReceived || 0;
             });
             if (dec <= 0) {
-              rlog('dec-check-fail', { kind: this.opts.mode, dec, recv, vBytes, aBytes, relayForced: forceRelayGlobal });
-              if (!forceRelayGlobal && vBytes <= 0 && aBytes <= 0) { forceRelayGlobal = true; rlog('retry-relay-only', { kind: this.opts.mode }); this.stop(); this.start(); return; }
+              rlog('dec-check-fail', { kind: this.opts.mode, dec, recv, vBytes, aBytes, relayForced: relayForced() });
+              if (!relayForced() && vBytes <= 0 && aBytes <= 0) { forceRelayUntil = Date.now() + FORCE_RELAY_MS; rlog('retry-relay-only', { kind: this.opts.mode }); this.stop(); this.start(); return; }
               this.fail('no-decode');
             }
-            else rlog('dec-ok', { kind: this.opts.mode, dec, relayForced: forceRelayGlobal });
+            else rlog('dec-ok', { kind: this.opts.mode, dec, relayForced: relayForced() });
           }).catch(() => { /* ignore */ });
         }, this.opts.mode === 'live' ? 5000 : 9000);
       }

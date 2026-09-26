@@ -21,7 +21,7 @@ import {
 } from '../../api';
 import { PlayerController, type PlayerState } from '../../player';
 import { useSentinelUi } from '../context';
-import { dateChipNav, stageStatus } from '../camera-logic';
+import { dateChipNav, shouldHandleKey, stageStatus } from '../camera-logic';
 import { lastTileSnapshot } from '../snapshot-cache';
 import { ClassBadge, classLabel } from './ClassBadge';
 import { EventList } from './EventList';
@@ -93,6 +93,7 @@ export function CameraPage(p: CameraPageProps) {
   const psRef = useRef(ps); psRef.current = ps;
   const loading = useRef(new Set<number>()); const daysRef = useRef(days); daysRef.current = days;
   const camRef = useRef(camId); camRef.current = camId;
+  const deepRef = useRef(''); // camera|startAt the page last opened or jumped to (deep links)
 
   // ---- data: one request per day, merged into a continuous range
   const merged = useMemo(() => {
@@ -168,8 +169,19 @@ export function CameraPage(p: CameraPageProps) {
         if (startAt) { c.playAt(startAt, {}); setJump({ ts: startAt, n: Date.now() }); } else c.goLive();
       })
       .catch(() => setLoadError(true));
+    deepRef.current = `${camId}|${startAt}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camId, client]);
+  // another deep link to the SAME camera (back/forward between #/…?at=… entries, a second event from the overview):
+  // the camera stays open, only the position changes
+  useEffect(() => {
+    const key = `${camId}|${startAt}`;
+    if (!startAt || !ctl.current || key === deepRef.current) return;
+    deepRef.current = key;
+    const c = ctl.current; c.freezeCurrent(); c.posterEvent(posterTs || startAt);
+    goToDay(dayOf(startAt), startAt).catch(() => setLoadError(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startAt, posterTs]);
   useEffect(() => { if (ctl.current && name) ctl.current.camName = name; }, [name]);
   // today upkeep: fresh clips/events/motion while live (no seek, no stage reset)
   useEffect(() => { const i = setInterval(() => { if (psRef.current.live) ensureDay(todayStart(), true).catch(() => { /* keep */ }); }, 15000); return () => clearInterval(i); }, [ensureDay]);
@@ -212,8 +224,7 @@ export function CameraPage(p: CameraPageProps) {
   // keyboard: space play/pause, ←/→ ±10 s (shift ±60), n/p events, l live
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if (dt) return;
-      const tag = ((e.target as HTMLElement | null)?.tagName || '').toLowerCase(); if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+      if (dt || !shouldHandleKey(e)) return;
       const c = ctl.current; if (!c) return;
       if (e.key === ' ') { e.preventDefault(); c.togglePlayPause(); }
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const ts = c.currentTs(); if (ts == null) return; c.playAt(ts + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 60 : 10) * 1000, {}); }

@@ -59,9 +59,10 @@ export class SentinelClient {
    * fetch (network error) resolves false so the player can recover instead of
    * believing a seek/rate change landed. (The plugin sends CORS on every reply.)
    */
-  async control(path: string): Promise<boolean> {
+  async control(path: string, timeoutMs = 8000): Promise<boolean> {
     try {
-      const r = await fetch(this.url(path), { cache: 'no-store' });
+      // bounded: a hanging control request kept the player's "one in flight" gate closed for good
+      const r = await fetch(this.url(path), { cache: 'no-store', signal: timeoutSignal(timeoutMs) });
       return r.ok;
     } catch {
       return false;
@@ -132,4 +133,9 @@ export async function exchangeSentinelToken(origin: string, username: string, pa
   const j = (await r.json()) as { token?: unknown };
   if (typeof j.token !== 'string' || !j.token) throw new SentinelHttpError(502, path);
   return j.token;
+}
+
+/** AbortSignal that fires after `ms` (undefined on engines without AbortSignal.timeout — Safari < 16). */
+export function timeoutSignal(ms: number): AbortSignal | undefined {
+  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(ms) : undefined;
 }
