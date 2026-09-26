@@ -4,6 +4,15 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.12.0 — 2026-09-26
+
+- +15 s (and →) from a recording that would land closer than 20 s to "now" — where no recording exists yet — goes
+  live instead of fizzling out (it advanced ~2 s). New DOM-free helper `skipTarget` / `SKIP_LIVE_EDGE_MS`
+  (`/player`), unit-tested.
+- Lint: no warnings (stable `mergedNow` in the deps, trigger-only timeline effects documented).
+- Dev tooling: vitest 5, vite 8 (tests only), `@types/node` 22, lucide-react 1.x as dev dependency (the peer range
+  `>=0.400.0` already allows 1.x). Built `dist` of the tooling update was byte-identical.
+
 ## 0.11.0 — 2026-09-26
 
 Player robustness.
