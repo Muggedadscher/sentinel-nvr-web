@@ -5,6 +5,13 @@ updates:
     directory: /
     schedule: { interval: weekly, day: monday }
     open-pull-requests-limit: 5
+    ignore:
+      # TypeScript 7 (native compiler) has no JS compiler API yet — typescript-eslint and tsup can't use it
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      # types follow the Node runtime (22)
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     groups:
       minor-patch:
         update-types: [minor, patch]
