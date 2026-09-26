@@ -13,7 +13,10 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser } },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off', // WebRTC stats / browser quirks are typed loosely on purpose
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' }],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' },
+      ],
       'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },

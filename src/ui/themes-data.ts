@@ -325,7 +325,7 @@ export function resolveThemeMode(mode: ThemeMode, systemPrefersDark: boolean): R
  */
 export function accentOverride(
   hue: number,
-  resolvedMode: ResolvedMode
+  resolvedMode: ResolvedMode,
 ): { accent: string; accentSoft: string; onAccent: string } {
   const isDark = resolvedMode === 'dark';
   const l = isDark ? 60 : 50;

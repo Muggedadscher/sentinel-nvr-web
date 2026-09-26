@@ -4,5 +4,9 @@
  * ~1–3 s for a fresh api/snapshot (user 23.09.: "erstmal kein Bild").
  */
 const last = new Map<string, string>();
-export function rememberTileSnapshot(camId: string, url: string): void { last.set(camId, url); }
-export function lastTileSnapshot(camId: string): string | undefined { return last.get(camId); }
+export function rememberTileSnapshot(camId: string, url: string): void {
+  last.set(camId, url);
+}
+export function lastTileSnapshot(camId: string): string | undefined {
+  return last.get(camId);
+}

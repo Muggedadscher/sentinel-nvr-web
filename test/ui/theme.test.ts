@@ -7,7 +7,8 @@ describe('themes', () => {
     expect(THEME_NAMES).toEqual(['aurora', 'sunset', 'ocean', 'forest']);
     for (const n of THEME_NAMES) {
       for (const m of ['light', 'dark'] as const) {
-        for (const key of Object.keys(TOKEN_TO_VAR) as (keyof typeof TOKEN_TO_VAR)[]) expect(THEMES[n][m][key], `${n}.${m}.${key}`).toBeTypeOf('string');
+        for (const key of Object.keys(TOKEN_TO_VAR) as (keyof typeof TOKEN_TO_VAR)[])
+          expect(THEMES[n][m][key], `${n}.${m}.${key}`).toBeTypeOf('string');
       }
     }
   });

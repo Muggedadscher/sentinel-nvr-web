@@ -10,7 +10,14 @@ export type TFn = (key: string, vars?: Record<string, string | number>) => strin
 const rulesCache = new Map<string, Intl.PluralRules>();
 function plural(locale: string): Intl.PluralRules {
   let r = rulesCache.get(locale);
-  if (!r) { try { r = new Intl.PluralRules(locale); } catch { r = new Intl.PluralRules('en'); } rulesCache.set(locale, r); }
+  if (!r) {
+    try {
+      r = new Intl.PluralRules(locale);
+    } catch {
+      r = new Intl.PluralRules('en');
+    }
+    rulesCache.set(locale, r);
+  }
   return r;
 }
 
@@ -19,7 +26,13 @@ export function interpolate(s: string, vars?: Record<string, string | number>): 
   return s.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
 }
 
-export function translate(dict: Dict, fallback: Dict, locale: string, key: string, vars?: Record<string, string | number>): string {
+export function translate(
+  dict: Dict,
+  fallback: Dict,
+  locale: string,
+  key: string,
+  vars?: Record<string, string | number>,
+): string {
   const candidates: string[] = [];
   if (typeof vars?.count === 'number') {
     candidates.push(`${key}.${plural(locale).select(vars.count)}`, `${key}.other`);
@@ -51,4 +64,12 @@ export function pickLocale(tags: readonly string[]): UiLocale {
 }
 
 /** Native names of the shipped locales (not translated — "Français" reads the same in every UI language). */
-export const UI_LOCALE_LABELS: Record<UiLocale, string> = { de: 'Deutsch', en: 'English', es: 'Español', fr: 'Français', it: 'Italiano', pt: 'Português', sv: 'Svenska' };
+export const UI_LOCALE_LABELS: Record<UiLocale, string> = {
+  de: 'Deutsch',
+  en: 'English',
+  es: 'Español',
+  fr: 'Français',
+  it: 'Italiano',
+  pt: 'Português',
+  sv: 'Svenska',
+};

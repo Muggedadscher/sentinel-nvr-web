@@ -1,14 +1,28 @@
 import { describe, it, expect } from 'vitest';
 import {
-  parseSentinelSetup, sentinelPublicBase, sentinelUrl, sentinelTimelineLink,
-  sentinelClassOf, sentinelClassesOf, sentinelEventPlayTs,
-  sentinelClipRuns, sentinelClipIndexFor, sentinelMergeDays, sentinelHumanBytes,
-  sentinelStorageForecast, type SentinelStats, type SentinelClipsResponse,
+  parseSentinelSetup,
+  sentinelPublicBase,
+  sentinelUrl,
+  sentinelTimelineLink,
+  sentinelClassOf,
+  sentinelClassesOf,
+  sentinelEventPlayTs,
+  sentinelClipRuns,
+  sentinelClipIndexFor,
+  sentinelMergeDays,
+  sentinelHumanBytes,
+  sentinelStorageForecast,
+  type SentinelStats,
+  type SentinelClipsResponse,
 } from '../../src/api';
 
 describe('setup / URLs', () => {
   it('accepts a bare host and assumes https', () => {
-    expect(parseSentinelSetup('192.168.2.120:10443')).toEqual({ origin: 'https://192.168.2.120:10443', token: null, prefix: '' });
+    expect(parseSentinelSetup('192.168.2.120:10443')).toEqual({
+      origin: 'https://192.168.2.120:10443',
+      token: null,
+      prefix: '',
+    });
   });
   it('extracts a token from a pasted embed URL', () => {
     const s = parseSentinelSetup('https://host:10443/endpoint/@local/sentinel-nvr/public/?token=abc&embed=1')!;
@@ -51,8 +65,8 @@ describe('event classification', () => {
 describe('timeline helpers', () => {
   const clips = [
     { id: 'a', startTime: 0, duration: 60_000 },
-    { id: 'b', startTime: 60_500, duration: 60_000 },   // 500ms gap → same run
-    { id: 'c', startTime: 200_000, duration: 60_000 },  // big gap → new run
+    { id: 'b', startTime: 60_500, duration: 60_000 }, // 500ms gap → same run
+    { id: 'c', startTime: 200_000, duration: 60_000 }, // big gap → new run
   ];
   it('merges runs across small gaps only', () => {
     const runs = sentinelClipRuns(clips);
@@ -66,11 +80,20 @@ describe('timeline helpers', () => {
   });
   it('merges per-day responses sorted', () => {
     const days: Record<number, SentinelClipsResponse> = {
-      2: { clips: [{ id: 'y', startTime: 2 }], events: [{ id: 'e2', timestamp: 2, classes: [], score: 0, source: 'motion' }], motion: [[2, 3]], codecs: 'avc1' },
-      1: { clips: [{ id: 'x', startTime: 1 }], events: [{ id: 'e1', timestamp: 1, classes: [], score: 0, source: 'motion' }], motion: [[1, 2]] },
+      2: {
+        clips: [{ id: 'y', startTime: 2 }],
+        events: [{ id: 'e2', timestamp: 2, classes: [], score: 0, source: 'motion' }],
+        motion: [[2, 3]],
+        codecs: 'avc1',
+      },
+      1: {
+        clips: [{ id: 'x', startTime: 1 }],
+        events: [{ id: 'e1', timestamp: 1, classes: [], score: 0, source: 'motion' }],
+        motion: [[1, 2]],
+      },
     };
     const m = sentinelMergeDays(days);
-    expect(m.clips.map(c => c.id)).toEqual(['x', 'y']);
+    expect(m.clips.map((c) => c.id)).toEqual(['x', 'y']);
     expect(m.oldestDay).toBe(1);
     expect(m.codecs).toBe('avc1');
   });
@@ -86,9 +109,16 @@ describe('humanBytes', () => {
 
 describe('storage forecast', () => {
   const base: SentinelStats = {
-    cameras: 1, recording: 1, eventsToday: 0, segments: 100,
-    bytes: 100 * 1e9, earliest: 1_700_000_000_000, retentionDays: 30,
-    diskFree: 500 * 1e9, diskTotal: 1000 * 1e9, minFreeBytes: 50 * 1e9,
+    cameras: 1,
+    recording: 1,
+    eventsToday: 0,
+    segments: 100,
+    bytes: 100 * 1e9,
+    earliest: 1_700_000_000_000,
+    retentionDays: 30,
+    diskFree: 500 * 1e9,
+    diskTotal: 1000 * 1e9,
+    minFreeBytes: 50 * 1e9,
   };
   it('reports reachable when the archive already spans retention', () => {
     const now = base.earliest! + 30 * 24 * 3600 * 1000; // archive spans 30 days
@@ -118,12 +148,18 @@ describe('SentinelClient base override', () => {
 
 describe('reverse-proxy prefix (0.10.0)', () => {
   it('is the path in front of /endpoint/, empty without one', () => {
-    expect(parseSentinelSetup('https://proxy.example/scrypted/endpoint/@local/sentinel-nvr/public/?token=t')).toEqual({ origin: 'https://proxy.example', token: 't', prefix: '/scrypted' });
+    expect(parseSentinelSetup('https://proxy.example/scrypted/endpoint/@local/sentinel-nvr/public/?token=t')).toEqual({
+      origin: 'https://proxy.example',
+      token: 't',
+      prefix: '/scrypted',
+    });
     expect(parseSentinelSetup('https://host:10443/endpoint/@local/sentinel-nvr/')!.prefix).toBe('');
     expect(parseSentinelSetup('https://host:10443/some/page')!.prefix).toBe('');
   });
   it('goes into the public base', () => {
-    expect(sentinelPublicBase('https://proxy.example', '/scrypted/')).toBe('https://proxy.example/scrypted/endpoint/@local/sentinel-nvr/public/');
+    expect(sentinelPublicBase('https://proxy.example', '/scrypted/')).toBe(
+      'https://proxy.example/scrypted/endpoint/@local/sentinel-nvr/public/',
+    );
     expect(sentinelPublicBase('https://h:10443')).toBe('https://h:10443/endpoint/@local/sentinel-nvr/public/');
   });
 });

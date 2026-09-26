@@ -17,10 +17,14 @@ describe('dateChipNav', () => {
 describe('stageStatus', () => {
   const now = day(2026, 9, 22) + 12 * 3600e3;
   it('live: the translated label only', () => {
-    expect(stageStatus({ live: true, label: 'liveWebrtc', playhead: null }, t, 'de-DE', false, now)).toBe('[nvr.player.liveWebrtc]');
+    expect(stageStatus({ live: true, label: 'liveWebrtc', playhead: null }, t, 'de-DE', false, now)).toBe(
+      '[nvr.player.liveWebrtc]',
+    );
   });
   it('recorded today: label · hh:mm:ss (no day)', () => {
-    expect(stageStatus({ live: false, label: 'playing', playhead: now }, t, 'de-DE', false, now)).toBe('[nvr.player.playing] · 12:00:00');
+    expect(stageStatus({ live: false, label: 'playing', playhead: now }, t, 'de-DE', false, now)).toBe(
+      '[nvr.player.playing] · 12:00:00',
+    );
   });
   it('recorded on another day: day prefix', () => {
     const s = stageStatus({ live: false, label: 'paused', playhead: now - DAY }, t, 'de-DE', false, now);
@@ -29,6 +33,8 @@ describe('stageStatus', () => {
     expect(s.length).toBeGreaterThan('[nvr.player.paused] · 12:00:00'.length);
   });
   it('load error wins over the player label', () => {
-    expect(stageStatus({ live: true, label: 'live', playhead: null }, t, 'en', true, now)).toBe('[nvr.error.loadFailed]');
+    expect(stageStatus({ live: true, label: 'live', playhead: null }, t, 'en', true, now)).toBe(
+      '[nvr.error.loadFailed]',
+    );
   });
 });
