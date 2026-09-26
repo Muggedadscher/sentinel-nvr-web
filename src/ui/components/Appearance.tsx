@@ -29,7 +29,7 @@ export function hexHue(hex: string): number {
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
   if (max === min) return 0;
   const d = max - min;
-  let h = 0;
+  let h: number;
   if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
   else if (max === g) h = ((b - r) / d + 2) / 6;
   else h = ((r - g) / d + 4) / 6;
