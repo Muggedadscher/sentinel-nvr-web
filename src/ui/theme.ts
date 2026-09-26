@@ -4,20 +4,43 @@
  * property on :root and sets data-theme / data-mode / color-scheme.
  */
 import {
-  THEMES, THEME_NAMES, accentOverride, resolveThemeMode,
-  type ThemeName, type ThemeMode, type ResolvedMode, type ThemeTokens,
+  THEMES,
+  THEME_NAMES,
+  accentOverride,
+  resolveThemeMode,
+  type ThemeName,
+  type ThemeMode,
+  type ResolvedMode,
+  type ThemeTokens,
 } from './themes-data';
 
 export * from './themes-data';
 
 export const TOKEN_TO_VAR: Record<keyof ThemeTokens, string> = {
-  bg: '--bg', bgRaised: '--bg-raised', bgCard: '--bg-card', bgCardHover: '--bg-card-hover', bgSubtle: '--bg-subtle',
-  text: '--text', textDim: '--text-dim', textFaint: '--text-faint',
-  accent: '--accent', accentSoft: '--accent-soft', onAccent: '--on-accent',
-  line: '--line', border: '--border',
-  positive: '--positive', positiveSoft: '--positive-soft', warning: '--warning', warningSoft: '--warning-soft',
-  danger: '--danger', dangerSoft: '--danger-soft', info: '--info', infoSoft: '--info-soft',
-  shadowCard: '--shadow-card', shadowElevated: '--shadow-elevated', shadowActive: '--shadow-active',
+  bg: '--bg',
+  bgRaised: '--bg-raised',
+  bgCard: '--bg-card',
+  bgCardHover: '--bg-card-hover',
+  bgSubtle: '--bg-subtle',
+  text: '--text',
+  textDim: '--text-dim',
+  textFaint: '--text-faint',
+  accent: '--accent',
+  accentSoft: '--accent-soft',
+  onAccent: '--on-accent',
+  line: '--line',
+  border: '--border',
+  positive: '--positive',
+  positiveSoft: '--positive-soft',
+  warning: '--warning',
+  warningSoft: '--warning-soft',
+  danger: '--danger',
+  dangerSoft: '--danger-soft',
+  info: '--info',
+  infoSoft: '--info-soft',
+  shadowCard: '--shadow-card',
+  shadowElevated: '--shadow-elevated',
+  shadowActive: '--shadow-active',
 };
 
 const darkMql = (): MediaQueryList | null =>
@@ -38,7 +61,8 @@ export function applyTheme(name: ThemeName, mode: ThemeMode = 'light', accentHue
   const theme: ThemeName = isThemeName(name) ? name : 'aurora';
   const resolved = resolveMode(mode);
   const tokens = THEMES[theme][resolved];
-  for (const key of Object.keys(TOKEN_TO_VAR) as (keyof ThemeTokens)[]) root.style.setProperty(TOKEN_TO_VAR[key], tokens[key]);
+  for (const key of Object.keys(TOKEN_TO_VAR) as (keyof ThemeTokens)[])
+    root.style.setProperty(TOKEN_TO_VAR[key], tokens[key]);
   root.setAttribute('data-theme', theme);
   root.setAttribute('data-mode', resolved);
   root.style.setProperty('color-scheme', resolved);
@@ -52,10 +76,18 @@ export function applyTheme(name: ThemeName, mode: ThemeMode = 'light', accentHue
 }
 
 /** Re-apply while mode === 'auto' when the OS scheme flips. Returns a cleanup. */
-export function watchSystemMode(getState: () => { theme: ThemeName; mode: ThemeMode; accentHue?: number | undefined }): () => void {
+export function watchSystemMode(
+  getState: () => { theme: ThemeName; mode: ThemeMode; accentHue?: number | undefined },
+): () => void {
   const mql = darkMql();
-  if (!mql) return () => { /* no matchMedia */ };
-  const on = () => { const s = getState(); if (s.mode === 'auto') applyTheme(s.theme, s.mode, s.accentHue); };
+  if (!mql)
+    return () => {
+      /* no matchMedia */
+    };
+  const on = () => {
+    const s = getState();
+    if (s.mode === 'auto') applyTheme(s.theme, s.mode, s.accentHue);
+  };
   mql.addEventListener('change', on);
   return () => mql.removeEventListener('change', on);
 }

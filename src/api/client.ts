@@ -72,8 +72,12 @@ export class SentinelClient {
   /** Text POST (client telemetry). Best effort, never throws. */
   postText(path: string, body: string): void {
     try {
-      void fetch(this.url(path), { method: 'POST', body, keepalive: true }).catch(() => { /* telemetry only */ });
-    } catch { /* ignore */ }
+      void fetch(this.url(path), { method: 'POST', body, keepalive: true }).catch(() => {
+        /* telemetry only */
+      });
+    } catch {
+      /* ignore */
+    }
   }
 
   /** WebSocket signaling URL (the plugin's Engine.IO handler). */
@@ -118,13 +122,22 @@ export class SentinelHttpError extends Error {
  * 429 too many attempts, 503 Scrypted login unavailable; 0 = unreachable. `prefix` = reverse-proxy
  * path prefix (SentinelSetup.prefix, since 0.10.0).
  */
-export async function exchangeSentinelToken(origin: string, username: string, password: string, timeoutMs = 10_000, prefix = ''): Promise<string> {
+export async function exchangeSentinelToken(
+  origin: string,
+  username: string,
+  password: string,
+  timeoutMs = 10_000,
+  prefix = '',
+): Promise<string> {
   const path = 'api/token-exchange';
   let r: Response;
   try {
     r = await fetch(sentinelPublicBase(origin, prefix) + path, {
-      method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(timeoutMs),
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }),
+      method: 'POST',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
     });
   } catch {
     throw new SentinelHttpError(0, path);
@@ -137,5 +150,7 @@ export async function exchangeSentinelToken(origin: string, username: string, pa
 
 /** AbortSignal that fires after `ms` (undefined on engines without AbortSignal.timeout — Safari < 16). */
 export function timeoutSignal(ms: number): AbortSignal | undefined {
-  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(ms) : undefined;
+  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+    ? AbortSignal.timeout(ms)
+    : undefined;
 }

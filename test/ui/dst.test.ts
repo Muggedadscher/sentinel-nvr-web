@@ -2,8 +2,13 @@
 process.env.TZ = 'Europe/Berlin';
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
-  sentinelAddDays as addDays, sentinelAtTime as atTime, sentinelDayEnd as dayEnd, sentinelDayOf as dayOf,
-  sentinelMergeDays, sentinelWallMarks as wallMarks, sentinelWallSeconds,
+  sentinelAddDays as addDays,
+  sentinelAtTime as atTime,
+  sentinelDayEnd as dayEnd,
+  sentinelDayOf as dayOf,
+  sentinelMergeDays,
+  sentinelWallMarks as wallMarks,
+  sentinelWallSeconds,
 } from '../../src/api';
 import { dateChipNav } from '../../src/ui/camera-logic';
 
@@ -13,7 +18,7 @@ const d = (y: number, m: number, day: number, h = 0, min = 0) => new Date(y, m -
 describe('time zone of this test file', () => {
   it('really is Europe/Berlin (else the DST cases below would test nothing)', () => {
     expect(new Date(2026, 9, 24, 12).getTimezoneOffset()).toBe(-120); // CEST
-    expect(new Date(2026, 9, 26, 12).getTimezoneOffset()).toBe(-60);  // CET
+    expect(new Date(2026, 9, 26, 12).getTimezoneOffset()).toBe(-60); // CET
   });
 });
 
@@ -56,7 +61,8 @@ describe('wall-clock marks (timeline axis)', () => {
     expect(marks.every((t, i) => i === 0 || t > marks[i - 1]!)).toBe(true);
   });
   it('fine steps inside a window, and label detection by wall seconds', () => {
-    const from = d(2026, 10, 25, 14, 0), to = d(2026, 10, 25, 14, 3);
+    const from = d(2026, 10, 25, 14, 0),
+      to = d(2026, 10, 25, 14, 3);
     const marks = wallMarks(from, to, 15_000);
     expect(marks).toHaveLength(13);
     expect(sentinelWallSeconds(marks[0]!) % 60).toBe(0);
@@ -70,10 +76,23 @@ describe('sentinelMergeDays', () => {
   afterEach(() => vi.useRealTimers());
   it('keeps a clip, an event and a motion span that come with two days once', () => {
     const clip = { id: '33|seg-20261025-235930Z.mp4', startTime: d(2026, 10, 25, 23, 59), duration: 60_000 };
-    const ev = { id: 'e1', timestamp: d(2026, 10, 25, 23, 59, ), classes: ['person'], score: 0.9, source: 'object' as const };
+    const ev = {
+      id: 'e1',
+      timestamp: d(2026, 10, 25, 23, 59),
+      classes: ['person'],
+      score: 0.9,
+      source: 'object' as const,
+    };
     const m = sentinelMergeDays({
       [d(2026, 10, 25)]: { clips: [clip], events: [ev], motion: [[d(2026, 10, 25, 23, 58), d(2026, 10, 26, 0, 1)]] },
-      [d(2026, 10, 26)]: { clips: [clip], events: [ev], motion: [[d(2026, 10, 25, 23, 58), d(2026, 10, 26, 0, 1)], [d(2026, 10, 26, 0, 0), d(2026, 10, 26, 0, 3)]] },
+      [d(2026, 10, 26)]: {
+        clips: [clip],
+        events: [ev],
+        motion: [
+          [d(2026, 10, 25, 23, 58), d(2026, 10, 26, 0, 1)],
+          [d(2026, 10, 26, 0, 0), d(2026, 10, 26, 0, 3)],
+        ],
+      },
     });
     expect(m.clips).toHaveLength(1);
     expect(m.events).toHaveLength(1);

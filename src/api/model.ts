@@ -15,7 +15,12 @@
 export type SentinelEventClass = 'person' | 'car' | 'bike' | 'animal' | 'package' | 'motion';
 
 export const SENTINEL_EVENT_CLASSES: readonly SentinelEventClass[] = [
-  'person', 'car', 'bike', 'animal', 'package', 'motion',
+  'person',
+  'car',
+  'bike',
+  'animal',
+  'package',
+  'motion',
 ];
 
 export type SentinelBox = [number, number, number, number];
@@ -272,7 +277,10 @@ export function sentinelStorageForecast(st: SentinelStats, nowMs: number = Date.
 // Timeline helpers
 // ---------------------------------------------------------------------------
 
-export interface SentinelRun { s: number; e: number }
+export interface SentinelRun {
+  s: number;
+  e: number;
+}
 
 /**
  * Contiguous recording runs: segments whose gap is ≤ `gapMs` (2 s) are drawn as
@@ -284,7 +292,10 @@ export function sentinelClipRuns(clips: SentinelClip[], gapMs = 2000): SentinelR
   for (const c of clips) {
     const e = c.startTime + (c.duration || 0);
     if (cur && c.startTime - cur.e <= gapMs) cur.e = Math.max(cur.e, e);
-    else { cur = { s: c.startTime, e }; out.push(cur); }
+    else {
+      cur = { s: c.startTime, e };
+      out.push(cur);
+    }
   }
   return out;
 }
@@ -370,10 +381,17 @@ export function sentinelWallSeconds(ts: number): number {
  * crosses midnight comes with both days — kept once (by id / by interval).
  */
 export function sentinelMergeDays(days: Record<number, SentinelClipsResponse>): {
-  clips: SentinelClip[]; events: SentinelEvent[]; motion: [number, number][]; codecs: string | null; oldestDay: number | null;
+  clips: SentinelClip[];
+  events: SentinelEvent[];
+  motion: [number, number][];
+  codecs: string | null;
+  oldestDay: number | null;
 } {
-  const keys = Object.keys(days).map(Number).sort((a, b) => a - b);
-  const clips = new Map<string, SentinelClip>(), events = new Map<string, SentinelEvent>();
+  const keys = Object.keys(days)
+    .map(Number)
+    .sort((a, b) => a - b);
+  const clips = new Map<string, SentinelClip>(),
+    events = new Map<string, SentinelEvent>();
   const motionRaw: [number, number][] = [];
   let codecs: string | null = null;
   for (const k of keys) {

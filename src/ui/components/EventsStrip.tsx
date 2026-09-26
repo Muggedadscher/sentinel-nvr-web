@@ -12,11 +12,18 @@ export function EventsStrip({ events }: { events: SentinelRecentEvent[] }) {
       <ul className="nvr-strip">
         {events.map((e) => (
           <li key={`${e.camera}-${e.ts}`}>
-            <button type="button" className="nvr-strip__item" onClick={() => nav.openCamera(e.camera, sentinelEventPlayTs(e), e.ts)}
-              aria-label={`${eventLabel(t, e)} · ${e.cameraName} · ${fmtTime(e.ts, locale)}`} title={e.cameraName}>
+            <button
+              type="button"
+              className="nvr-strip__item"
+              onClick={() => nav.openCamera(e.camera, sentinelEventPlayTs(e), e.ts)}
+              aria-label={`${eventLabel(t, e)} · ${e.cameraName} · ${fmtTime(e.ts, locale)}`}
+              title={e.cameraName}
+            >
               <span className="nvr-strip__img">
                 <img src={client.eventThumbUrl(e.camera, e.ts)} alt="" loading="lazy" />
-                <span className="nvr-strip__badges"><EventBadges ev={e} t={t} /></span>
+                <span className="nvr-strip__badges">
+                  <EventBadges ev={e} t={t} />
+                </span>
               </span>
               <span className="nvr-strip__time nvr-data">{fmtTime(e.ts, locale)}</span>
             </button>

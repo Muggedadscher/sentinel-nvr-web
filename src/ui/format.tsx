@@ -17,4 +17,7 @@ export function fmtDays(d: number, t: TFn): string {
   return t('nvr.time.days', { count: n });
 }
 /** "7.7 GB" */
-export function humanBytes(b: number): string { const h = sentinelHumanBytes(b); return `${h.value} ${h.unit}`; }
+export function humanBytes(b: number): string {
+  const h = sentinelHumanBytes(b);
+  return `${h.value} ${h.unit}`;
+}
