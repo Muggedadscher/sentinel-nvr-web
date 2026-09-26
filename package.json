@@ -43,13 +43,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:tz": "TZ=UTC vitest run && TZ=Europe/Berlin vitest run && TZ=America/New_York vitest run",
-    "release": "npm run build && changeset publish",
+    "prepublishOnly": "node scripts/prepublish-check.mjs && npm run build",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "@changesets/cli": "^2.27.0",
     "@eslint/js": "^10.0.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.3.0",
