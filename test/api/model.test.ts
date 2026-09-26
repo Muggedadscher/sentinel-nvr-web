@@ -8,7 +8,7 @@ import {
 
 describe('setup / URLs', () => {
   it('accepts a bare host and assumes https', () => {
-    expect(parseSentinelSetup('192.168.2.120:10443')).toEqual({ origin: 'https://192.168.2.120:10443', token: null });
+    expect(parseSentinelSetup('192.168.2.120:10443')).toEqual({ origin: 'https://192.168.2.120:10443', token: null, prefix: '' });
   });
   it('extracts a token from a pasted embed URL', () => {
     const s = parseSentinelSetup('https://host:10443/endpoint/@local/sentinel-nvr/public/?token=abc&embed=1')!;
@@ -113,5 +113,17 @@ describe('SentinelClient base override', () => {
     expect(b.base).toBe('https://h:1/scrypted/endpoint/@local/sentinel-nvr/');
     expect(b.url('api/stats')).toBe('https://h:1/scrypted/endpoint/@local/sentinel-nvr/api/stats');
     expect(b.signalingUrl('33')).toBe('wss://h:1/scrypted/endpoint/@local/sentinel-nvr/?camera=33&signaling=1');
+  });
+});
+
+describe('reverse-proxy prefix (0.10.0)', () => {
+  it('is the path in front of /endpoint/, empty without one', () => {
+    expect(parseSentinelSetup('https://proxy.example/scrypted/endpoint/@local/sentinel-nvr/public/?token=t')).toEqual({ origin: 'https://proxy.example', token: 't', prefix: '/scrypted' });
+    expect(parseSentinelSetup('https://host:10443/endpoint/@local/sentinel-nvr/')!.prefix).toBe('');
+    expect(parseSentinelSetup('https://host:10443/some/page')!.prefix).toBe('');
+  });
+  it('goes into the public base', () => {
+    expect(sentinelPublicBase('https://proxy.example', '/scrypted/')).toBe('https://proxy.example/scrypted/endpoint/@local/sentinel-nvr/public/');
+    expect(sentinelPublicBase('https://h:10443')).toBe('https://h:10443/endpoint/@local/sentinel-nvr/public/');
   });
 });

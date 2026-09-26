@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Minus, ArrowUp } from 'lucide-react';
 import {
-  SENTINEL_DAY_MS as DAY, sentinelClassOf as classOf, sentinelClipRuns, sentinelEventPlayTs as eventPlayTs,
+  SENTINEL_DAY_MS as DAY, sentinelAddDays as addDays, sentinelWallMarks as wallMarks, sentinelWallSeconds as wallSec, sentinelClassOf as classOf, sentinelClipRuns, sentinelEventPlayTs as eventPlayTs,
   fmtDay as dayLabel, fmtTime, fmtTimeSec, type SentinelClip as Clip, type SentinelEvent as NvrEvent,
 } from '../../api';
 import { rlog } from '../../player';
@@ -148,9 +148,12 @@ export function VerticalTimeline(p: TimelineProps) {
   // the ruler runs to the very top of the content (through the future headroom above LIVE), not just to rangeEnd
   // px is 0 until the first layout pass → tsForY() would be Infinity and the loops unbounded
   const topTs = px > 0 ? tsForY(0) : p.rangeEnd;
-  const axis: number[] = []; const a0 = Math.max(p.rangeStart, Math.floor(winStart / step) * step); for (let t = a0; t <= Math.min(topTs, winEnd) && axis.length < 2000; t += step) axis.push(t);
-  const q = step / 4; const ticks: number[] = []; if (q * px >= 3) { const t0 = Math.max(p.rangeStart, Math.floor(winStart / q) * q); for (let t = t0; t <= Math.min(topTs, winEnd) && ticks.length < 8000; t += q) ticks.push(t); }
-  const midnights: number[] = []; for (let t = new Date(Math.max(p.rangeStart, winStart)).setHours(0, 0, 0, 0); t <= Math.min(topTs, winEnd); t += DAY) if (t > p.rangeStart) midnights.push(t);
+  // labels, ruler ticks and midnight separators on LOCAL wall-clock positions (calendar days, not ±24 h: DST days are 23/25 h)
+  const axisEnd = Math.min(topTs, winEnd), axisStart = Math.max(p.rangeStart, winStart);
+  const axis = axisEnd >= axisStart ? wallMarks(axisStart, axisEnd, step, 2000) : [];
+  const q = step / 4; const ticks = q * px >= 3 && axisEnd >= axisStart ? wallMarks(axisStart, axisEnd, q, 8000) : [];
+  const stepSec = Math.round(step / 1000);
+  const midnights: number[] = []; for (let t = addDays(axisStart, 0); t <= axisEnd && midnights.length < 400; t = addDays(t, 1)) if (t > p.rangeStart) midnights.push(t);
   let lastThumbY = -1e9; const thumbGap = (window.innerWidth < 900 ? 63 : 77) + 6;
   const now = Date.now();
   // the centre label shows what the view shows: the scroll centre while the user scrubs or the view is not following
@@ -165,7 +168,7 @@ export function VerticalTimeline(p: TimelineProps) {
         <div className="vtl-content" style={{ height: span * px + PAD + PAD_BOT }}>
           <div className="vtl-daybg" style={{ top: 0, height: span * px + PAD }} />
           {/* ruler (Scrypted's tile): a tick every quarter step — short / medium at the half / long at the label — exact per tick, only the visible window */}
-          {ticks.map(t => <div key={'t' + t} className={'vtick' + (t % step === 0 ? ' vtick--l' : t % (step / 2) === 0 ? ' vtick--m' : '')} style={{ top: yFor(t) }} />)}
+          {ticks.map(t => { const w = wallSec(t); return <div key={'t' + t} className={'vtick' + (w % stepSec === 0 ? ' vtick--l' : w % (stepSec / 2) === 0 ? ' vtick--m' : '')} style={{ top: yFor(t) }} />; })}
           {axis.map(t => <div key={t} className="vaxis nvr-data" style={{ top: yFor(t) }}>{hhmm(t)}</div>)}
           {midnights.map(t => <div key={'d' + t} className="vday" style={{ top: yFor(t) }}><span className="nvr-data">{dayLbl(t)}</span></div>)}
           {runs.map((r, i) => inWin(r.s, r.e) && <div key={i} className="vseg" style={{ top: yFor(r.e), height: Math.max(2, (r.e - r.s) * px) }} />)}

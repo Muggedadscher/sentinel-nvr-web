@@ -29,6 +29,7 @@ on older servers, but only get their full behaviour with the matching plugin:
 | 0.7.x | 2026-09-23 | scrub by target: `api/relay-target` (server-side servo stops at the timeline centre), `relay-pos` returns `{t, r}` |
 | 0.8.x | 2026-09-24 | jumps with a still picture: `relay-seek&mark=1&avoid=W` answers `{w}`; the still is lifted on the first frame of that width (older servers: timer) |
 | 0.9.x | 2026-09-25 | speed buttons in place: `api/relay-speed` (older servers: a seek to the displayed position); stills fade out two frames after the video runs |
+| 0.10.x | any | calendar days instead of ±24 h (DST days are 23/25 h: no duplicate clips/events on 25.10., "next day" works, time picker and axis on the wall clock), `SentinelSetup.prefix` / `sentinelPublicBase(origin, prefix)` / `exchangeSentinelToken(…, prefix)` for a reverse-proxy path prefix. No server change needed. |
 
 Lab note: headless Chromium reports an 800×600 screen unless `screenWidth/screenHeight` are emulated; the Scrypted
 sink then transcodes every stream to 800 px / 15 fps, which distorts latency and resolution measurements.

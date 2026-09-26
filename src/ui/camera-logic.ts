@@ -1,11 +1,11 @@
 /** DOM-free logic of the camera page (testable without a browser). */
-import { SENTINEL_DAY_MS as DAY, sentinelDayOf as dayOf, fmtDay, fmtTimeSec } from '../api';
+import { sentinelAddDays as addDays, sentinelDayOf as dayOf, fmtDay, fmtTimeSec } from '../api';
 import type { PlayerState } from '../player/controller';
 import type { TFn } from './i18n';
 
 /** Date-chip arrows: yesterday exists down to the retention floor, tomorrow never past today. */
 export function dateChipNav(centerDay: number, oldestAllowed: number, today: number = dayOf(Date.now())): { prevDisabled: boolean; nextDisabled: boolean } {
-  return { prevDisabled: centerDay - DAY < oldestAllowed, nextDisabled: centerDay >= today };
+  return { prevDisabled: addDays(centerDay, -1) < oldestAllowed, nextDisabled: centerDay >= today };
 }
 
 /** Info-bar status: label, plus " · [day ]hh:mm:ss" of the playhead while not live. */

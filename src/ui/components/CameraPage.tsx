@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Calendar, Camera, ChevronLeft, ChevronRight, FastForward, Maximize2, Pause, PictureInPicture2, Play, Rewind, Volume2, VolumeX } from 'lucide-react';
 import {
-  SENTINEL_DAY_MS as DAY, SENTINEL_EVENT_CLASSES, sentinelClassOf as classOf, sentinelDayOf as dayOf, sentinelEventPlayTs, sentinelMergeDays,
+  sentinelAddDays as addDays, sentinelAtTime as atTime, sentinelDayEnd as dayEnd, SENTINEL_EVENT_CLASSES, sentinelClassOf as classOf, sentinelDayOf as dayOf, sentinelEventPlayTs, sentinelMergeDays,
   fmtDay, type SentinelClip, type SentinelClipsResponse, type SentinelEvent, type SentinelEventClass,
 } from '../../api';
 import { PlayerController, type PlayerState } from '../../player';
@@ -99,22 +99,22 @@ export function CameraPage(p: CameraPageProps) {
     const m = sentinelMergeDays(days);
     const rangeStart = m.oldestDay ?? todayStart();
     // a little headroom above LIVE, not the whole rest of the day (moves with the clock)
-    const rangeEnd = Math.min(todayStart() + DAY, nowTick + 20 * 60000);
+    const rangeEnd = Math.min(dayEnd(todayStart()), nowTick + 20 * 60000);
     return { ...m, rangeStart, rangeEnd };
   }, [days, nowTick]);
   /** the merged range as of NOW (from daysRef, which ensureDay updates synchronously) — for code that just awaited a load */
-  const mergedNow = useCallback(() => { const m = sentinelMergeDays(daysRef.current); return { ...m, rangeStart: m.oldestDay ?? todayStart(), rangeEnd: Math.min(todayStart() + DAY, Date.now() + 20 * 60000) }; }, []);
+  const mergedNow = useCallback(() => { const m = sentinelMergeDays(daysRef.current); return { ...m, rangeStart: m.oldestDay ?? todayStart(), rangeEnd: Math.min(dayEnd(todayStart()), Date.now() + 20 * 60000) }; }, []);
   useEffect(() => { ctl.current?.setClips(merged.clips, merged.codecs, merged.rangeStart, merged.rangeEnd); }, [merged]);
 
   const fetchDay = useCallback(async (ds: number): Promise<SentinelClipsResponse> => {
-    const d = await client.getJson<SentinelClipsResponse>(`api/clips?camera=${encodeURIComponent(camId)}&start=${ds}&end=${ds + DAY}`);
+    const d = await client.getJson<SentinelClipsResponse>(`api/clips?camera=${encodeURIComponent(camId)}&start=${ds}&end=${dayEnd(ds)}`);
     d.clips = (d.clips || []).sort((a, b) => a.startTime - b.startTime); d.events = d.events || []; d.motion = d.motion || [];
     return d;
   }, [client, camId]);
   /** load a day once (retention floor: nothing older than the oldest recording); `force` = refresh (today while live) */
   const ensureDay = useCallback(async (ds: number, force = false): Promise<void> => {
     if (ds > todayStart()) return;
-    if (earliest && ds + DAY < dayOf(earliest)) return;
+    if (earliest && addDays(ds, 1) < dayOf(earliest)) return;
     if (!force && (daysRef.current[ds] || loading.current.has(ds))) return;
     loading.current.add(ds);
     try {
@@ -123,10 +123,11 @@ export function CameraPage(p: CameraPageProps) {
       // React renders the setDays() update in a later task, so a render-time ref would still miss this day (deep link → "no recording")
       daysRef.current = { ...daysRef.current, [ds]: d };
       setDays((prev) => ({ ...prev, [ds]: d }));
+      setLoadError(false); // an earlier failed load is over once a day loads again
     }
     finally { loading.current.delete(ds); }
   }, [fetchDay, earliest, camId]);
-  const onCenter = useCallback((ts: number) => { const d = dayOf(ts); setCenterDay(d); void ensureDay(d); void ensureDay(d - DAY); void ensureDay(d + DAY); }, [ensureDay]);
+  const onCenter = useCallback((ts: number) => { const d = dayOf(ts); setCenterDay(d); for (const x of [d, addDays(d, -1), addDays(d, 1)]) ensureDay(x).catch(() => setLoadError(true)); }, [ensureDay]);
 
   // the controller writes the picture's aspect (--stage-ar) on the stage; the layout needs it on the body (column width = picture width)
   useEffect(() => {
@@ -159,7 +160,7 @@ export function CameraPage(p: CameraPageProps) {
     setDays({}); daysRef.current = {}; setFilterOff({}); setTab('tl'); setLoadError(false); loading.current.clear();
     if (startAt) c.posterEvent(posterTs || startAt); else c.posterFromSnapshot(lastTileSnapshot(camId));
     const t0 = todayStart(); const target = startAt ? dayOf(startAt) : t0;
-    Promise.all([ensureDay(target), ensureDay(target - DAY), target !== t0 ? ensureDay(t0) : Promise.resolve(), target === t0 ? Promise.resolve() : ensureDay(target + DAY)])
+    Promise.all([ensureDay(target), ensureDay(addDays(target, -1)), target !== t0 ? ensureDay(t0) : Promise.resolve(), target === t0 ? Promise.resolve() : ensureDay(addDays(target, 1))])
       .then(() => {
         if (c.camId !== camId || ctl.current !== c) return;
         setLoadError(false); // a prior failure must not stick once a load succeeds
@@ -188,13 +189,13 @@ export function CameraPage(p: CameraPageProps) {
   /** go to a day (chip arrows / picker): load it, then play from `at` (or the first recording at/after it, else the last one of that day) */
   const goToDay = useCallback(async (ds: number, at?: number) => {
     const c = ctl.current; if (!c) return;
-    await Promise.all([ensureDay(ds), ensureDay(ds - DAY), ensureDay(ds + DAY)]);
+    await Promise.all([ensureDay(ds), ensureDay(addDays(ds, -1)), ensureDay(addDays(ds, 1))]);
     if (camRef.current !== camId) return;
     if (ds === todayStart() && at == null) { goLive(); return; }
-    const want = at ?? ds + DAY / 2;
+    const want = at ?? atTime(ds, 12, 0);
     if (want > Date.now()) { goLive(); return; }
     const m = mergedNow(); c.setClips(m.clips, m.codecs, m.rangeStart, m.rangeEnd);
-    const inDay = m.clips.filter((x) => x.startTime >= ds && x.startTime < ds + DAY);
+    const inDay = m.clips.filter((x) => x.startTime >= ds && x.startTime < dayEnd(ds));
     const exact = c.clipIndexFor(want) >= 0;
     const pick = exact ? want : (inDay.find((x) => x.startTime >= want) || inDay[inDay.length - 1])?.startTime;
     setJump({ ts: pick ?? want, n: Date.now() });
@@ -285,9 +286,9 @@ export function CameraPage(p: CameraPageProps) {
             <EventList camId={camId} events={merged.events} filterOff={filterOff} onPick={playEvent} />
           )}
           <div className={'nvr-datechip' + (ps.live ? '' : ' nvr-datechip--rec')}>
-            <button type="button" onClick={() => void goToDay(centerDay - DAY)} disabled={nav.prevDisabled} aria-label={t('nvr.date.prevDay')}><ChevronLeft size={14} /></button>
+            <button type="button" onClick={() => goToDay(addDays(centerDay, -1)).catch(() => setLoadError(true))} disabled={nav.prevDisabled} aria-label={t('nvr.date.prevDay')}><ChevronLeft size={14} /></button>
             <button type="button" className="nvr-datechip__lbl nvr-data" onClick={() => setDt(true)} aria-label={t('nvr.date.title')}><Calendar size={13} />{fmtDay(centerDay, locale)}</button>
-            <button type="button" onClick={() => void goToDay(centerDay + DAY)} disabled={nav.nextDisabled} aria-label={t('nvr.date.nextDay')}><ChevronRight size={14} /></button>
+            <button type="button" onClick={() => goToDay(addDays(centerDay, 1)).catch(() => setLoadError(true))} disabled={nav.nextDisabled} aria-label={t('nvr.date.nextDay')}><ChevronRight size={14} /></button>
           </div>
         </aside>
       </div>
@@ -299,8 +300,8 @@ export function CameraPage(p: CameraPageProps) {
         onClose: () => setDt(false),
         onGo: (ds, time) => {
           setDt(false);
-          const at = time ? ds + (Number(time.split(':')[0]) * 3600 + Number(time.split(':')[1]) * 60) * 1000 : undefined;
-          goToDay(ds, at).catch(() => { /* keep */ });
+          const at = time ? atTime(ds, Number(time.split(':')[0]), Number(time.split(':')[1])) : undefined;
+          goToDay(ds, at).catch(() => setLoadError(true));
         },
       })}
     </div>
