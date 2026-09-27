@@ -69,6 +69,8 @@ const SCRUB_OFF_DELAY_MS = 1500;
  *  overshot by (reaction time × rate) and then jumped back, and every seek shows 2.4 s of stale stream first. */
 const TARGET_FLOOR_MS = 120,
   TARGET_MIN_STEP_MS = 250;
+/** an opening that shows no frame is reported after this long anyway */
+const OPEN_REPORT_MS = 30000;
 
 export class PlayerController {
   private v!: HTMLVideoElement;
@@ -186,6 +188,11 @@ export class PlayerController {
   private liveUpgradeN = 0;
   private rwPosBusy = false;
   private unlisten: (() => void)[] = [];
+  /** Opening a camera: ms since setCamera per milestone, reported as ONE `open` telemetry line at the first presented
+   *  frame (or on leave / switch / after OPEN_REPORT_MS). Grey-stage complaint 27.09.2026 — there was no number for it. */
+  private op: { t0: number; cam: string; d: Record<string, number | string | boolean>; t: number } | null = null;
+  /** the last finished `open` record (lab probes read it via window.__snvr.ctl) */
+  lastOpen: Record<string, number | string | boolean> | null = null;
 
   private arPrefix: string;
   constructor(api: SentinelClient, opts: Opts) {
@@ -309,6 +316,7 @@ export class PlayerController {
   }
 
   destroy(): void {
+    this.openEnd('leave');
     this.destroyed = true;
     // no path may (re)start a stream on a destroyed controller: the 1-s live
     // restart timer, a pending async load in the host, a visibility change …
@@ -351,6 +359,7 @@ export class PlayerController {
   }
 
   setCamera(camId: string, name: string): void {
+    this.openBegin(camId);
     if (camId !== this.camId) {
       this.recWebrtcDisabled = false;
       this.recoveries = 0;
@@ -423,6 +432,28 @@ export class PlayerController {
     this.rangeEnd = rangeEnd;
   }
 
+  // ---- open telemetry ------------------------------------------------------------
+  private openBegin(camId: string): void {
+    this.openEnd('switch');
+    const t = window.setTimeout(() => this.openEnd('timeout'), OPEN_REPORT_MS);
+    this.op = { t0: Date.now(), cam: camId, d: {}, t };
+  }
+  /** record a milestone of the current opening (first value wins; `v` = a label instead of the elapsed ms) */
+  openMark(k: string, v?: string | boolean): void {
+    const op = this.op;
+    if (!op || op.d[k] !== undefined) return;
+    op.d[k] = v ?? Date.now() - op.t0;
+  }
+  private openEnd(end: 'frame' | 'leave' | 'switch' | 'timeout'): void {
+    const op = this.op;
+    if (!op) return;
+    this.op = null;
+    clearTimeout(op.t);
+    const rec = { ...op.d, end, ms: Date.now() - op.t0, via: this.transport, mobile: mobileClient() };
+    this.lastOpen = rec;
+    rlog('open', rec);
+  }
+
   // ---- state ---------------------------------------------------------------------
   private setLabel(l: PlayerLabel): void {
     this.label = l;
@@ -489,6 +520,10 @@ export class PlayerController {
     const tick = (_now: number, md?: { width?: number }) => {
       if (this.fc.tok !== tok) return;
       this.fc.n++;
+      if (this.op) {
+        this.openMark('frame');
+        this.openEnd('frame');
+      }
       const w = (md && md.width) || this.v.videoWidth;
       if (w) {
         this.shownW = w;
@@ -700,7 +735,9 @@ export class PlayerController {
       const firstFramePending = !!this.rw?.active && this.presentedFrames() <= this.sessFrames0;
       if (this.swapPending)
         this.freezeFromImage(img, true, true, 'event'); // a jump is under way → until its picture
-      else if (firstFramePending || !this.rw?.active) this.freezeFromImage(img, true, false, 'event'); // new session → until its first frame
+      else if (firstFramePending || !this.rw?.active) {
+        if (this.freezeFromImage(img, true, false, 'event')) this.openMark('poster'); // new session → until its first frame
+      }
       // else: the target picture is already on screen — don't cover it
     };
     img.src = this.api.url(`api/evframe?camera=${encodeURIComponent(cam)}&ts=${ts}`);
@@ -715,7 +752,10 @@ export class PlayerController {
       img.onload = () => {
         if (this.camId !== cam || this.rw?.active || this.recPaused || this.posterUp()) return;
         if (this.v.readyState >= 2 && this.v.videoWidth && !this.v.paused) return;
-        this.freezeFromImage(img, true, false, 'snapshot');
+        if (this.freezeFromImage(img, true, false, 'snapshot')) {
+          this.openMark('poster');
+          this.openMark('posterSrc', fresh ? 'net' : 'tile');
+        }
       };
       if (!fresh)
         img.onerror = () =>
@@ -774,6 +814,7 @@ export class PlayerController {
     this.curClipId = null;
     this.L.restarts = 0;
     this.setLabel('live');
+    this.openMark('live');
     if (document.visibilityState === 'hidden') return;
     if (window.RTCPeerConnection && window.WebSocket) this.liveStartWebrtc();
     else if (this.liveMseOk()) this.liveStartMse();
@@ -834,8 +875,12 @@ export class PlayerController {
       this.api,
       { camId: this.camId, mode: 'live' },
       {
+        onPhase: (p) => {
+          if (this.w === s) this.openMark(p);
+        },
         onStream: (ms) => {
           if (!this.live || this.w !== s) return;
+          this.openMark('track');
           this.setMjpeg(false);
           this.v.muted = !this.soundOn;
           try {
@@ -1188,12 +1233,17 @@ export class PlayerController {
     this.cmdSeq++; // event poster clears when relay-pos reaches here
     const compat = mobileClient();
     if (compat) rlog('rec-compat-start', { ts: Math.round(ts) });
+    this.openMark('relay');
     const s = new WebRtcSession(
       this.api,
       { camId: this.camId, mode: 'recorded', startMs: ts, compat },
       {
+        onPhase: (p) => {
+          if (this.rw === s) this.openMark(p);
+        },
         onStream: (ms) => {
           if (this.rw !== s || this.live) return;
+          this.openMark('track');
           try {
             s.pc?.getReceivers().forEach((r) => {
               try {

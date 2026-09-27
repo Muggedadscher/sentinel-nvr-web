@@ -13,6 +13,8 @@ export interface SessionCallbacks {
   onStream: (ms: MediaStream) => void;
   onFail: (reason: string) => void;
   onSessionId?: (id: string) => void;
+  /** connection milestones for the open telemetry: signaling socket open, first SDP exchanged, ICE connected */
+  onPhase?: (phase: 'ws' | 'sdp' | 'ice') => void;
 }
 export interface SessionOptions {
   camId: string;
@@ -106,6 +108,7 @@ export class WebRtcSession {
       }
     }, 12000);
     ws.onopen = () => {
+      this.cb.onPhase?.('ws');
       try {
         ws.send(JSON.stringify({ type: 'options', options: rtcOptions() }));
       } catch {
@@ -228,6 +231,7 @@ export class WebRtcSession {
       if (!this.active || this.pc !== pc) return;
       const st = pc.iceConnectionState;
       if (st === 'connected' || st === 'completed') {
+        this.cb.onPhase?.('ice');
         if (this.connectT) {
           clearTimeout(this.connectT);
           this.connectT = undefined;
@@ -319,6 +323,7 @@ export class WebRtcSession {
 
   private setRemote(ws: WebSocket, msg: any): void {
     const pc = this.ensurePc(msg.setup);
+    this.cb.onPhase?.('sdp');
     const mid = this.connected;
     pc.setRemoteDescription(msg.description)
       .then(() => {
