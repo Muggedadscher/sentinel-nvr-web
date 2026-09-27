@@ -5,6 +5,7 @@ export * from './format';
 export * from './components/ClassBadge';
 export * from './components/EventsStrip';
 export * from './components/CameraGrid';
+export { rememberTileSnapshot, type TileSnapshot } from './snapshot-cache';
 export * from './components/EventList';
 export * from './components/DatePickerPanel';
 export * from './components/Stats';

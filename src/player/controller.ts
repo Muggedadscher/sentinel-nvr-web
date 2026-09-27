@@ -69,6 +69,8 @@ const SCRUB_OFF_DELAY_MS = 1500;
  *  overshot by (reaction time × rate) and then jumped back, and every seek shows 2.4 s of stale stream first. */
 const TARGET_FLOOR_MS = 120,
   TARGET_MIN_STEP_MS = 250;
+/** fresh poster when no tile picture is at hand: stage-sized, not the camera's multi-MP original */
+const POSTER_SNAPSHOT_W = 1280;
 /** an opening that shows no frame is reported after this long anyway */
 const OPEN_REPORT_MS = 30000;
 
@@ -742,28 +744,39 @@ export class PlayerController {
     };
     img.src = this.api.url(`api/evframe?camera=${encodeURIComponent(cam)}&ts=${ts}`);
   }
-  /** Camera opened: a picture in front of the black stage until live plays — the overview tile's snapshot when the host
-   *  remembers one (browser cache → instant), else a fresh api/snapshot (1–3 s). */
-  posterFromSnapshot(tileUrl?: string): void {
+  /** Camera opened: a picture in front of the grey stage until live plays. `tile` = what the overview tile showed: its
+   *  loaded <img> is drawn at once (already decoded, no request); a URL or a broken/unfinished image falls back to a
+   *  fresh api/snapshot. */
+  posterFromSnapshot(tile?: HTMLImageElement | string): void {
     const cam = this.camId;
+    const canPoster = () =>
+      this.camId === cam &&
+      !this.rw?.active &&
+      !this.recPaused &&
+      !this.posterUp() &&
+      !(this.v.readyState >= 2 && this.v.videoWidth && !this.v.paused);
+    const shown = (src: string) => {
+      this.openMark('poster');
+      this.openMark('posterSrc', src);
+    };
+    if (tile && typeof tile !== 'string') {
+      if (tile.complete && tile.naturalWidth && canPoster() && this.freezeFromImage(tile, true, false, 'snapshot')) {
+        shown('tile');
+        return;
+      }
+      tile = undefined;
+    }
     const load = (src: string, fresh: boolean) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
-        if (this.camId !== cam || this.rw?.active || this.recPaused || this.posterUp()) return;
-        if (this.v.readyState >= 2 && this.v.videoWidth && !this.v.paused) return;
-        if (this.freezeFromImage(img, true, false, 'snapshot')) {
-          this.openMark('poster');
-          this.openMark('posterSrc', fresh ? 'net' : 'tile');
-        }
+        if (canPoster() && this.freezeFromImage(img, true, false, 'snapshot')) shown(fresh ? 'net' : 'url');
       };
-      if (!fresh)
-        img.onerror = () =>
-          load(this.api.url(`api/snapshot?camera=${encodeURIComponent(cam)}`) + `&_=${Date.now()}`, true);
+      if (!fresh) img.onerror = () => load(this.api.snapshotUrl(cam, Date.now(), POSTER_SNAPSHOT_W), true);
       img.src = src;
     };
-    if (tileUrl) load(tileUrl, false);
-    else load(this.api.url(`api/snapshot?camera=${encodeURIComponent(cam)}`) + `&_=${Date.now()}`, true);
+    if (tile) load(tile, false);
+    else load(this.api.snapshotUrl(cam, Date.now(), POSTER_SNAPSHOT_W), true);
   }
   private posterShow(ts: number): void {
     try {

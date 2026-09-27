@@ -144,6 +144,14 @@ describe('SentinelClient base override', () => {
     expect(b.url('api/stats')).toBe('https://h:1/scrypted/endpoint/@local/sentinel-nvr/api/stats');
     expect(b.signalingUrl('33')).toBe('wss://h:1/scrypted/endpoint/@local/sentinel-nvr/?camera=33&signaling=1');
   });
+  it('snapshot URL: optional width before the cache buster', async () => {
+    const { SentinelClient } = await import('../../src/api');
+    const b = new SentinelClient('https://h:1', '', { base: 'https://h:1/endpoint/@local/sentinel-nvr' });
+    expect(b.snapshotUrl('33')).toBe('https://h:1/endpoint/@local/sentinel-nvr/api/snapshot?camera=33');
+    expect(b.snapshotUrl('33', 5, 640)).toBe(
+      'https://h:1/endpoint/@local/sentinel-nvr/api/snapshot?camera=33&w=640&_=5',
+    );
+  });
 });
 
 describe('reverse-proxy prefix (0.10.0)', () => {
