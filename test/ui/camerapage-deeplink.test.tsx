@@ -33,6 +33,9 @@ vi.mock('../../src/player', () => ({
     goLive = goLive;
     posterEvent = posterEvent;
     freezeCurrent = freezeCurrent;
+    openMark() {
+      /* telemetry */
+    }
     currentTs() {
       return null;
     }

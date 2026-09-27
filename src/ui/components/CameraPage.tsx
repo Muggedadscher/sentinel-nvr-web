@@ -267,6 +267,7 @@ export function CameraPage(p: CameraPageProps) {
     ])
       .then(() => {
         if (c.camId !== camId || ctl.current !== c) return;
+        c.openMark('clips');
         setLoadError(false); // a prior failure must not stick once a load succeeds
         const m = mergedNow();
         c.setClips(m.clips, m.codecs, m.rangeStart, m.rangeEnd);
@@ -275,7 +276,10 @@ export function CameraPage(p: CameraPageProps) {
           setJump({ ts: startAt, n: Date.now() });
         } else c.goLive();
       })
-      .catch(() => setLoadError(true));
+      .catch(() => {
+        c.openMark('clipsErr');
+        setLoadError(true);
+      });
     deepRef.current = `${camId}|${startAt}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camId, client]);

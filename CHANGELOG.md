@@ -4,6 +4,14 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.12.1 — 2026-09-27
+
+- Telemetry `open`: one line per camera opening with the ms from opening to each milestone — `poster` (+ `posterSrc`
+  tile/net), `clips`/`clipsErr`, `live`/`relay`, `ws`, `sdp`, `ice`, `track`, `frame` (first presented frame) — plus
+  `end` (frame/leave/switch/timeout after 30 s), `via` and `mobile`. `PlayerController.openMark()` for hosts,
+  `lastOpen` for lab probes. `WebRtcSession` reports the milestones through the optional `onPhase` callback.
+  Groundwork for the grey-stage complaint (opening a camera takes long until the first picture).
+
 ## 0.12.0 — 2026-09-26
 
 - +15 s (and →) from a recording that would land closer than 20 s to "now" — where no recording exists yet — goes
