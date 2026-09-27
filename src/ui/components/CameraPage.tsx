@@ -256,7 +256,13 @@ export function CameraPage(p: CameraPageProps) {
     setLoadError(false);
     loading.current.clear();
     if (startAt) c.posterEvent(posterTs || startAt);
-    else c.posterFromSnapshot(lastTileSnapshot(camId));
+    else {
+      c.posterFromSnapshot(lastTileSnapshot(camId));
+      // live needs no clips: start it now instead of after the day loads (two api/clips answers, several hundred KB on a
+      // phone — the grey stage waited for them). Only the MSE-live fallback reads the codec from the clips; it kicks in
+      // after a failed WebRTC attempt (seconds), when the days are long loaded.
+      c.goLive();
+    }
     const t0 = todayStart();
     const target = startAt ? dayOf(startAt) : t0;
     Promise.all([
@@ -274,7 +280,7 @@ export function CameraPage(p: CameraPageProps) {
         if (startAt) {
           c.playAt(startAt, {});
           setJump({ ts: startAt, n: Date.now() });
-        } else c.goLive();
+        }
       })
       .catch(() => {
         c.openMark('clipsErr');

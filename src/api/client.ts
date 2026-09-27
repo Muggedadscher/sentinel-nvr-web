@@ -92,8 +92,13 @@ export class SentinelClient {
   }
 
   // ---- media URL helpers (all <img>/<video>-loadable) ----
-  snapshotUrl(cameraId: string, bust?: number): string {
-    return this.url(`api/snapshot?camera=${encodeURIComponent(cameraId)}`) + (bust != null ? `&_=${bust}` : '');
+  /** `width` = resized picture (plugin ≥ 2026-09-27, older ones ignore it and send the camera's original) */
+  snapshotUrl(cameraId: string, bust?: number, width?: number): string {
+    return (
+      this.url(`api/snapshot?camera=${encodeURIComponent(cameraId)}`) +
+      (width ? `&w=${Math.round(width)}` : '') +
+      (bust != null ? `&_=${bust}` : '')
+    );
   }
   eventThumbUrl(cameraId: string, ts: number): string {
     return this.url(`api/evthumb?camera=${encodeURIComponent(cameraId)}&ts=${Math.round(ts)}`);

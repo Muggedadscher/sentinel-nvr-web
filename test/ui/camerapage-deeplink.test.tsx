@@ -13,6 +13,7 @@ import { CameraPage } from '../../src/ui/components/CameraPage';
 const playAt = vi.fn();
 const goLive = vi.fn();
 const posterEvent = vi.fn();
+const posterFromSnapshot = vi.fn();
 const freezeCurrent = vi.fn();
 const setClips = vi.fn();
 vi.mock('../../src/player', () => ({
@@ -32,6 +33,7 @@ vi.mock('../../src/player', () => ({
     playAt = playAt;
     goLive = goLive;
     posterEvent = posterEvent;
+    posterFromSnapshot = posterFromSnapshot;
     freezeCurrent = freezeCurrent;
     openMark() {
       /* telemetry */
@@ -132,6 +134,53 @@ describe('CameraPage deep link', () => {
     const handed = before[before.length - 1]![0] as { id: string }[];
     expect(handed.some((c) => c.id === 'c')).toBe(true);
     expect(goLive).not.toHaveBeenCalled();
+    root.unmount();
+  });
+
+  it('opening a camera starts live at once — not after the day loads, and also when they fail', async () => {
+    goLive.mockClear();
+    posterFromSnapshot.mockClear();
+    const rejects: ((e: unknown) => void)[] = [];
+    const client = {
+      corsMedia: true,
+      url: (p: string) => p,
+      getJson: () =>
+        new Promise((_res, rej) => {
+          rejects.push(rej);
+        }),
+      eventThumbUrl: () => '',
+      snapshotUrl: () => '',
+      segmentThumbUrl: () => '',
+    } as any;
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    const root = createRoot(div);
+    await act(async () => {
+      root.render(
+        <SentinelUiProvider
+          value={{
+            client,
+            t: (k: string) => k,
+            locale: 'de-DE',
+            nav: {
+              openCamera: () => {
+                /* */
+              },
+            },
+          }}
+        >
+          <CameraPage camId="33" name="Cam" storagePrefix="t-" brand="test" renderDatePicker={() => null} />
+        </SentinelUiProvider>,
+      );
+    });
+    // no clips answer yet: poster and live are already under way
+    expect(rejects.length).toBeGreaterThan(0);
+    expect(posterFromSnapshot).toHaveBeenCalledTimes(1);
+    expect(goLive).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      for (const r of rejects) r(new Error('offline'));
+    });
+    expect(goLive).toHaveBeenCalledTimes(1); // a failed day load neither blocks nor repeats it
     root.unmount();
   });
 });

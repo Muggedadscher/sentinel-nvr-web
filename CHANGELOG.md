@@ -4,6 +4,19 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.13.0 — 2026-09-27
+
+Opening a camera shows a picture at once and goes live sooner (user 27.09., iPhone/HAPulse: grey stage; measured with
+the 0.12.1 `open` telemetry: grey 374–479 ms although the tile picture was "cached", first frame 1.4–1.6 s).
+
+- The tile snapshot cache keeps the loaded `<img>` itself, not its URL: the poster is drawn synchronously. The URL path
+  meant a new full-size download (api/snapshot is `no-store`, and the poster's CORS mode differed from the tile's).
+  Tiles load with `crossOrigin="anonymous"` (untainted freeze canvas); `rememberTileSnapshot` is exported for host
+  cards (e.g. HAPulse's home card). `posterSrc` in the telemetry: `tile` / `url` / `net`.
+- Live starts right away instead of after the day loads (`api/clips`); a failed load no longer keeps live from starting.
+- Smaller pictures: tiles ask for `api/snapshot&w=640` (960 at devicePixelRatio ≥ 2), the fresh poster for 1280 —
+  `SentinelClient.snapshotUrl(id, bust, width)`. Plugins before 2026-09-27 ignore `w`.
+
 ## 0.12.1 — 2026-09-27
 
 - Telemetry `open`: one line per camera opening with the ms from opening to each milestone — `poster` (+ `posterSrc`

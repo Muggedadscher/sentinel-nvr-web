@@ -7,6 +7,12 @@ import { fmtRelative } from '../format';
 import { rememberTileSnapshot } from '../snapshot-cache';
 
 const SNAPSHOT_MS = 5000;
+/** Tile snapshot width: a tile is ~300–450 CSS px wide; the 5-MP original (~400 KB every 5 s per camera) only cost the
+ *  phone bandwidth and decode time. 640 px ≈ 66 KB, 960 px ≈ 150 KB (Amcrest, measured 27.09.2026). The same picture is
+ *  the poster when the camera opens. */
+export function tileSnapshotWidth(): number {
+  return (window.devicePixelRatio || 1) >= 2 ? 960 : 640;
+}
 const RETRY_EVERY = 6; // ticks (30 s): give a failed snapshot another chance instead of degrading until remount
 
 function CameraTile({ cam, tick, n }: { cam: SentinelCamera; tick: number; n: number }) {
@@ -20,7 +26,7 @@ function CameraTile({ cam, tick, n }: { cam: SentinelCamera; tick: number; n: nu
   }, [n]);
   const src =
     failed === 0
-      ? client.snapshotUrl(cam.id, tick)
+      ? client.snapshotUrl(cam.id, tick, tileSnapshotWidth())
       : failed === 1 && cam.latestThumbId
         ? client.segmentThumbUrl(cam.latestThumbId)
         : null;
@@ -50,7 +56,8 @@ function CameraTile({ cam, tick, n }: { cam: SentinelCamera; tick: number; n: nu
           className="nvr-camtile__img"
           src={src}
           alt=""
-          onLoad={() => rememberTileSnapshot(cam.id, src)}
+          crossOrigin="anonymous"
+          onLoad={(e) => rememberTileSnapshot(cam.id, e.currentTarget)}
           onError={() => setFailed((f) => Math.min(2, f + 1))}
         />
       ) : (
