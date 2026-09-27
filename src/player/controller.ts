@@ -195,6 +195,9 @@ export class PlayerController {
   private op: { t0: number; cam: string; d: Record<string, number | string | boolean>; t: number } | null = null;
   /** the last finished `open` record (lab probes read it via window.__snvr.ctl) */
   lastOpen: Record<string, number | string | boolean> | null = null;
+  /** live fell back to MJPEG only because the codec was not known yet (live starts before the day loads bring it):
+   *  switch to MSE-live once setClips delivers it */
+  private mseAwaitCodec = false;
 
   private arPrefix: string;
   constructor(api: SentinelClient, opts: Opts) {
@@ -396,6 +399,7 @@ export class PlayerController {
     this.mseTeardown();
     this.liveTeardown();
     this.live = false;
+    this.mseAwaitCodec = false;
     this.recPaused = false;
     this.recPausedTs = null;
     this.hiddenTs = null;
@@ -432,6 +436,14 @@ export class PlayerController {
     this.codecs = codecs;
     this.rangeStart = rangeStart;
     this.rangeEnd = rangeEnd;
+    if (this.mseAwaitCodec && codecs) {
+      this.mseAwaitCodec = false;
+      if (this.live && this.transport === 'mjpeg' && !this.w && !this.destroyed && this.liveMseOk()) {
+        rlog('live-mse-late', {});
+        this.freezeFromImage(this.img, true, false, 'mjpeg'); // a still until MSE shows its first frame
+        this.liveStartMse();
+      }
+    }
   }
 
   // ---- open telemetry ------------------------------------------------------------
@@ -826,6 +838,7 @@ export class PlayerController {
     this.playIndex = -1;
     this.curClipId = null;
     this.L.restarts = 0;
+    this.mseAwaitCodec = false;
     this.setLabel('live');
     this.openMark('live');
     if (document.visibilityState === 'hidden') return;
@@ -837,6 +850,7 @@ export class PlayerController {
       } catch {
         /* ignore */
       }
+      this.mseAwaitCodec = !this.codecs;
       this.liveFallbackImg();
     }
   }
@@ -984,7 +998,10 @@ export class PlayerController {
       /* ignore */
     }
     if (this.liveMseOk()) this.liveStartMse();
-    else this.liveFallbackImg();
+    else {
+      this.mseAwaitCodec = !this.codecs;
+      this.liveFallbackImg();
+    }
   }
   private liveCodec(): string | null {
     return this.codecs ? (this.codecs.split(',')[0] ?? null) : null;

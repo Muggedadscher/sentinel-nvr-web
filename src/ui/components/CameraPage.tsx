@@ -259,8 +259,8 @@ export function CameraPage(p: CameraPageProps) {
     else {
       c.posterFromSnapshot(lastTileSnapshot(camId));
       // live needs no clips: start it now instead of after the day loads (two api/clips answers, several hundred KB on a
-      // phone — the grey stage waited for them). Only the MSE-live fallback reads the codec from the clips; it kicks in
-      // after a failed WebRTC attempt (seconds), when the days are long loaded.
+      // phone — the grey stage waited for them). Only the MSE-live fallback reads the codec from the clips: a fallback
+      // before they arrive goes to MJPEG and switches to MSE-live in setClips.
       c.goLive();
     }
     const t0 = todayStart();

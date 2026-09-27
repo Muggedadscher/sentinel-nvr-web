@@ -4,6 +4,13 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.13.1 — 2026-09-27
+
+- Live fallback before the day loads: since 0.13.0 live starts before `api/clips` brings the codec, so a WebRTC failure
+  at once (WebSocket error, no `RTCPeerConnection`) went to MJPEG and stayed there until the 2-min WebRTC retry. Now
+  the codec's arrival (`setClips`) switches such an MJPEG fallback to MSE-live (telemetry `live-mse-late`); only when
+  the codec was the reason — a failed MSE is not retried this way. Lab probe `live-fallback-test.js` (Sentinel repo).
+
 ## 0.13.0 — 2026-09-27
 
 Opening a camera shows a picture at once and goes live sooner (user 27.09., iPhone/HAPulse: grey stage; measured with
