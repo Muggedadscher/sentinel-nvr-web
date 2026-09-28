@@ -133,5 +133,9 @@
   "nvr.setup.loginDisabled": "Token-Zugang ist im Plugin ausgeschaltet (403)",
   "nvr.setup.loginOld": "Dieses Sentinel kennt den Login-Tausch noch nicht (404) — Plugin aktualisieren oder das Token eintragen",
   "nvr.setup.loginBusy": "Zu viele Versuche — kurz warten (429)",
-  "nvr.setup.loginHint": "Mit deinem Scrypted-Konto anmelden; HAPulse holt sich das Zugriffs-Token selbst. Das Passwort wird nicht gespeichert."
+  "nvr.setup.loginHint": "Mit deinem Scrypted-Konto anmelden; HAPulse holt sich das Zugriffs-Token selbst. Das Passwort wird nicht gespeichert.",
+  "nvr.player.pipHomeScreen": "Bild-in-Bild sperrt Apple in Home-Bildschirm-Apps auf iPhone und iPad – in Safari geht es.",
+  "nvr.player.pipUnsupported": "Bild-in-Bild wird in diesem Browser nicht unterstützt.",
+  "nvr.player.openInSafari": "In Safari öffnen",
+  "nvr.player.dismiss": "Schließen"
 }

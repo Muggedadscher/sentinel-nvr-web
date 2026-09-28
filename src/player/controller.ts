@@ -21,6 +21,9 @@ import { skipTarget } from './skip';
 /** `label` is an i18n key suffix: nvr.player.<label> */
 export type PlayerLabel =
   'live' | 'liveWebrtc' | 'liveMse' | 'liveMjpeg' | 'loading' | 'playing' | 'paused' | 'scrub' | 'noRecording' | '';
+/** Outcome of `PlayerController.pip()`. */
+export type PipResult = 'entered' | 'exited' | 'unsupported' | 'failed';
+
 export interface PlayerState {
   live: boolean;
   label: PlayerLabel;
@@ -2229,36 +2232,48 @@ export class PlayerController {
       /* ignore */
     }
   }
-  pip(): void {
+  /**
+   * Picture-in-picture on/off. Resolves how it went — `unsupported` when this browsing context cannot do PiP at all:
+   * notably a Home-Screen web app on iPhone/iPad, where Apple disables it (`requestPictureInPicture` rejects with
+   * NotSupportedError and `webkitSupportsPresentationMode('picture-in-picture')` is false; Safari itself allows it).
+   * The request itself still runs synchronously inside the click (user gesture).
+   */
+  async pip(): Promise<PipResult> {
     const v: any = this.v;
     this.capLog('pip-btn');
+    const wkOk = (): boolean =>
+      !!(v.webkitSupportsPresentationMode && v.webkitSupportsPresentationMode('picture-in-picture'));
     try {
       if (document.pictureInPictureElement || v.webkitPresentationMode === 'picture-in-picture') {
         if (document.pictureInPictureElement)
-          document.exitPictureInPicture().catch(() => {
+          await document.exitPictureInPicture().catch(() => {
             /* ignore */
           });
         else v.webkitSetPresentationMode('inline');
-        return;
+        return 'exited';
       }
-      if (this.v.classList.contains('hidden')) return;
-      const wk = () => {
+      if (this.v.classList.contains('hidden')) return 'failed'; // MJPEG: no video element to float
+      if (v.requestPictureInPicture) {
         try {
-          if (v.webkitSupportsPresentationMode && v.webkitSupportsPresentationMode('picture-in-picture'))
-            v.webkitSetPresentationMode('picture-in-picture');
-          else this.capLog('pip-unsupported');
+          await v.requestPictureInPicture();
+          return 'entered';
         } catch (e: any) {
           this.capLog('pip-fail', { e: String(e?.name || e) });
+          if (!wkOk()) {
+            this.capLog('pip-unsupported');
+            return e?.name === 'NotSupportedError' ? 'unsupported' : 'failed';
+          }
         }
-      };
-      if (v.requestPictureInPicture)
-        v.requestPictureInPicture().catch((e: any) => {
-          this.capLog('pip-fail', { e: String(e?.name || e) });
-          wk();
-        });
-      else wk();
+      }
+      if (wkOk()) {
+        v.webkitSetPresentationMode('picture-in-picture');
+        return 'entered';
+      }
+      this.capLog('pip-unsupported');
+      return 'unsupported';
     } catch (e: any) {
       this.capLog('pip-fail', { e: String(e?.name || e) });
+      return 'failed';
     }
   }
   fullscreen(): void {
