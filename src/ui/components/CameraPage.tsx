@@ -27,6 +27,7 @@ import {
   Rewind,
   Volume2,
   VolumeX,
+  X,
 } from 'lucide-react';
 import {
   sentinelAddDays as addDays,
@@ -43,7 +44,8 @@ import {
   type SentinelEvent,
   type SentinelEventClass,
 } from '../../api';
-import { PlayerController, type PlayerState } from '../../player';
+import { PlayerController, rlog, type PlayerState } from '../../player';
+import { isIosHomeScreenApp, outsideAppHref } from '../outside';
 import { useSentinelUi } from '../context';
 import { dateChipNav, shouldHandleKey, stageStatus } from '../camera-logic';
 import { lastTileSnapshot } from '../snapshot-cache';
@@ -92,6 +94,9 @@ export interface CameraPageProps {
   header?: ReactNode;
   /** the host wraps the date picker in its own modal primitive */
   renderDatePicker: (req: DatePickerRequest) => ReactNode;
+  /** This camera outside the app (Sentinel's public entry, no token). Offered as "open in Safari" when a Home-Screen
+   *  web app on iPhone/iPad cannot do Picture-in-Picture (Apple blocks it there; Safari allows it). */
+  externalUrl?: string | undefined;
 }
 
 /** Host header row: back button + camera name (+ host actions on the right). Same metrics in every host. */
@@ -128,6 +133,21 @@ export function CameraPage(p: CameraPageProps) {
   const [ps, setPs] = useState<PlayerState>(IDLE);
   const [loadError, setLoadError] = useState(false);
   const [dt, setDt] = useState(false);
+  // Picture-in-Picture refused by the browser: 'homescreen' = iPhone/iPad Home-Screen app (Apple blocks PiP there)
+  const [pipNote, setPipNote] = useState<null | 'homescreen' | 'unsupported'>(null);
+  useEffect(() => {
+    if (!pipNote) return;
+    const i = setTimeout(() => setPipNote(null), 15000);
+    return () => clearTimeout(i);
+  }, [pipNote]);
+  const onPip = useCallback(() => {
+    const c = ctl.current;
+    if (!c) return;
+    void c.pip().then((r) => {
+      if (r === 'unsupported') setPipNote(isIosHomeScreenApp() ? 'homescreen' : 'unsupported');
+      else if (r === 'entered') setPipNote(null);
+    });
+  }, []);
   const body = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
@@ -499,12 +519,7 @@ export function CameraPage(p: CameraPageProps) {
                 >
                   <Camera size={16} />
                 </button>
-                <button
-                  type="button"
-                  className="nvr-iconbtn"
-                  aria-label={t('nvr.player.pip')}
-                  onClick={() => ctl.current?.pip()}
-                >
+                <button type="button" className="nvr-iconbtn" aria-label={t('nvr.player.pip')} onClick={onPip}>
                   <PictureInPicture2 size={16} />
                 </button>
                 <button
@@ -517,6 +532,30 @@ export function CameraPage(p: CameraPageProps) {
                 </button>
               </span>
             </div>
+            {pipNote && (
+              <div className="nvr-pipnote" role="status">
+                <span>{t(pipNote === 'homescreen' ? 'nvr.player.pipHomeScreen' : 'nvr.player.pipUnsupported')}</span>
+                {pipNote === 'homescreen' && p.externalUrl && (
+                  <a
+                    className="nvr-pipnote__open"
+                    href={outsideAppHref(p.externalUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => rlog('pip-outside', { href: outsideAppHref(p.externalUrl!).split(':')[0] })}
+                  >
+                    {t('nvr.player.openInSafari')}
+                  </a>
+                )}
+                <button
+                  type="button"
+                  className="nvr-iconbtn nvr-pipnote__close"
+                  aria-label={t('nvr.player.dismiss')}
+                  onClick={() => setPipNote(null)}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

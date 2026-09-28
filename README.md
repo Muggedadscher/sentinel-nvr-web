@@ -34,6 +34,7 @@ on older servers, but only get their full behaviour with the matching plugin ver
 | 0.11.x | any (storage warning: ≥ 1.1.0) | robustness: the chosen speed survives a new relay session (pause/play, tab switch, recovery), control/seek/poll requests time out, answers of a finished session are ignored, a camera switch stops the old stream at once, forced TURN relay only for 10 min, live watchdog (frozen WebRTC → restart → fallback, WebRTC retried out of a fallback with back-off), MJPEG retry, telemetry rate limit, keyboard shortcuts leave modifiers/buttons alone, fallback transport shown, second deep link to the same camera works, storage-unavailable warning in the hero (`stats.storageOk`). `sideEffects` keeps the CSS, NOTICE.md shipped, react/lucide-react optional peers. |
 | 0.12.x | any | +15 s at the recording edge goes live; 0.12.1: `open` telemetry per camera opening. |
 | 0.13.x | any (smaller pictures: ≥ 1.2.0; older plugins ignore `w=` and send full-size snapshots) | opening a camera: the tile's loaded picture is the poster at once (tiles load with `crossOrigin="anonymous"`, `rememberTileSnapshot` exported for host cards), live starts without waiting for the day loads (a failed load no longer blocks it), tiles ask for `api/snapshot&w=640/960`, the fresh poster for 1280. 0.13.1: an MJPEG fallback taken before the codec was known switches to MSE-live once the day loads bring it — client only. |
+| 0.14.x | any | Picture-in-Picture note + "Open in Safari" in iPhone/iPad Home-Screen apps (Apple blocks PiP there); `PlayerController.pip()` resolves its outcome. Client only. |
 
 Lab note: Scrypted's WebRTC sink re-encodes (1280 px, 15 fps) for clients that are not Windows/macOS/iOS and report a
 screen below 1920 physical pixels, unless the source declares a width ≤ 1280. Plugin ≥ 1.2.0 declares it for recorded
@@ -52,6 +53,8 @@ The server keeps its own types; `docs/API.md` in the plugin repository is the co
 - **Camera page:** hosts render `<CameraPage …/>` with `header` (their page header, e.g.
   `<CameraTitle/>` + actions) and `renderDatePicker` (their modal around `useDatePicker`).
   Everything visible inside comes from the package, so both consumers look identical.
+  Optional `externalUrl` = this camera outside the app (Sentinel's public entry, no token): offered as "Open in
+  Safari" when an iPhone/iPad Home-Screen app refuses Picture-in-Picture.
 
 ## Develop
 

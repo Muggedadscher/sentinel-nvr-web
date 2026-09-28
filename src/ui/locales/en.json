@@ -133,5 +133,9 @@
   "nvr.setup.loginDisabled": "Token access is switched off in the plugin (403)",
   "nvr.setup.loginOld": "This Sentinel has no sign-in exchange yet (404) — update the plugin or enter the token",
   "nvr.setup.loginBusy": "Too many attempts — wait a moment (429)",
-  "nvr.setup.loginHint": "Sign in with your Scrypted account; HAPulse fetches the access token itself. The password is not stored."
+  "nvr.setup.loginHint": "Sign in with your Scrypted account; HAPulse fetches the access token itself. The password is not stored.",
+  "nvr.player.pipHomeScreen": "Apple blocks picture-in-picture in Home Screen apps on iPhone and iPad – it works in Safari.",
+  "nvr.player.pipUnsupported": "Picture-in-picture is not supported in this browser.",
+  "nvr.player.openInSafari": "Open in Safari",
+  "nvr.player.dismiss": "Close"
 }

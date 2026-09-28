@@ -133,5 +133,9 @@
   "nvr.setup.loginDisabled": "L’accès par jeton est désactivé dans le plugin (403)",
   "nvr.setup.loginOld": "Ce Sentinel ne connaît pas encore la connexion par compte (404) — mettez le plugin à jour ou saisissez le jeton",
   "nvr.setup.loginBusy": "Trop de tentatives — patientez un instant (429)",
-  "nvr.setup.loginHint": "Connectez-vous avec votre compte Scrypted ; HAPulse récupère le jeton lui-même. Le mot de passe n’est pas enregistré."
+  "nvr.setup.loginHint": "Connectez-vous avec votre compte Scrypted ; HAPulse récupère le jeton lui-même. Le mot de passe n’est pas enregistré.",
+  "nvr.player.pipHomeScreen": "Apple bloque l’image dans l’image dans les apps de l’écran d’accueil sur iPhone et iPad – cela fonctionne dans Safari.",
+  "nvr.player.pipUnsupported": "L’image dans l’image n’est pas prise en charge par ce navigateur.",
+  "nvr.player.openInSafari": "Ouvrir dans Safari",
+  "nvr.player.dismiss": "Fermer"
 }

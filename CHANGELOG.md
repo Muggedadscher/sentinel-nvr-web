@@ -4,7 +4,20 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
-## Unreleased
+## 0.14.0 — 2026-09-28
+
+- Picture-in-Picture in iPhone/iPad Home-Screen apps: Apple disables PiP there (the video rejects with
+  NotSupportedError, `webkitSupportsPresentationMode('picture-in-picture')` is false — seen in the `pip-fail` telemetry
+  of HAPulse's home-screen app on iOS 18.7; Safari itself allows it). The PiP button no longer fails silently: the
+  camera page shows a short note under the stage and, when the host passes `externalUrl` (new optional `CameraPage`
+  prop: this camera outside the app, e.g. Sentinel's public entry without a token), an "Open in Safari" link —
+  `x-safari-https://…` on iOS 17+ so it opens Safari itself instead of iOS's in-app browser sheet. Browsers without
+  any PiP get a plain note. Telemetry `pip-outside` on that link.
+- `PlayerController.pip()` resolves `PipResult` (`entered` | `exited` | `unsupported` | `failed`); the request still
+  runs inside the click. New exports `isIosHomeScreenApp`, `outsideAppHref` (`/ui`). Keys `nvr.player.pipHomeScreen`,
+  `pipUnsupported`, `openInSafari`, `dismiss` in all 7 locales.
+
+### Docs (unreleased before)
 
 - Docs: the README's server-compatibility table names plugin versions (≥ 1.1.0 / ≥ 1.2.0) instead of dates, the lab
   note describes the real cause of the sink re-encode, a wrong claim (the plugin importing `@sentinel-nvr/api`) is gone,

@@ -133,5 +133,9 @@
   "nvr.setup.loginDisabled": "O acesso por token está desligado no plugin (403)",
   "nvr.setup.loginOld": "Este Sentinel ainda não suporta o início de sessão (404) — atualiza o plugin ou introduz o token",
   "nvr.setup.loginBusy": "Demasiadas tentativas — aguarda um momento (429)",
-  "nvr.setup.loginHint": "Inicia sessão com a tua conta Scrypted; o HAPulse obtém o token sozinho. A palavra-passe não é guardada."
+  "nvr.setup.loginHint": "Inicia sessão com a tua conta Scrypted; o HAPulse obtém o token sozinho. A palavra-passe não é guardada.",
+  "nvr.player.pipHomeScreen": "A Apple bloqueia a imagem em imagem nas apps do ecrã principal no iPhone e no iPad – no Safari funciona.",
+  "nvr.player.pipUnsupported": "Este navegador não suporta imagem em imagem.",
+  "nvr.player.openInSafari": "Abrir no Safari",
+  "nvr.player.dismiss": "Fechar"
 }

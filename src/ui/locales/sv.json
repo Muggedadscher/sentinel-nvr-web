@@ -133,5 +133,9 @@
   "nvr.setup.loginDisabled": "Tokenåtkomst är avstängd i insticksmodulen (403)",
   "nvr.setup.loginOld": "Den här Sentinel saknar inloggningsutbyte (404) – uppdatera insticksmodulen eller ange token",
   "nvr.setup.loginBusy": "För många försök – vänta en stund (429)",
-  "nvr.setup.loginHint": "Logga in med ditt Scrypted-konto; HAPulse hämtar åtkomsttoken själv. Lösenordet sparas inte."
+  "nvr.setup.loginHint": "Logga in med ditt Scrypted-konto; HAPulse hämtar åtkomsttoken själv. Lösenordet sparas inte.",
+  "nvr.player.pipHomeScreen": "Apple spärrar bild-i-bild i hemskärmsappar på iPhone och iPad – i Safari fungerar det.",
+  "nvr.player.pipUnsupported": "Bild-i-bild stöds inte i den här webbläsaren.",
+  "nvr.player.openInSafari": "Öppna i Safari",
+  "nvr.player.dismiss": "Stäng"
 }
