@@ -4,6 +4,13 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## Unreleased
+
+- Docs: the README's server-compatibility table names plugin versions (≥ 1.1.0 / ≥ 1.2.0) instead of dates, the lab
+  note describes the real cause of the sink re-encode, a wrong claim (the plugin importing `@sentinel-nvr/api`) is gone,
+  and the link to the private plugin repository is marked as such.
+- Examples and tests use a documentation address (192.0.2.10) instead of a LAN address; `.npmrc`/`.env*` ignored.
+
 ## 0.13.1 — 2026-09-27
 
 - Live fallback before the day loads: since 0.13.0 live starts before `api/clips` brings the codec, so a WebRTC failure

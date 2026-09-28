@@ -115,7 +115,7 @@ export const SENTINEL_DAY_MS = 24 * 60 * 60 * 1000;
 export const SENTINEL_ENDPOINT_PATH = '/endpoint/@local/sentinel-nvr';
 
 export interface SentinelSetup {
-  /** Scrypted origin, e.g. `https://192.168.2.120:10443` (no trailing slash). */
+  /** Scrypted origin, e.g. `https://192.0.2.10:10443` (no trailing slash). */
   origin: string;
   /** Access token found in the pasted URL (`?token=`), if any. */
   token: string | null;

@@ -5,3 +5,7 @@ dist/
 .vscode/
 # local assistant notes / credentials (never published)
 .claude/
+# npm auth / local environment (never committed)
+.npmrc
+.env
+.env.*
