@@ -18,8 +18,8 @@ import {
 
 describe('setup / URLs', () => {
   it('accepts a bare host and assumes https', () => {
-    expect(parseSentinelSetup('192.168.2.120:10443')).toEqual({
-      origin: 'https://192.168.2.120:10443',
+    expect(parseSentinelSetup('192.0.2.10:10443')).toEqual({
+      origin: 'https://192.0.2.10:10443',
       token: null,
       prefix: '',
     });
