@@ -8,6 +8,8 @@ import {
   sentinelClassesOf,
   sentinelEventHidden,
   sentinelEventPlayTs,
+  sentinelEventSpan,
+  sentinelDuration,
   sentinelClipRuns,
   sentinelClipIndexFor,
   sentinelMergeDays,
@@ -181,5 +183,30 @@ describe('reverse-proxy prefix (0.10.0)', () => {
       'https://proxy.example/scrypted/endpoint/@local/sentinel-nvr/public/',
     );
     expect(sentinelPublicBase('https://h:10443')).toBe('https://h:10443/endpoint/@local/sentinel-nvr/public/');
+  });
+});
+
+describe('event as a time span (plugin ≥ 1.3.0)', () => {
+  const T = 1_790_000_000_000;
+  it('spans from the first sighting to the last movement; short events and old servers have none', () => {
+    expect(sentinelEventSpan({ timestamp: T, startTs: T - 2000, endTs: T + 40000 })).toEqual({
+      start: T - 2000,
+      end: T + 40000,
+      open: false,
+    });
+    expect(sentinelEventSpan({ timestamp: T, startTs: T - 1000, endTs: T + 1000 })).toBeUndefined();
+    expect(sentinelEventSpan({ timestamp: T, startTs: T - 1000 })).toBeUndefined();
+  });
+  it('a running event reaches up to now', () => {
+    expect(sentinelEventSpan({ timestamp: T, startTs: T - 1000, endTs: T + 5000, open: true }, T + 60000)).toEqual({
+      start: T - 1000,
+      end: T + 60000,
+      open: true,
+    });
+  });
+  it('formats a duration as m:ss or h:mm:ss', () => {
+    expect(sentinelDuration(42000)).toBe('0:42');
+    expect(sentinelDuration(185000)).toBe('3:05');
+    expect(sentinelDuration(3723000)).toBe('1:02:03');
   });
 });

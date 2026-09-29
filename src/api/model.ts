@@ -64,6 +64,10 @@ export interface SentinelRecentEvent {
   cameraName: string;
   ts: number;
   startTs?: number;
+  /** plugin ≥ 1.3.0: event as a time span — last movement of one of its objects */
+  endTs?: number;
+  /** plugin ≥ 1.3.0: the event is still running */
+  open?: boolean;
   classes: string[];
   score: number;
 }
@@ -74,6 +78,8 @@ export interface SentinelEventBox {
   score: number;
   box: SentinelBox;
   nbox?: SentinelBox;
+  /** plugin ≥ 1.3.0: picture time of this box (later than `timestamp` = the object joined the running event) */
+  ts?: number;
 }
 
 /** Full event (`api/clips.events`). */
@@ -85,6 +91,10 @@ export interface SentinelEvent {
   score: number;
   source: 'object' | 'motion';
   boxes?: SentinelEventBox[];
+  /** plugin ≥ 1.3.0: event as a time span — last movement of one of its objects */
+  endTs?: number;
+  /** plugin ≥ 1.3.0: the event is still running (its objects are still there) */
+  open?: boolean;
 }
 
 /** Recording segment (`api/clips.clips`). */
@@ -234,6 +244,35 @@ export function sentinelEventHidden(
   off: Partial<Record<SentinelEventClass, boolean>>,
 ): boolean {
   return sentinelClassesOf(ev).every((c) => off[c]);
+}
+
+/** Shorter spans are drawn as a plain marker. */
+export const SENTINEL_MIN_SPAN_MS = 3000;
+
+/**
+ * An event as a time span (plugin ≥ 1.3.0): from its first sighting to the last movement of its objects — a running
+ * event reaches up to `now`. Undefined for short events and for servers without `endTs`.
+ */
+export function sentinelEventSpan(
+  ev: { timestamp?: number; ts?: number; startTs?: number; endTs?: number; open?: boolean },
+  now = Date.now(),
+): { start: number; end: number; open: boolean } | undefined {
+  const t = ev.timestamp ?? ev.ts ?? 0;
+  const start = Math.min(ev.startTs ?? t, t);
+  const open = !!ev.open;
+  const end = open ? Math.max(now, ev.endTs ?? t) : ev.endTs;
+  if (end === undefined || end - start < SENTINEL_MIN_SPAN_MS)
+    return open ? { start, end: end ?? now, open } : undefined;
+  return { start, end, open };
+}
+
+/** A span's length as m:ss (h:mm:ss from one hour). */
+export function sentinelDuration(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(s / 3600),
+    m = Math.floor((s % 3600) / 60),
+    sec = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
 }
 
 /**

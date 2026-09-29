@@ -137,5 +137,6 @@
   "nvr.player.pipHomeScreen": "A Apple bloqueia a imagem em imagem nas apps do ecrã principal no iPhone e no iPad – no Safari funciona.",
   "nvr.player.pipUnsupported": "Este navegador não suporta imagem em imagem.",
   "nvr.player.openInSafari": "Abrir no Safari",
-  "nvr.player.dismiss": "Fechar"
+  "nvr.player.dismiss": "Fechar",
+  "nvr.events.running": "a decorrer"
 }
