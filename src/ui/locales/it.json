@@ -137,5 +137,6 @@
   "nvr.player.pipHomeScreen": "Apple blocca il picture-in-picture nelle app della schermata Home su iPhone e iPad: in Safari funziona.",
   "nvr.player.pipUnsupported": "Il picture-in-picture non è supportato in questo browser.",
   "nvr.player.openInSafari": "Apri in Safari",
-  "nvr.player.dismiss": "Chiudi"
+  "nvr.player.dismiss": "Chiudi",
+  "nvr.events.running": "in corso"
 }

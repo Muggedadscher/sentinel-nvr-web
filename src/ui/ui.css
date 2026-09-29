@@ -762,6 +762,28 @@
   cursor: pointer;
   padding: 0;
 }
+.nvr-vtl .vspan {
+  /* event as a time span (plugin ≥ 1.3.0): first sighting → last movement, centred on the marker */
+  position: absolute;
+  left: 84px;
+  width: 3px;
+  border-radius: 2px;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.nvr-vtl .vspan--open {
+  animation: nvr-span-run 1.6s ease-in-out infinite;
+}
+@keyframes nvr-span-run {
+  50% {
+    opacity: 0.2;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nvr-vtl .vspan--open {
+    animation: none;
+  }
+}
 .nvr-vtl .vev--minor {
   width: 6px;
   left: 82px;
@@ -915,6 +937,9 @@
   .nvr-vtl .vev {
     left: 58px;
     width: 26px;
+  }
+  .nvr-vtl .vspan {
+    left: 70px;
   }
   .nvr-vtl .vev--minor {
     left: 68px;
@@ -1484,6 +1509,10 @@
   display: block;
   font-size: 0.72rem;
   color: var(--text-faint);
+}
+.nvr-evrow__open {
+  color: var(--accent);
+  font-weight: 600;
 }
 @media (max-width: 899px) {
   .nvr-cam {

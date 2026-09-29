@@ -14,6 +14,7 @@ import {
   sentinelEventHidden,
   sentinelClipRuns,
   sentinelEventPlayTs as eventPlayTs,
+  sentinelEventSpan as eventSpan,
   fmtDay as dayLabel,
   fmtTime,
   fmtTimeSec,
@@ -434,8 +435,19 @@ export function VerticalTimeline(p: TimelineProps) {
             const k = classOf(ev);
             const thumb = y - lastThumbY >= thumbGap && px > vh / (8 * 3600 * 1000);
             if (thumb) lastThumbY = y;
+            const sp = eventSpan(ev, now);
             return (
               <div key={ev.id}>
+                {sp && (
+                  <div
+                    className={'vspan' + (sp.open ? ' vspan--open' : '')}
+                    style={{
+                      top: yFor(sp.end),
+                      height: Math.max(3, (sp.end - sp.start) * px),
+                      background: `var(--nvr-c-${k})`,
+                    }}
+                  />
+                )}
                 <button
                   className={'vev' + (thumb ? '' : ' vev--minor')}
                   style={{ top: y, background: `var(--nvr-c-${k})` }}

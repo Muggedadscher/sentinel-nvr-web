@@ -4,6 +4,14 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.16.0 — 2026-09-29
+
+- Events as time spans (plugin ≥ 1.3.0): the vertical timeline draws a thin bar in the class colour from an event's
+  first sighting to the last movement of its objects; a running event (`open`) reaches up to now and pulses (still
+  with `prefers-reduced-motion`). The event list shows the duration („· 0:42“) or „· läuft“. New model fields
+  `endTs`/`open` (`SentinelEvent`, `SentinelRecentEvent`), `boxes[].ts`; helpers `sentinelEventSpan`,
+  `sentinelDuration`. Key `nvr.events.running` in all 7 locales. Older servers: no spans, nothing else changes.
+
 ## 0.15.0 — 2026-09-29
 
 - Event classes by priority: `sentinelClassOf` returns the most important class (person > animal > bike > car >

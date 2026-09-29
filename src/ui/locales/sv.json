@@ -137,5 +137,6 @@
   "nvr.player.pipHomeScreen": "Apple spärrar bild-i-bild i hemskärmsappar på iPhone och iPad – i Safari fungerar det.",
   "nvr.player.pipUnsupported": "Bild-i-bild stöds inte i den här webbläsaren.",
   "nvr.player.openInSafari": "Öppna i Safari",
-  "nvr.player.dismiss": "Stäng"
+  "nvr.player.dismiss": "Stäng",
+  "nvr.events.running": "pågår"
 }

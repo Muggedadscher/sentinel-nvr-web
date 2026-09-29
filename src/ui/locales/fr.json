@@ -137,5 +137,6 @@
   "nvr.player.pipHomeScreen": "Apple bloque l’image dans l’image dans les apps de l’écran d’accueil sur iPhone et iPad – cela fonctionne dans Safari.",
   "nvr.player.pipUnsupported": "L’image dans l’image n’est pas prise en charge par ce navigateur.",
   "nvr.player.openInSafari": "Ouvrir dans Safari",
-  "nvr.player.dismiss": "Fermer"
+  "nvr.player.dismiss": "Fermer",
+  "nvr.events.running": "en cours"
 }

@@ -1,6 +1,13 @@
 /** Event list (camera page "Events" tab): newest first over all loaded days, a day header at every day change. */
 import { Fragment } from 'react';
-import { sentinelEventHidden, fmtDay, fmtTimeSec, type SentinelEvent } from '../../api';
+import {
+  sentinelDuration,
+  sentinelEventHidden,
+  sentinelEventSpan,
+  fmtDay,
+  fmtTimeSec,
+  type SentinelEvent,
+} from '../../api';
 import { useSentinelUi } from '../context';
 import { EventBadges, eventLabel } from './ClassBadge';
 
@@ -37,12 +44,26 @@ export function EventList({
                 <span className="nvr-evrow__cls">
                   <EventBadges ev={ev} size={16} t={t} /> {eventLabel(t, ev)}
                 </span>
-                <span className="nvr-evrow__t nvr-data">{fmtTimeSec(ev.timestamp, locale)}</span>
+                <span className="nvr-evrow__t nvr-data">
+                  {fmtTimeSec(ev.timestamp, locale)}
+                  <EventSpanNote ev={ev} t={t} />
+                </span>
               </span>
             </button>
           </Fragment>
         );
       })}
     </div>
+  );
+}
+
+/** "· 0:42" after the time of an event that lasted, "· läuft" while it runs (plugin ≥ 1.3.0). */
+function EventSpanNote({ ev, t }: { ev: SentinelEvent; t: (k: string) => string }) {
+  const sp = sentinelEventSpan(ev);
+  if (!sp) return null;
+  return sp.open ? (
+    <span className="nvr-evrow__open"> · {t('nvr.events.running')}</span>
+  ) : (
+    <> · {sentinelDuration(sp.end - sp.start)}</>
   );
 }
