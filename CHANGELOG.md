@@ -4,6 +4,16 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.15.0 — 2026-09-29
+
+- Event classes by priority: `sentinelClassOf` returns the most important class (person > animal > bike > car >
+  package) instead of the first one, `sentinelClassesOf` sorts by it (new export `SENTINEL_CLASS_PRIORITY`). A cyclist
+  (car + person) is a person in markers, colours and the list — also with older servers that send classes
+  alphabetically.
+- Class filters hide an event only when ALL of its classes are off (`sentinelEventHidden`); the chips count every
+  event that contains their class (a cyclist counts for person and vehicle). Before, „vehicle off“ also hid cyclists
+  and the person chip missed them.
+
 ## 0.14.0 — 2026-09-28
 
 - Picture-in-Picture in iPhone/iPad Home-Screen apps: Apple disables PiP there (the video rejects with

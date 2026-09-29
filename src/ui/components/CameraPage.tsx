@@ -34,7 +34,8 @@ import {
   sentinelAtTime as atTime,
   sentinelDayEnd as dayEnd,
   SENTINEL_EVENT_CLASSES,
-  sentinelClassOf as classOf,
+  sentinelClassesOf,
+  sentinelEventHidden,
   sentinelDayOf as dayOf,
   sentinelEventPlayTs,
   sentinelMergeDays,
@@ -337,13 +338,14 @@ export function CameraPage(p: CameraPageProps) {
 
   const present = useMemo(() => {
     const m: Partial<Record<SentinelEventClass, number>> = {};
-    for (const e of merged.events) {
-      const k = classOf(e);
-      m[k] = (m[k] ?? 0) + 1;
-    }
+    // a chip counts every event that CONTAINS its class (a cyclist counts for person and vehicle)
+    for (const e of merged.events) for (const k of sentinelClassesOf(e)) m[k] = (m[k] ?? 0) + 1;
     return m;
   }, [merged.events]);
-  const visEvents = useMemo(() => merged.events.filter((e) => !filterOff[classOf(e)]), [merged.events, filterOff]);
+  const visEvents = useMemo(
+    () => merged.events.filter((e) => !sentinelEventHidden(e, filterOff)),
+    [merged.events, filterOff],
+  );
   const goLive = useCallback(() => {
     ctl.current?.goLive();
     setJump({ ts: Date.now(), n: Date.now() });

@@ -1,6 +1,6 @@
 /** Event list (camera page "Events" tab): newest first over all loaded days, a day header at every day change. */
 import { Fragment } from 'react';
-import { sentinelClassOf, fmtDay, fmtTimeSec, type SentinelEvent } from '../../api';
+import { sentinelEventHidden, fmtDay, fmtTimeSec, type SentinelEvent } from '../../api';
 import { useSentinelUi } from '../context';
 import { EventBadges, eventLabel } from './ClassBadge';
 
@@ -17,7 +17,7 @@ export function EventList({
 }) {
   const { client, t, locale } = useSentinelUi();
   const evs = events
-    .filter((e) => !filterOff[sentinelClassOf(e)])
+    .filter((e) => !sentinelEventHidden(e, filterOff))
     .slice()
     .sort((a, b) => b.timestamp - a.timestamp);
   if (!evs.length) return <p className="nvr-muted nvr-evlist__empty">{t('nvr.events.none')}</p>;

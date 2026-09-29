@@ -200,20 +200,40 @@ function isKnownClass(k: string): k is SentinelEventClass {
   return (SENTINEL_EVENT_CLASSES as readonly string[]).includes(k);
 }
 
-/** Primary class of an event (first known class, else `motion`). */
-export function sentinelClassOf(ev: { classes?: string[] | undefined }): SentinelEventClass {
-  const k = ev.classes?.[0];
-  return k !== undefined && isKnownClass(k) ? k : 'motion';
-}
+/** Which class of a multi-class event matters most (a cyclist is a person first). Servers from plugin 1.3.0 send
+ *  `classes` in this order; older ones sent them alphabetically — the helpers below sort themselves. */
+export const SENTINEL_CLASS_PRIORITY: readonly SentinelEventClass[] = [
+  'person',
+  'animal',
+  'bike',
+  'car',
+  'package',
+  'motion',
+];
 
-/** Distinct known classes of an event, in order — never empty. */
+/** Distinct known classes of an event by priority (unknown classes count as `motion`) — never empty. */
 export function sentinelClassesOf(ev: { classes?: string[] | undefined }): SentinelEventClass[] {
   const out: SentinelEventClass[] = [];
   for (const k of ev.classes ?? []) {
     const c: SentinelEventClass = isKnownClass(k) ? k : 'motion';
     if (!out.includes(c)) out.push(c);
   }
-  return out.length ? out : [sentinelClassOf(ev)];
+  if (!out.length) out.push('motion');
+  return out.sort((a, b) => SENTINEL_CLASS_PRIORITY.indexOf(a) - SENTINEL_CLASS_PRIORITY.indexOf(b));
+}
+
+/** Primary class of an event: its most important class (person > animal > bike > car > package), else `motion`. */
+export function sentinelClassOf(ev: { classes?: string[] | undefined }): SentinelEventClass {
+  return sentinelClassesOf(ev)[0];
+}
+
+/** A class filter hides an event only when ALL of its classes are switched off (a cyclist stays visible with
+ *  „Fahrzeug“ off, because it is also a person). */
+export function sentinelEventHidden(
+  ev: { classes?: string[] | undefined },
+  off: Partial<Record<SentinelEventClass, boolean>>,
+): boolean {
+  return sentinelClassesOf(ev).every((c) => off[c]);
 }
 
 /**

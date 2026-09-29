@@ -35,6 +35,7 @@ on older servers, but only get their full behaviour with the matching plugin ver
 | 0.12.x | any | +15 s at the recording edge goes live; 0.12.1: `open` telemetry per camera opening. |
 | 0.13.x | any (smaller pictures: ≥ 1.2.0; older plugins ignore `w=` and send full-size snapshots) | opening a camera: the tile's loaded picture is the poster at once (tiles load with `crossOrigin="anonymous"`, `rememberTileSnapshot` exported for host cards), live starts without waiting for the day loads (a failed load no longer blocks it), tiles ask for `api/snapshot&w=640/960`, the fresh poster for 1280. 0.13.1: an MJPEG fallback taken before the codec was known switches to MSE-live once the day loads bring it — client only. |
 | 0.14.x | any | Picture-in-Picture note + "Open in Safari" in iPhone/iPad Home-Screen apps (Apple blocks PiP there); `PlayerController.pip()` resolves its outcome. Client only. |
+| 0.15.x | any (priority order from the server: ≥ 1.3.0; older servers are sorted client-side) | event classes by priority (a cyclist is a person), class filters hide an event only when all its classes are off, chips count every contained class — client only. |
 
 Lab note: Scrypted's WebRTC sink re-encodes (1280 px, 15 fps) for clients that are not Windows/macOS/iOS and report a
 screen below 1920 physical pixels, unless the source declares a width ≤ 1280. Plugin ≥ 1.2.0 declares it for recorded
