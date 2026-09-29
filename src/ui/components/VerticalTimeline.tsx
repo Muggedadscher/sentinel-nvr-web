@@ -11,6 +11,7 @@ import {
   sentinelWallMarks as wallMarks,
   sentinelWallSeconds as wallSec,
   sentinelClassOf as classOf,
+  sentinelEventHidden,
   sentinelClipRuns,
   sentinelEventPlayTs as eventPlayTs,
   fmtDay as dayLabel,
@@ -352,7 +353,7 @@ export function VerticalTimeline(p: TimelineProps) {
   const vis = useMemo(
     () =>
       p.events
-        .filter((e) => !p.filterOff[classOf(e)])
+        .filter((e) => !sentinelEventHidden(e, p.filterOff))
         .slice()
         .sort((a, b) => b.timestamp - a.timestamp),
     [p.events, p.filterOff],

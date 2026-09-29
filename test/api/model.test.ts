@@ -6,6 +6,7 @@ import {
   sentinelTimelineLink,
   sentinelClassOf,
   sentinelClassesOf,
+  sentinelEventHidden,
   sentinelEventPlayTs,
   sentinelClipRuns,
   sentinelClipIndexFor,
@@ -52,9 +53,20 @@ describe('event classification', () => {
     expect(sentinelClassOf({ classes: ['spaceship'] })).toBe('motion');
     expect(sentinelClassOf({})).toBe('motion');
   });
-  it('distinct classes in order, never empty', () => {
-    expect(sentinelClassesOf({ classes: ['car', 'car', 'person'] })).toEqual(['car', 'person']);
+  it('distinct classes by priority, never empty', () => {
+    expect(sentinelClassesOf({ classes: ['car', 'car', 'person'] })).toEqual(['person', 'car']);
+    expect(sentinelClassesOf({ classes: ['animal', 'bike', 'person'] })).toEqual(['person', 'animal', 'bike']);
     expect(sentinelClassesOf({ classes: [] })).toEqual(['motion']);
+  });
+  it('primary class by priority, also for alphabetical events of older servers', () => {
+    expect(sentinelClassOf({ classes: ['car', 'person'] })).toBe('person'); // cyclist
+    expect(sentinelClassOf({ classes: ['animal', 'person'] })).toBe('person');
+  });
+  it('a filter hides an event only when all its classes are off', () => {
+    const cyclist = { classes: ['car', 'person'] };
+    expect(sentinelEventHidden(cyclist, { car: true })).toBe(false);
+    expect(sentinelEventHidden(cyclist, { car: true, person: true })).toBe(true);
+    expect(sentinelEventHidden({ classes: ['car'] }, { car: true })).toBe(true);
   });
   it('playback start: -2s with a sighting, else -3s', () => {
     expect(sentinelEventPlayTs({ startTs: 10_000, ts: 12_000 })).toBe(8_000);
