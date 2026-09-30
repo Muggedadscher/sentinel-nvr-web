@@ -121,6 +121,8 @@ export function VerticalTimeline(p: TimelineProps) {
   // the page moves rangeEnd forward every 30 s while the scroll position is compensated at once — a centre computed with
   // the old rangeEnd was off by those 30 s and became the scrub target (the video landed 30 s beside the timeline, which
   // then jumped there; lab 30.09.2026)
+  // anchor of a pending zoom step (applyZoom → layout effect on px)
+  const zoomAnchor = useRef<{ ts: number; y: number } | null>(null);
   const geo = useRef({ rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, px, vh, PAD });
   geo.current = { rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, px, vh, PAD };
   const centerTs = () => {
@@ -184,6 +186,17 @@ export function VerticalTimeline(p: TimelineProps) {
     // only when the range end moves (setTop is a plain helper of this render)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.rangeEnd, px]);
+  useLayoutEffect(() => {
+    const a = zoomAnchor.current;
+    zoomAnchor.current = null;
+    const el = scroll.current;
+    if (a && el && px) {
+      setTop(el, PAD + (p.rangeEnd - a.ts) * px - a.y, 'zoom');
+      tick((n) => n + 1);
+    }
+    // only when the scale changes (a zoom step set the anchor right before)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [px]);
   useEffect(() => {
     if (p.jump && px) scrollCenter(p.jump.ts, 'jump');
     // only for a new jump request (p.jump.n), not when the object identity changes
@@ -355,16 +368,20 @@ export function VerticalTimeline(p: TimelineProps) {
     el.addEventListener('wheel', h, { passive: false });
     return () => el.removeEventListener('wheel', h);
   }, []);
+  // the new scale and the scroll position that keeps the anchor in place reach the screen in the SAME commit (layout effect
+  // on px below). The scroll position used to follow one requestAnimationFrame later: for a frame the content showed the new
+  // scale at the old position, and the follow tick in between read a centre far off and logged a false follow-jump
+  // (iPhone 30.09.2026: −3599.6 s right after a zoom step)
   const applyZoom = (npx: number, anchor: number, anchorY: number) => {
     const c = clamp(npx, minPx, maxPx);
+    if (c === px) return;
+    zoomAnchor.current = { ts: anchor, y: anchorY };
     setPx(c);
-    requestAnimationFrame(() => {
-      const el = scroll.current;
-      if (el) setTop(el, PAD + (p.rangeEnd - anchor) * c - anchorY, 'zoom');
-    });
   };
+  // anchor: live = now; following = the playhead; otherwise (parked on a scrub target, paused) the centre the view
+  // shows — zooming around the playhead there lost the parked position
   const zoomStep = (f: number) => {
-    const a = p.live ? Date.now() : (p.playhead() ?? centerTs());
+    const a = p.live ? Date.now() : p.following() ? (p.playhead() ?? centerTs()) : centerTs();
     applyZoom(px * f, a, vh * HEAD);
   };
 
