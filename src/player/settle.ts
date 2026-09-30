@@ -44,15 +44,16 @@ export function settleStart(pos: number, target: number, now: number): SettleTra
 export function settleStep(s: SettleTrack, x: SettleSample, target: number, now: number): SettleState {
   const d = Math.abs(x.pos - target);
   // arrived = the picture plays at normal speed near the target, and the server's servo has settled (rate 1). Position
-  // alone is not enough: the servo occasionally overshoots (seen in the lab: 30 s past the target while running at −25×) —
-  // handing back while the picture swept through the window froze the cursor there
+  // alone is not enough: the picture trails the servo by 1.3 s and sweeps through the window while the servo still brakes
+  // or moves on — handing back then leaves the timeline chasing it, and ends the steering (relay-scrub off) wherever the
+  // cursor happens to be
   const v = x.prev && x.at > x.prev.at ? (x.pos - x.prev.pos) / (x.at - x.prev.at) : null;
   if (d <= SETTLE_NEAR_MS && (x.r == null || x.r === 1) && v != null && v >= SETTLE_V_MIN && v <= SETTLE_V_MAX)
     return 'arrived';
   if (d <= s.best - SETTLE_PROGRESS_MS) {
     s.best = d;
     s.bestAt = now;
-  } else if (d > s.best) s.best = d; // moving away (overshoot): the way back counts as progress from here, the clock runs on
+  } else if (d > s.best) s.best = d; // moving away (e.g. past the target): the way back counts as progress from here, the clock runs on
   if (now - s.t0 >= SETTLE_CAP_MS || now - s.bestAt >= SETTLE_STALL_MS) return 'giveup';
   return 'wait';
 }

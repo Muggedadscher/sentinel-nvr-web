@@ -33,12 +33,12 @@ describe('settleStep (timeline stays parked until the picture plays normally at 
     expect(settleStep(s, poll(T + 2_500, NOW + 1800, T + 9_100), T, NOW + 1800)).toBe('wait'); // in range, still −11×
     expect(settleStep(s, poll(T + 3_100, NOW + 2400, T + 2_500), T, NOW + 2400)).toBe('arrived');
   });
-  it('waits while the servo is not at 1× (overshoot passing through the window)', () => {
+  it('waits while the servo is not at 1× (picture passing through the window)', () => {
     const s = settleStart(T + 21_000, T, NOW);
     // picture sweeps through +1.7 s at a moderate speed, but the server reports −25×
     expect(settleStep(s, poll(T + 1_700, NOW + 600, T + 2_300, -25), T, NOW + 600)).toBe('wait');
   });
-  it('an overshoot does not count as a stall: the way back is progress', () => {
+  it('moving past the target does not count as a stall: the way back is progress', () => {
     const s = settleStart(T + 21_000, T, NOW);
     expect(settleStep(s, poll(T + 1_700, NOW + 600, T + 21_000, -25), T, NOW + 600)).toBe('wait');
     expect(settleStep(s, poll(T - 21_000, NOW + 1200, T + 1_700, -25), T, NOW + 1200)).toBe('wait');
