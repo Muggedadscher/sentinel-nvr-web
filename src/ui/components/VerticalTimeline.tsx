@@ -3,7 +3,7 @@
  * scroll = scrub time-lapse, hold/release seeks, only the visible window is
  * rendered). Client, translate function and locale come from the SentinelUi context.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Minus, ArrowUp } from 'lucide-react';
 import {
   SENTINEL_DAY_MS as DAY,
@@ -36,7 +36,8 @@ export interface ScrubHandlers {
    *  drift becomes a seek — every seek shows ~2.4 s of stale stream before the new picture, so step-wise wheel scrolling
    *  with a seek per step made the picture run back and forth (user 23.09.) */
   hold: (centerTs: number) => void;
-  /** gesture settled → back to auto-follow; the player lands exactly on centerTs if it drifted */
+  /** gesture settled (700 ms quiet): centerTs is the final target; auto-follow resumes once `following()` is true again —
+   *  on the relay only when the picture plays at the target (PlayerController.scrubSettling) */
   idle: (centerTs: number) => void;
 }
 export interface TimelineProps {
@@ -64,9 +65,9 @@ export interface TimelineProps {
  * FIXED centre line is the playhead; the content scrolls natively and simply
  * continues across midnight (day separators in the axis). Recording band,
  * motion stretches, class-coloured event markers with thumbnails, LIVE line.
- * Scrolling = scrub time-lapse (server-side rate from the scroll velocity): a
- * brief hold preview-seeks, the release lands on the centre at 1×, 700 ms of
- * silence hands control back to auto-follow. Only the visible window is
+ * Scrolling = scrub time-lapse (the server steers onto the centre): 700 ms of
+ * silence end the gesture, and the view stays parked on the centre until the
+ * picture plays there at 1× (then auto-follow). Only the visible window is
  * rendered (a fortnight of markers would otherwise be thousands of nodes).
  */
 export function VerticalTimeline(p: TimelineProps) {
@@ -116,8 +117,20 @@ export function VerticalTimeline(p: TimelineProps) {
   const span = p.rangeEnd - p.rangeStart;
   const yFor = (ts: number) => PAD + (p.rangeEnd - ts) * px;
   const tsForY = (y: number) => p.rangeEnd - (y - PAD) / px;
-  const centerTs = () => tsForY((scroll.current?.scrollTop || 0) + vh * HEAD);
+  // the centre from the CURRENT geometry: the hold (250 ms) and idle (700 ms) timers run closures of an older render, and
+  // the page moves rangeEnd forward every 30 s while the scroll position is compensated at once — a centre computed with
+  // the old rangeEnd was off by those 30 s and became the scrub target (the video landed 30 s beside the timeline, which
+  // then jumped there; lab 30.09.2026)
+  const geo = useRef({ rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, px, vh, PAD });
+  geo.current = { rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, px, vh, PAD };
+  const centerTs = () => {
+    const g = geo.current;
+    // px is 0 until the first layout pass (0/0 = NaN made the centre label throw when mounted neither live nor following)
+    if (!(g.px > 0)) return Math.min(Date.now(), g.rangeEnd - 1);
+    return g.rangeEnd - ((scroll.current?.scrollTop || 0) + g.vh * HEAD - g.PAD) / g.px;
+  };
   const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+  const clampRange = (ts: number) => clamp(ts, geo.current.rangeStart, geo.current.rangeEnd - 1);
   const setTop = (el: HTMLDivElement, top: number, why: string) => {
     const v = VT.current;
     v.selfAt = Date.now();
@@ -158,11 +171,16 @@ export function VerticalTimeline(p: TimelineProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [px]);
   const prevEnd = useRef(p.rangeEnd);
-  useEffect(() => {
+  // before paint, and re-rendered at once: this render computed the centre label from the new rangeEnd and the old scroll
+  // position (30 s off every 30 s until the next tick), and a plain effect showed the shifted content for a frame
+  useLayoutEffect(() => {
     const d = p.rangeEnd - prevEnd.current;
     prevEnd.current = p.rangeEnd;
     const el = scroll.current;
-    if (d && el && px) setTop(el, el.scrollTop + d * px, 'range');
+    if (d && el && px) {
+      setTop(el, el.scrollTop + d * px, 'range');
+      tick((n) => n + 1);
+    }
     // only when the range end moves (setTop is a plain helper of this render)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.rangeEnd, px]);
@@ -224,22 +242,22 @@ export function VerticalTimeline(p: TimelineProps) {
     const v = VT.current;
     if (Date.now() - v.lastCenterCb < 400) return;
     v.lastCenterCb = Date.now();
-    p.onCenter(clamp(centerTs(), p.rangeStart, p.rangeEnd - 1));
+    p.onCenter(clampRange(centerTs()));
   };
   const scrubSeek = (ts?: number) => {
     const v = VT.current;
     v.previewing = true;
-    p.scrub.seek(clamp(ts ?? centerTs(), p.rangeStart, p.rangeEnd - 1));
+    p.scrub.seek(clampRange(ts ?? centerTs()));
   };
   const userIdle = () => {
     VT.current.user = 0;
     VT.current.idleAt = Date.now();
-    p.scrub.idle(clamp(centerTs(), p.rangeStart, p.rangeEnd - 1));
+    p.scrub.idle(clampRange(centerTs()));
   };
   const scrubHold = () => {
     const v = VT.current;
     v.previewing = true;
-    p.scrub.hold(clamp(centerTs(), p.rangeStart, p.rangeEnd - 1));
+    p.scrub.hold(clampRange(centerTs()));
   };
   const markUser = () => {
     const v = VT.current;

@@ -4,6 +4,27 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.16.1 — 2026-09-30
+
+- Timeline stays where you scrolled until the picture is there: after a scrub gesture on the relay the timeline used to
+  hand back to the playhead after a fixed 1.5 s — while the time-lapse was still on its way (the picture trails the
+  server's servo by 1.3 s, and at 3000× a fling of hours takes seconds). It jumped to the picture's position and chased
+  it in 600-ms steps (`follow-jump` telemetry, `sinceIdle` ≈ 1.5 s, up to 3.8 h). Leaving the scrub mode also dropped
+  the server's target, so a far fling stopped short of it. Now the gesture keeps its target (scrub profile stays on)
+  until the picture plays at normal speed near it: `relay-pos` within 5 s of the target, the server's rate `r` = 1 and
+  ~1× between the last two polls. It gives up after 3 s without progress or 30 s (telemetry `settle` when parked longer
+  than the base delay). New DOM-free helper `settleStart`/`settleStep` (`/player`). No server change.
+- Scrub target 30 s off: the page moves the timeline's range end forward every 30 s and the timeline compensates its
+  scroll position at once, but the hold/idle timers of a gesture computed the centre with the previous range end — when
+  the tick fell into those 700 ms, the target (and the video) landed 30 s before the centre and the timeline then jumped
+  there. The centre now always comes from the current geometry; the compensation runs before paint and re-renders at
+  once (the centre label showed +30 s until the next tick).
+- Leaving the scrub mode read the playhead after dropping its clamp to the target — for one poll it could be
+  extrapolated with the last servo rate (up to 30 min off).
+- The timeline mounted neither live nor following (px still 0) computed a NaN centre and threw in the date label.
+- Day separator: the date chip sits right of the recording band (the band painted over it) and the line starts right
+  of the time column, so its „00:00“ stays readable; the playhead stays on top of the chip, thumbnails too.
+
 ## 0.16.0 — 2026-09-29
 
 - Events as time spans (plugin ≥ 1.3.0): the vertical timeline draws a thin bar in the class colour from an event's
