@@ -1,0 +1,83 @@
+# Publishes @sentinel-nvr/web to npm from a version tag, without a stored token: npm Trusted Publishing
+# (GitHub OIDC). One-time setup on npmjs.com: package settings -> Trusted publishing -> GitHub Actions,
+# owner Muggedadscher, repository sentinel-nvr-web, workflow file release.yml.
+#
+# Same gates as the host script snvrweb-publish.sh: the tag v<version> must match package.json, lie on main
+# and not be published yet; then typecheck, lint, format check, tests in three time zones, build, pack check,
+# publish, and a registry tarball == dist comparison. `workflow_dispatch` with dry=true runs everything but
+# the publish (also for versions already on npm).
+name: release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish, e.g. v0.16.2'
+        required: true
+      dry:
+        description: 'Dry run (everything except npm publish)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write # OIDC token for npm Trusted Publishing and provenance
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry || false }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+      # Trusted Publishing needs npm >= 11.5.1; Node 22 ships npm 10
+      - run: npm install -g npm@11
+      - name: Check tag, version and main
+        run: |
+          VER=$(node -p "require('./package.json').version")
+          echo "VER=$VER" >> "$GITHUB_ENV"
+          [ "$TAG" = "v$VER" ] || { echo "::error::tag $TAG does not match package.json version $VER"; exit 1; }
+          git fetch -q origin main
+          git merge-base --is-ancestor HEAD origin/main || { echo "::error::$TAG is not on main"; exit 1; }
+          if [ -n "$(npm view "@sentinel-nvr/web@$VER" version 2>/dev/null)" ]; then
+            if [ "$DRY" = true ]; then echo "$VER is already on npm (dry run continues)"; else echo "::error::$VER is already on npm"; exit 1; fi
+          fi
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run test:tz # UTC, Europe/Berlin, America/New_York
+      - run: npm run build
+      - name: Pack check
+        run: |
+          npm pack --dry-run 2>&1 | tee pack.log
+          grep -q 'NOTICE.md' pack.log || { echo "::error::NOTICE.md missing from the package"; exit 1; }
+      - name: Publish
+        if: env.DRY != 'true'
+        env:
+          SNVR_PUBLISH_TAG: ${{ env.TAG }}
+        run: npm publish --access public --provenance
+      - name: Registry tarball == dist
+        if: env.DRY != 'true'
+        run: |
+          URL="https://registry.npmjs.org/@sentinel-nvr/web/-/web-$VER.tgz"
+          # the CDN can answer 404 for minutes after the metadata already lists the version
+          for i in $(seq 1 120); do
+            [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL")" = 200 ] && break
+            sleep 5
+          done
+          mkdir -p .reg && curl -sf "$URL" | tar xz -C .reg
+          diff -r dist .reg/package/dist && echo "registry tarball == dist"
