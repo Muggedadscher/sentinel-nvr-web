@@ -716,16 +716,20 @@
   transform: translateY(-50%);
 }
 .nvr-vtl .vday {
+  /* midnight: the line starts right of the time column (its "00:00" stays readable) and runs under the recording band;
+     the date chip sits right of the band and the motion stripe — at left 4 px the band painted over it */
   position: absolute;
-  left: 0;
+  left: 62px;
   right: 0;
   height: 1px;
   background: var(--border);
 }
 .nvr-vtl .vday span {
   position: absolute;
-  left: 4px;
-  top: -9px;
+  left: 50px;
+  top: 0;
+  transform: translateY(-50%);
+  z-index: 1;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -794,6 +798,7 @@
 }
 .nvr-vtl .vthumb {
   position: absolute;
+  z-index: 2;
   right: 8px;
   transform: translateY(-50%);
   width: 137px;
@@ -846,6 +851,7 @@
 }
 .nvr-vtl .vcenter {
   position: absolute;
+  z-index: 3;
   left: 0;
   right: 0;
   top: 35%;
@@ -950,6 +956,12 @@
   }
   .nvr-vtl .vtick {
     right: calc(100% - 61px);
+  }
+  .nvr-vtl .vday {
+    left: 50px;
+  }
+  .nvr-vtl .vday span {
+    left: 46px;
   }
   .nvr-vtl .vlink {
     left: 90px;

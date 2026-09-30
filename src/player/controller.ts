@@ -17,6 +17,7 @@ import { timeoutSignal, type SentinelClip as Clip, type SentinelClient } from '.
 import { rlog, setRlogClient } from './rlog';
 import { WebRtcSession, mobileClient } from './webrtc';
 import { skipTarget } from './skip';
+import { settleStart, settleStep, SETTLE_CAP_MS, type SettleTrack } from './settle';
 
 /** `label` is an i18n key suffix: nvr.player.<label> */
 export type PlayerLabel =
@@ -64,8 +65,11 @@ const MARK_CAP_MS = 12000;
 const LIFT_FRAMES = 2;
 const LIFT_FADE_MS = 120;
 /** Scrub profile (640 all-intra) → normal (1280) only after the gesture has been quiet this long: a scroll–pause–scroll pattern
- *  restarted the transcoder twice per pause (server log: profile switch every 1–2 s, 30 restarts in one session). */
+ *  restarted the transcoder twice per pause (server log: profile switch every 1–2 s, 30 restarts in one session).
+ *  A steered relay gesture then waits on until the picture has reached the target (see settle.ts), checked every
+ *  SETTLE_CHECK_MS. */
 const SCRUB_OFF_DELAY_MS = 1500;
+const SETTLE_CHECK_MS = 250;
 /** hold mid-gesture: seek only if the playhead is further than this from the centre; idle: land if further than this */
 /** Scrub by TARGET (since 0.7.0): while the user scrubs, the client sends the timeline centre (api/relay-target, coalesced) and
  *  the server's feeder steers its cursor onto it and stops there. No client-side rate estimate, no hold/landing seeks — those
@@ -143,6 +147,15 @@ export class PlayerController {
   // position for a moment after a seek — ignore far-off values in that window.
   private cmdSeq = 0;
   private seekAt = 0;
+  /** the last relay-pos answers as they came (picture position, server rate, the answer before in the same command
+   *  generation) — the end of a scrub gesture waits for the picture to play at 1× at the target (settle.ts) */
+  private rwPoll: {
+    t: number;
+    at: number;
+    r: number | null;
+    seq: number;
+    prev: { pos: number; at: number } | null;
+  } | null = null;
   // live session (W) + live MSE (L)
   private w: WebRtcSession | undefined;
   private L = {
@@ -1226,6 +1239,7 @@ export class PlayerController {
     this.rw = undefined;
     this.rwBase = null;
     this.rwPosTs = null;
+    this.rwPoll = null;
     this.rwScrub = false;
     this.rwSeekBusy = false;
     this.rwPending = null;
@@ -1504,10 +1518,12 @@ export class PlayerController {
     const s = this.rw;
     if (!s?.active || !s.id) return;
     if (this.rwScrub === on && !(force && !on)) return;
+    // read BEFORE rwScrub drops: while scrubbing currentTs() is clamped to [position, target]; afterwards it would
+    // extrapolate with the last servo rate (up to 0.6 s × 3000 = 30 min off until the next poll)
+    const c = this.currentTs();
     this.rwScrub = on;
     this.cmdSeq++;
     if (!on) {
-      const c = this.currentTs();
       this.rwSrate = 1;
       this.rwRate = this.rate;
       if (c != null) {
@@ -1615,6 +1631,14 @@ export class PlayerController {
             this.wdDead = 0;
             this.rwPosTs = d.t;
             this.rwPosAt = Date.now();
+            const P = this.rwPoll;
+            this.rwPoll = {
+              t: d.t,
+              at: this.rwPosAt,
+              r: typeof d.r === 'number' && isFinite(d.r) ? d.r : null,
+              seq,
+              prev: P && P.seq === seq ? { pos: P.t, at: P.at } : null,
+            };
             if ((this.rwScrub || this.scrubMoves > 0) && typeof d.r === 'number' && isFinite(d.r) && d.r)
               this.rwRate = d.r;
             this.emit();
@@ -2317,8 +2341,9 @@ export class PlayerController {
     }
     // the scrub profile is entered by scrubMove on the first real movement (a single wheel notch = one in-place seek, no restarts)
   }
-  /** true between the end of a gesture and the profile switch back (SCRUB_OFF_DELAY_MS): the timeline must not auto-follow
-   *  the playhead in that window — the servo is still converging on the centre the user left */
+  /** true between the end of a gesture and the profile switch back (SCRUB_OFF_DELAY_MS, on the relay until the picture has
+   *  reached the target): the timeline must not auto-follow the playhead in that window — the servo is still converging on
+   *  the centre the user left, and the timeline stays parked there */
   scrubSettling(): boolean {
     return this.scrubOffT !== 0;
   }
@@ -2353,16 +2378,52 @@ export class PlayerController {
     if (!this.rw?.active) this.scrubSeek(ts);
     else if (this.rw.id) this.recRelayTarget(this.clampRange(ts));
   }
-  /** gesture settled → final target, then back to the normal profile after SCRUB_OFF_DELAY_MS of quiet (a new gesture cancels it) */
+  /** gesture settled → final target, then back to the normal profile after SCRUB_OFF_DELAY_MS of quiet (a new gesture cancels
+   *  it). A steered relay gesture keeps its target until the picture has arrived (settle.ts): the server steers on in the
+   *  scrub profile and scrubSettling() keeps the timeline parked on the centre the user left. */
   scrubIdle(ts?: number): void {
     if (ts != null && this.rw?.active && this.rw.id && this.scrubMoves > 0) this.recRelayTarget(this.clampRange(ts));
     if (this.scrubOffT) clearTimeout(this.scrubOffT);
-    this.scrubOffT = window.setTimeout(() => {
-      this.scrubOffT = 0;
+    const s = this.rw,
+      idleAt = Date.now();
+    let track: SettleTrack | null = null;
+    const off = () => {
       const steered = this.scrubMoves > 0;
+      if (steered && s?.active && s.id && this.rw === s) {
+        const now = Date.now();
+        const P = this.rwPoll,
+          target = this.rwLastTarget;
+        let st: 'arrived' | 'wait' | 'giveup' | 'none';
+        if (!P || !target) st = 'none';
+        else if (this.rwTargetBusy || this.rwPendingTarget != null)
+          st = 'wait'; // the final target is still on its way
+        else
+          st = settleStep(
+            (track ??= settleStart(P.t, target, now)),
+            { pos: P.t, at: P.at, r: P.r, prev: P.prev },
+            target,
+            now,
+          );
+        if (st === 'wait') {
+          if (now - idleAt < SCRUB_OFF_DELAY_MS + SETTLE_CAP_MS) {
+            this.scrubOffT = window.setTimeout(off, SETTLE_CHECK_MS);
+            return;
+          }
+          st = 'giveup';
+        }
+        // only gestures that were parked beyond the base delay (a single wheel notch arrives at the first check)
+        if (st !== 'arrived' || now - idleAt > SCRUB_OFF_DELAY_MS + SETTLE_CHECK_MS)
+          rlog('settle', {
+            how: st,
+            ms: now - idleAt,
+            dSec: P && target ? Math.round((P.t - target) / 100) / 10 : null,
+          });
+      }
+      this.scrubOffT = 0;
+      this.recRelayScrub(false, steered); // before scrubMoves drops: the position it reads is still clamped to the target
       this.scrubMoves = 0;
-      this.recRelayScrub(false, steered);
-    }, SCRUB_OFF_DELAY_MS);
+    };
+    this.scrubOffT = window.setTimeout(off, SCRUB_OFF_DELAY_MS);
   }
 
   // ---- visibility ---------------------------------------------------------------------------
