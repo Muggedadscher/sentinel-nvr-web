@@ -117,12 +117,12 @@ export function VerticalTimeline(p: TimelineProps) {
   const span = p.rangeEnd - p.rangeStart;
   const yFor = (ts: number) => PAD + (p.rangeEnd - ts) * px;
   const tsForY = (y: number) => p.rangeEnd - (y - PAD) / px;
+  // anchor of a pending zoom step (applyZoom → layout effect on px)
+  const zoomAnchor = useRef<{ ts: number; y: number } | null>(null);
   // the centre from the CURRENT geometry: the hold (250 ms) and idle (700 ms) timers run closures of an older render, and
   // the page moves rangeEnd forward every 30 s while the scroll position is compensated at once — a centre computed with
   // the old rangeEnd was off by those 30 s and became the scrub target (the video landed 30 s beside the timeline, which
   // then jumped there; lab 30.09.2026)
-  // anchor of a pending zoom step (applyZoom → layout effect on px)
-  const zoomAnchor = useRef<{ ts: number; y: number } | null>(null);
   const geo = useRef({ rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, px, vh, PAD });
   geo.current = { rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, px, vh, PAD };
   const centerTs = () => {
