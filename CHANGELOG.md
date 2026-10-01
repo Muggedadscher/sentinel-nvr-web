@@ -4,6 +4,16 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.16.2 — 2026-10-01
+
+- Zoom without a jumping frame: the zoom buttons and ctrl+wheel changed the scale in one frame and the scroll position
+  only in the next animation frame, so for one frame the content showed the new scale at the old position, and the
+  follow tick in between logged a false `follow-jump` (iPhone 30.09.: −3599.6 s right after a zoom step). Scale and
+  scroll position now reach the screen in the same commit.
+- Zooming while the timeline is parked on a scrub target (or paused) zooms around the centre it shows; it used to zoom
+  around the playhead and lose the parked position. Live and following zoom around now/the playhead as before.
+- First release published by the `release` workflow (npm Trusted Publishing with provenance) instead of the host script.
+
 ## 0.16.1 — 2026-09-30
 
 - Timeline stays where you scrolled until the picture is there: after a scrub gesture on the relay the timeline used to

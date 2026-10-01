@@ -71,7 +71,8 @@ Releases: bump `version` in `package.json`, add a `CHANGELOG.md` entry, merge, t
 the tag. The `release` workflow publishes from the tag via npm Trusted Publishing (no stored token; typecheck, lint,
 format check, tests in three time zones, build, pack check, `npm publish --provenance`, registry tarball compared
 with `dist`). A manual run with `dry` checks a tag without publishing. The maintainer's `snvrweb-publish.sh <version>`
-remains the fallback; `prepublishOnly` refuses any publish without the matching tag.
+remains the fallback; it needs an npm token, so with "disallow tokens" set in the package's npm settings tokens have to
+be allowed again for that publish. `prepublishOnly` refuses any publish without the matching tag.
 
 ## License
 
