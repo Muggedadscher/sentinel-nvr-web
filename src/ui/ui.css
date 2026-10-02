@@ -1544,6 +1544,9 @@
     gap: 0.5rem;
     height: calc(100dvh - 64px - env(safe-area-inset-bottom, 0px) - 120px);
     min-height: 520px;
+    /* the desktop grid centres its columns (justify-content: center); in this column that centred an overflow too,
+       half of it above the body: a 4:3 picture on a small viewport (iPhone in-app Safari) slid ~13 px under the title */
+    justify-content: flex-start;
   }
   .nvr-cam__left {
     align-self: stretch;
@@ -1580,7 +1583,8 @@
   .nvr-cam__right {
     flex: 1;
     height: auto;
-    min-height: 220px;
+    /* takes what the picture leaves of the body instead of overflowing under the tab bar */
+    min-height: 0;
   }
   .nvr-tabs button {
     padding: 0.5rem;

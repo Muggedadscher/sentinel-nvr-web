@@ -4,6 +4,14 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.16.4 — 2026-10-02
+
+- Camera page on small phone viewports: below 900 px the body is a flex column, but it kept the desktop grid's
+  `justify-content: center`. When picture and timeline were taller than the body (a 4:3 camera in the iPhone's in-app
+  Safari, ~667 px viewport), the overflow was centred, so the picture slid ~13 px up under the title row. The column now
+  starts at the top, and the timeline takes what the picture leaves (`min-height` 0 instead of 220 px), so it ends
+  above the tab bar instead of running under it.
+
 ## 0.16.3 — 2026-10-02
 
 - LIVE label above the playhead: while live the timeline follows now, so the red LIVE label and the orange playhead
