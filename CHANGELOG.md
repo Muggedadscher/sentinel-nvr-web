@@ -4,6 +4,15 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.16.3 — 2026-10-02
+
+- LIVE label above the playhead: while live the timeline follows now, so the red LIVE label and the orange playhead
+  line sit at the same height, and the line (z-index 3) ran through the label (2). The label now lies above the line;
+  the date chip and the live-jump button still cover it when it scrolls under them.
+- Camera page header row as tall as HAPulse's: `CameraTitle` without host actions was 36 px (the back button), HAPulse's
+  row carries a 40-px action button (desktop) and the 44-px avatar (mobile), so the picture sat 4–8 px closer to the
+  title in Sentinel than in HAPulse. `.nvr-cam__head` now has `min-height` 40 px / 44 px below 900 px.
+
 ## 0.16.2 — 2026-10-01
 
 - Zoom without a jumping frame: the zoom buttons and ctrl+wheel changed the scale in one frame and the scroll position

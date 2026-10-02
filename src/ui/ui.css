@@ -846,7 +846,9 @@
   letter-spacing: 0.08em;
   padding: 2px 6px;
   border-radius: 6px;
-  z-index: 2;
+  /* above the playhead line (.vcenter, 3): while live the view follows now, so both sit at the same height and the
+     orange line ran through the label; the date chip and the live jump (4, later in the DOM) still cover it */
+  z-index: 4;
   cursor: pointer;
 }
 .nvr-vtl .vcenter {
@@ -1068,6 +1070,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  /* HAPulse's header row height (its 40-px action button) — the same spacing to the picture with or without host actions */
+  min-height: 40px;
 }
 .nvr-cam__title {
   display: flex;
@@ -1529,6 +1533,10 @@
 @media (max-width: 899px) {
   .nvr-cam {
     gap: 0.5rem;
+  }
+  /* mobile: HAPulse's header row carries bell + 44-px avatar */
+  .nvr-cam__head {
+    min-height: 44px;
   }
   .nvr-cam__body {
     display: flex;
