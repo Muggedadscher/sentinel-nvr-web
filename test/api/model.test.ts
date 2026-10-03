@@ -119,6 +119,18 @@ describe('humanBytes', () => {
     expect(sentinelHumanBytes(1536)).toEqual({ value: '1.5', unit: 'KB' });
     expect(sentinelHumanBytes(5 * 1024 ** 3)).toEqual({ value: '5.0', unit: 'GB' });
   });
+  it('uses the decimal separator of the UI language', () => {
+    const b = 7.7 * 1024 ** 3;
+    expect(sentinelHumanBytes(b, 'de')).toEqual({ value: '7,7', unit: 'GB' });
+    expect(sentinelHumanBytes(b, 'de-DE')).toEqual({ value: '7,7', unit: 'GB' });
+    expect(sentinelHumanBytes(b, 'en')).toEqual({ value: '7.7', unit: 'GB' });
+    expect(sentinelHumanBytes(5 * 1024 ** 3, 'de')).toEqual({ value: '5,0', unit: 'GB' });
+    expect(sentinelHumanBytes(512, 'de')).toEqual({ value: '512', unit: 'B' });
+    expect(sentinelHumanBytes(0, 'de')).toEqual({ value: '0', unit: 'B' });
+  });
+  it('falls back to a decimal point for an unusable locale tag', () => {
+    expect(sentinelHumanBytes(1536, 'not a locale!')).toEqual({ value: '1.5', unit: 'KB' });
+  });
 });
 
 describe('storage forecast', () => {

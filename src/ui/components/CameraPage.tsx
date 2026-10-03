@@ -48,7 +48,7 @@ import {
 import { PlayerController, rlog, type PlayerState } from '../../player';
 import { isIosHomeScreenApp, outsideAppHref } from '../outside';
 import { useSentinelUi } from '../context';
-import { dateChipNav, shouldHandleKey, stageStatus } from '../camera-logic';
+import { dateChipNav, shouldHandleKey, stageStatus, todayRefreshAllowed } from '../camera-logic';
 import { lastTileSnapshot } from '../snapshot-cache';
 import { ClassBadge, classLabel } from './ClassBadge';
 import { EventList } from './EventList';
@@ -163,6 +163,7 @@ export function CameraPage(p: CameraPageProps) {
   const camRef = useRef(camId);
   camRef.current = camId;
   const deepRef = useRef(''); // camera|startAt the page last opened or jumped to (deep links)
+  const gestureAt = useRef(0); // last activity of the running timeline gesture, 0 = none (the today refresh waits for its end)
 
   // ---- data: one request per day, merged into a continuous range
   const merged = useMemo(() => {
@@ -325,10 +326,17 @@ export function CameraPage(p: CameraPageProps) {
   useEffect(() => {
     if (ctl.current && name) ctl.current.camName = name;
   }, [name]);
-  // today upkeep: fresh clips/events/motion while live (no seek, no stage reset)
+  // today upkeep: fresh clips/events/motion every 15 s, live and during playback (no seek, no stage reset: the player only
+  // gets the new clip list); skipped while a timeline gesture runs or settles and in a hidden tab (todayRefreshAllowed)
   useEffect(() => {
     const i = setInterval(() => {
-      if (psRef.current.live)
+      const ok = todayRefreshAllowed({
+        hidden: document.visibilityState === 'hidden',
+        gestureAt: gestureAt.current,
+        settling: !!ctl.current?.scrubSettling(),
+        now: Date.now(),
+      });
+      if (ok)
         ensureDay(todayStart(), true).catch(() => {
           /* keep */
         });
@@ -408,11 +416,26 @@ export function CameraPage(p: CameraPageProps) {
   );
   const scrub = useMemo<ScrubHandlers>(
     () => ({
-      begin: () => ctl.current?.scrubBegin(),
-      move: (c, v, s) => ctl.current?.scrubMove(c, v, s),
-      seek: (ts) => ctl.current?.scrubSeek(ts),
-      hold: (ts) => ctl.current?.scrubHold(ts),
-      idle: (ts) => ctl.current?.scrubIdle(ts),
+      begin: () => {
+        gestureAt.current = Date.now();
+        ctl.current?.scrubBegin();
+      },
+      move: (c, v, s) => {
+        gestureAt.current = Date.now();
+        ctl.current?.scrubMove(c, v, s);
+      },
+      seek: (ts) => {
+        gestureAt.current = Date.now();
+        ctl.current?.scrubSeek(ts);
+      },
+      hold: (ts) => {
+        gestureAt.current = Date.now();
+        ctl.current?.scrubHold(ts);
+      },
+      idle: (ts) => {
+        gestureAt.current = 0;
+        ctl.current?.scrubIdle(ts);
+      },
     }),
     [],
   );

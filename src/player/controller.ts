@@ -17,6 +17,7 @@ import { timeoutSignal, type SentinelClip as Clip, type SentinelClient } from '.
 import { rlog, setRlogClient } from './rlog';
 import { WebRtcSession, mobileClient } from './webrtc';
 import { skipTarget } from './skip';
+import { carryClipIndex } from './clips';
 import { settleStart, settleStep, SETTLE_CAP_MS, type SettleTrack } from './settle';
 
 /** `label` is an i18n key suffix: nvr.player.<label> */
@@ -448,6 +449,10 @@ export class PlayerController {
   }
   /** clips of the loaded range (several days, sorted), codec string, and the range the timeline spans */
   setClips(clips: Clip[], codecs: string | null, rangeStart: number, rangeEnd: number): void {
+    // the list is refreshed during playback (and grows in front when older days load): the clip being played (native)
+    // and the next one to feed (MSE) keep pointing at the same clip
+    this.playIndex = carryClipIndex(this.clips, clips, this.playIndex);
+    this.M.nextIdx = carryClipIndex(this.clips, clips, this.M.nextIdx);
     this.clips = clips;
     this.codecs = codecs;
     this.rangeStart = rangeStart;

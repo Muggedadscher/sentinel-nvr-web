@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SENTINEL_DAY_MS as DAY } from '../../src/api';
-import { dateChipNav, stageStatus } from '../../src/ui/camera-logic';
+import { dateChipNav, GESTURE_STALE_MS, stageStatus, todayRefreshAllowed } from '../../src/ui/camera-logic';
 
 const t = (k: string) => `[${k}]`;
 const day = (y: number, m: number, d: number) => new Date(y, m - 1, d).getTime();
@@ -36,5 +36,26 @@ describe('stageStatus', () => {
     expect(stageStatus({ live: true, label: 'live', playhead: null }, t, 'en', true, now)).toBe(
       '[nvr.error.loadFailed]',
     );
+  });
+});
+
+describe('todayRefreshAllowed (15-s refresh of today)', () => {
+  const now = 1_790_000_000_000;
+  const base = { hidden: false, gestureAt: 0, settling: false, now };
+  it('runs live, during playback and paused alike (the player state is not an input)', () => {
+    expect(todayRefreshAllowed(base)).toBe(true);
+  });
+  it('waits while a timeline gesture runs', () => {
+    expect(todayRefreshAllowed({ ...base, gestureAt: now - 200 })).toBe(false);
+    expect(todayRefreshAllowed({ ...base, gestureAt: now - GESTURE_STALE_MS + 1 })).toBe(false);
+  });
+  it('a gesture that never ended stops blocking after GESTURE_STALE_MS', () => {
+    expect(todayRefreshAllowed({ ...base, gestureAt: now - GESTURE_STALE_MS })).toBe(true);
+  });
+  it('waits while the last gesture settles on its target', () => {
+    expect(todayRefreshAllowed({ ...base, settling: true })).toBe(false);
+  });
+  it('skips a hidden tab', () => {
+    expect(todayRefreshAllowed({ ...base, hidden: true })).toBe(false);
   });
 });
