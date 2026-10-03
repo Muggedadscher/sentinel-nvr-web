@@ -476,10 +476,29 @@ export function sentinelMergeDays(days: Record<number, SentinelClipsResponse>): 
   };
 }
 
-/** Human-readable byte size split into value + unit (binary steps). */
-export function sentinelHumanBytes(b: number): { value: string; unit: string } {
+const bytesFmt = new Map<string, Intl.NumberFormat | null>();
+/** Fixed-decimals number in a locale ("7,7" in German, "7.7" in English); an unknown tag falls back to toFixed. */
+function fixedIn(n: number, digits: number, locale: string): string {
+  const key = `${locale}|${digits}`;
+  let f = bytesFmt.get(key);
+  if (f === undefined) {
+    try {
+      f = new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    } catch {
+      f = null;
+    }
+    bytesFmt.set(key, f);
+  }
+  return f ? f.format(n) : n.toFixed(digits);
+}
+
+/** Human-readable byte size split into value + unit (binary steps). With `locale` the value carries that language's
+ *  decimal separator (de "7,7", en "7.7"); without it, a plain decimal point as before. */
+export function sentinelHumanBytes(b: number, locale?: string): { value: string; unit: string } {
   if (!b || b <= 0) return { value: '0', unit: 'B' };
   const u = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.min(u.length - 1, Math.floor(Math.log(b) / Math.log(1024)));
-  return { value: (b / Math.pow(1024, i)).toFixed(i ? 1 : 0), unit: u[i]! };
+  const n = b / Math.pow(1024, i),
+    digits = i ? 1 : 0;
+  return { value: locale ? fixedIn(n, digits, locale) : n.toFixed(digits), unit: u[i]! };
 }

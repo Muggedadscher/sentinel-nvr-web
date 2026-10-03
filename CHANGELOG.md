@@ -4,6 +4,20 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.16.5 — 2026-10-03
+
+- Storage values with the decimal separator of the UI language: the status page's storage card (hero tile, legend,
+  rate, capacity) showed "7.7 GB" in every language. `sentinelHumanBytes(b, locale?)` and `humanBytes(b, locale?)`
+  take the locale; the components pass the host's `locale`, so German reads "7,7 GB" and English "7.7 GB". Without a
+  locale the output stays as before (decimal point).
+- The camera page refreshes today's clips, events and motion every 15 s also during playback and pause, not only live:
+  new events appear in the timeline and the list, a running event grows, the recording band extends. The refresh waits
+  while a timeline gesture runs or settles on its target, and skips a hidden tab. The player only gets the new clip list
+  (no seek, no restart).
+- `setClips` keeps the clip being played (native) and the next clip to feed (MSE) when the list changes underneath —
+  clips added in front when an older day loads, the oldest dropped by retention (`carryClipIndex`). A plain index used
+  to point at a different clip afterwards.
+
 ## 0.16.4 — 2026-10-02
 
 - Camera page on small phone viewports: below 900 px the body is a flex column, but it kept the desktop grid's

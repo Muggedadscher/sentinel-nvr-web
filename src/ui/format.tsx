@@ -16,8 +16,8 @@ export function fmtDays(d: number, t: TFn): string {
   const n = Math.round(d);
   return t('nvr.time.days', { count: n });
 }
-/** "7.7 GB" */
-export function humanBytes(b: number): string {
-  const h = sentinelHumanBytes(b);
+/** "7,7 GB" (de) / "7.7 GB" (en): the decimal separator follows `locale` */
+export function humanBytes(b: number, locale?: string): string {
+  const h = sentinelHumanBytes(b, locale);
   return `${h.value} ${h.unit}`;
 }

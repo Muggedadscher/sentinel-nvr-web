@@ -45,3 +45,24 @@ export function shouldHandleKey(
     return false;
   return true;
 }
+
+/** A gesture that never reported its end (missed pointerup) stops blocking the today refresh after this long without movement. */
+export const GESTURE_STALE_MS = 10_000;
+
+/**
+ * Whether the 15-s today refresh (clips, events, motion) may run now: live AND during playback or pause (new events show
+ * up, a running one grows, the recording band extends), but never while a timeline gesture runs or its landing settles
+ * (the timeline is parked on the scrub target; a re-render with a new answer there is avoidable work in the most sensitive
+ * moment), and not in a hidden tab (nothing to show; the next tick after the return catches up).
+ */
+export function todayRefreshAllowed(s: {
+  hidden: boolean;
+  /** last activity of the running timeline gesture (begin/move/hold/seek), 0 when none runs */
+  gestureAt: number;
+  /** the player still settles onto the target of the last gesture */
+  settling: boolean;
+  now: number;
+}): boolean {
+  if (s.hidden || s.settling) return false;
+  return !(s.gestureAt > 0 && s.now - s.gestureAt < GESTURE_STALE_MS);
+}

@@ -64,11 +64,11 @@ export function CardTitle({
 }
 
 export function Hero({ cameras, stats }: { cameras: SentinelCamera[]; stats: SentinelStats }) {
-  const { t } = useSentinelUi();
+  const { t, locale } = useSentinelUi();
   const online = cameras.filter((c) => c.online).length;
   const offline = Math.max(0, stats.cameras - online);
   const fc = sentinelStorageForecast(stats);
-  const bytes = sentinelHumanBytes(stats.bytes);
+  const bytes = sentinelHumanBytes(stats.bytes, locale);
   const span = fc.spanDays ? fmtDays(fc.spanDays, t).split(' ') : ['–'];
   return (
     <div className="nvr-card nvr-hero">
@@ -162,7 +162,7 @@ export function HistogramCard({ histogram }: { histogram: number[] }) {
 }
 
 export function StorageCard({ stats }: { stats: SentinelStats }) {
-  const { t } = useSentinelUi();
+  const { t, locale } = useSentinelUi();
   const fc = sentinelStorageForecast(stats);
   const pct = (v: number) => (stats.diskTotal ? `${((v / stats.diskTotal) * 100).toFixed(2)}%` : '0%');
   const reserveShown = Math.min(fc.reserve, stats.diskFree);
@@ -201,32 +201,32 @@ export function StorageCard({ stats }: { stats: SentinelStats }) {
       <div className="nvr-legend">
         <span>
           <i className="nvr-legend__sw nvr-legend__sw--rec" />
-          {t('nvr.storage.recordings')} {humanBytes(stats.bytes)}
+          {t('nvr.storage.recordings')} {humanBytes(stats.bytes, locale)}
         </span>
         <span>
           <i className="nvr-legend__sw nvr-legend__sw--other" />
-          {t('nvr.storage.system')} {humanBytes(fc.other)}
+          {t('nvr.storage.system')} {humanBytes(fc.other, locale)}
         </span>
         <span>
           <i className="nvr-legend__sw nvr-legend__sw--free" />
-          {t('nvr.storage.free')} {humanBytes(stats.diskFree)}
+          {t('nvr.storage.free')} {humanBytes(stats.diskFree, locale)}
         </span>
         <span>
           <i className="nvr-legend__sw nvr-legend__sw--reserve" />
-          {t('nvr.storage.reserve')} {humanBytes(fc.reserve)}
+          {t('nvr.storage.reserve')} {humanBytes(fc.reserve, locale)}
         </span>
       </div>
       <ul className="nvr-kv">
         <li>
           <span>{t('nvr.storage.rate')}</span>
           <b className="nvr-data">
-            {fc.ratePerDay ? t('nvr.storage.perDay', { value: humanBytes(fc.ratePerDay) }) : '–'}
+            {fc.ratePerDay ? t('nvr.storage.perDay', { value: humanBytes(fc.ratePerDay, locale) }) : '–'}
           </b>
         </li>
         <li>
           <span>{t('nvr.storage.capacity')}</span>
           <b className="nvr-data">
-            {humanBytes(fc.capacity)}
+            {humanBytes(fc.capacity, locale)}
             {fc.ratePerDay ? <em> ≈ {fmtDays(fc.fitsDays, t)}</em> : null}
           </b>
         </li>
