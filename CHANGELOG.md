@@ -17,6 +17,7 @@ are listed in the README compatibility table.
 - `setClips` keeps the clip being played (native) and the next clip to feed (MSE) when the list changes underneath —
   clips added in front when an older day loads, the oldest dropped by retention (`carryClipIndex`). A plain index used
   to point at a different clip afterwards.
+- README: plugin 1.3.0 (2026-10-03) in the compatibility dates.
 
 ## 0.16.4 — 2026-10-02
 
