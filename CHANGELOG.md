@@ -4,6 +4,15 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.16.6 — 2026-10-04
+
+- No behaviour change. The player's playback rules are split out of `PlayerController` into small, tested pure
+  functions: still-picture rules (`player/stills.ts`: `SWAP_MS`, `MARK_CAP_MS`, `LIFT_FRAMES`, `STILL_CAP_MS`, marker
+  frame, how a seek answer lifts the still, the width to avoid) and relay state (`player/relaystate.ts`: which
+  `relay-pos` answers count — only the current command generation, pre-swap positions ignored for 2.5 s — three dead
+  polls, two recoveries before the MSE fallback). The controller calls them unchanged; the public API is the same.
+  Tests in `test/ui/player-relay.test.ts`.
+
 ## 0.16.5 — 2026-10-03
 
 - Storage values with the decimal separator of the UI language: the status page's storage card (hero tile, legend,
