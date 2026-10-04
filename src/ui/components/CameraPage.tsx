@@ -48,7 +48,7 @@ import {
 import { PlayerController, rlog, type PlayerState } from '../../player';
 import { isIosHomeScreenApp, outsideAppHref } from '../outside';
 import { useSentinelUi } from '../context';
-import { dateChipNav, shouldHandleKey, stageStatus, todayRefreshAllowed } from '../camera-logic';
+import { dateChipNav, eventsOnDay, shouldHandleKey, stageStatus, todayRefreshAllowed } from '../camera-logic';
 import { lastTileSnapshot } from '../snapshot-cache';
 import { ClassBadge, classLabel } from './ClassBadge';
 import { EventList } from './EventList';
@@ -354,6 +354,8 @@ export function CameraPage(p: CameraPageProps) {
     () => merged.events.filter((e) => !sentinelEventHidden(e, filterOff)),
     [merged.events, filterOff],
   );
+  // tab number: the centred day only (on today = the overview tile's "N today"); the list keeps every loaded day
+  const dayCount = useMemo(() => eventsOnDay(visEvents, centerDay), [visEvents, centerDay]);
   const goLive = useCallback(() => {
     ctl.current?.goLive();
     setJump({ ts: Date.now(), n: Date.now() });
@@ -603,7 +605,7 @@ export function CameraPage(p: CameraPageProps) {
               onClick={() => setTab('ev')}
             >
               {t('nvr.tab.events')}
-              {visEvents.length ? ` (${visEvents.length})` : ''}
+              {dayCount ? ` (${dayCount})` : ''}
             </button>
           </div>
           <div className="nvr-filters">

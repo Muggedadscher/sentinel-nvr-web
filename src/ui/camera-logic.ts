@@ -66,3 +66,11 @@ export function todayRefreshAllowed(s: {
   if (s.hidden || s.settling) return false;
   return !(s.gestureAt > 0 && s.now - s.gestureAt < GESTURE_STALE_MS);
 }
+
+/** Number in the "Events (N)" tab: only the day the timeline is centred on (the date chip's day), not every loaded day —
+ *  on today it matches the overview tile's "N today" (same local midnight). The list below still shows every loaded day. */
+export function eventsOnDay(events: readonly { timestamp: number }[], day: number): number {
+  let n = 0;
+  for (const e of events) if (dayOf(e.timestamp) === day) n++;
+  return n;
+}

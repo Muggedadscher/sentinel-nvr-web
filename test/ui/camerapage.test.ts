@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { SENTINEL_DAY_MS as DAY } from '../../src/api';
-import { dateChipNav, GESTURE_STALE_MS, stageStatus, todayRefreshAllowed } from '../../src/ui/camera-logic';
+import {
+  dateChipNav,
+  eventsOnDay,
+  GESTURE_STALE_MS,
+  stageStatus,
+  todayRefreshAllowed,
+} from '../../src/ui/camera-logic';
 
 const t = (k: string) => `[${k}]`;
 const day = (y: number, m: number, d: number) => new Date(y, m - 1, d).getTime();
@@ -57,5 +63,23 @@ describe('todayRefreshAllowed (15-s refresh of today)', () => {
   });
   it('skips a hidden tab', () => {
     expect(todayRefreshAllowed({ ...base, hidden: true })).toBe(false);
+  });
+});
+
+describe('eventsOnDay', () => {
+  it('counts only the events of the given local day, midnight belongs to the new day', () => {
+    const d = day(2026, 10, 4);
+    const evs = [d - 1, d, d + 12 * 3600e3, day(2026, 10, 5) - 1, day(2026, 10, 5)].map((timestamp) => ({ timestamp }));
+    expect(eventsOnDay(evs, d)).toBe(3);
+    expect(eventsOnDay(evs, day(2026, 10, 3))).toBe(1);
+    expect(eventsOnDay(evs, day(2026, 10, 5))).toBe(1);
+    expect(eventsOnDay([], d)).toBe(0);
+  });
+  it('the 25-hour day at the end of daylight saving time is one day', () => {
+    const d = day(2026, 10, 25);
+    const evs = [d + 1000, d + 24.5 * 3600e3].map((timestamp) => ({ timestamp }));
+    // in zones with DST the second event (00:30 + 24.5 h) is still on the 25th only if that day has 25 hours
+    const long = day(2026, 10, 26) - d > DAY;
+    expect(eventsOnDay(evs, d)).toBe(long ? 2 : 1);
   });
 });
