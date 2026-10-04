@@ -4,6 +4,16 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.16.8 — 2026-10-04
+
+- Camera page: the number in the "Events (N)" tab counts only the day centred in the timeline (the date chip's day).
+  It used to count every loaded day — on opening today and yesterday, more after scrolling back — so it was larger
+  than the overview tile's "N today" for the same camera. On today the two now agree (same local midnight; the tile
+  counts with the class filter all on). The number changes while scrolling across midnight, and the list below still
+  shows every loaded day, so it can hold more entries than the number. The class filter applies to the number as
+  before. `eventsOnDay(events, day)` in `ui/camera-logic.ts`; tests in `test/ui/camerapage.test.ts` and
+  `test/ui/camerapage-daycount.test.tsx`.
+
 ## 0.16.7 — 2026-10-04
 
 - Camera-page timeline: event markers closer than 14 px (at the start scale of 2 h per screen about three minutes) lay
