@@ -14,6 +14,18 @@ are listed in the README compatibility table.
   before. `eventsOnDay(events, day)` in `ui/camera-logic.ts`; tests in `test/ui/camerapage.test.ts` and
   `test/ui/camerapage-daycount.test.tsx`.
 
+## 0.16.7 — 2026-10-04
+
+- Camera-page timeline: event markers closer than 14 px (at the start scale of 2 h per screen about three minutes) lay
+  on top of each other — the stack showed one marker and a tap opened the OLDEST event (drawn last), while the
+  thumbnail beside it opened the newest. They now form one marker with the count, coloured by the most important class
+  of the group (`ui/timeline-groups.ts`). A tap on it zooms in until the group fills half the timeline and puts the
+  group's middle on the playhead line; the video jumps there like after an event click (still picture until the new
+  picture), no event opens. If the middle falls into a recording gap, the newest event of the group is the target. At
+  the finest scale (events a few seconds apart) the tap opens the newest event, like the thumbnail. Single markers,
+  thumbnails and event spans behave as before. New optional `TimelineProps.onSeekTo(ts)` (CameraPage passes it;
+  without it the tap lands like a scroll release). Tests in `test/ui/timeline-groups.test.tsx`.
+
 ## 0.16.6 — 2026-10-04
 
 - No behaviour change. The player's playback rules are split out of `PlayerController` into small, tested pure

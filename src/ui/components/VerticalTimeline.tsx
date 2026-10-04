@@ -13,6 +13,7 @@ import {
   sentinelClassOf as classOf,
   sentinelEventHidden,
   sentinelClipRuns,
+  sentinelClipIndexFor,
   sentinelEventPlayTs as eventPlayTs,
   sentinelEventSpan as eventSpan,
   fmtDay as dayLabel,
@@ -24,6 +25,7 @@ import {
 import { rlog } from '../../player';
 import { useSentinelUi } from '../context';
 import { EventBadges, classLabel } from './ClassBadge';
+import { groupEvents, groupZoomPx, groupCountLabel, type EventGroup } from '../timeline-groups';
 
 export interface ScrubHandlers {
   /** first touch/wheel of a gesture (freeze, scrub profile on) */
@@ -53,6 +55,9 @@ export interface TimelineProps {
   following: () => boolean;
   filterOff: Record<string, boolean>;
   onEvent: (ev: NvrEvent) => void;
+  /** a tap on a group of overlapping markers zoomed in and moved the view onto the group: play from ts there (a jump
+   *  like an event click, without opening an event). Without it the timeline lands there like a scroll release. */
+  onSeekTo?: (ts: number) => void;
   onGoLive: () => void;
   scrub: ScrubHandlers;
   /** centre of the view moved (throttled) — the page loads neighbouring days and updates the date chip */
@@ -394,6 +399,29 @@ export function VerticalTimeline(p: TimelineProps) {
         .sort((a, b) => b.timestamp - a.timestamp),
     [p.events, p.filterOff],
   );
+  // markers closer than GROUP_PX become one marker with a count (they used to lie on top of each other)
+  const groups = useMemo(() => groupEvents(vis, px), [vis, px]);
+  // tap on a group: zoom so the group fills half the screen and put its middle on the playhead line — the line is the
+  // playback position, so the video goes there too (like scrolling there); a seek, not an opened event. Already at the
+  // finest scale (events seconds apart): open the newest, like its thumbnail.
+  const openGroup = (g: EventGroup) => {
+    const npx = groupZoomPx(g, px, vh, maxPx);
+    if (npx == null) {
+      p.onEvent(g.newest);
+      return;
+    }
+    const mid = (g.newest.timestamp + g.oldest.timestamp) / 2;
+    // the middle may fall into a recording gap → land on the newest event instead (always recorded)
+    const ts = clampRange(sentinelClipIndexFor(p.clips, mid) >= 0 ? mid : g.newest.timestamp);
+    const v = VT.current;
+    if (!v.user) markUser(); // keyboard activation: same gesture frame as a tap (begin … idle), so auto-follow waits
+    applyZoom(npx, ts, vh * HEAD);
+    if (p.onSeekTo) p.onSeekTo(ts);
+    else scrubSeek(ts);
+    clearTimeout(v.holdT);
+    clearTimeout(v.relT);
+    v.relT = window.setTimeout(userIdle, 250);
+  };
   // visible window (plus one screen each side) — everything else is not rendered
   const top = scroll.current?.scrollTop || 0;
   const winStart = tsForY(top + 2 * vh),
@@ -464,32 +492,51 @@ export function VerticalTimeline(p: TimelineProps) {
                 <div key={i} className="vmot" style={{ top: yFor(m[1]), height: Math.max(4, (m[1] - m[0]) * px) }} />
               ),
           )}
-          {vis.map((ev) => {
-            if (!inWin(ev.timestamp)) return null;
+          {groups.map((g) => {
+            if (!inWin(g.oldest.timestamp, g.newest.timestamp)) return null;
+            const ev = g.newest;
             const y = yFor(ev.timestamp);
-            const k = classOf(ev);
+            const n = g.events.length;
+            const k = n > 1 ? g.cls : classOf(ev);
             const thumb = y - lastThumbY >= thumbGap && px > vh / (8 * 3600 * 1000);
             if (thumb) lastThumbY = y;
-            const sp = eventSpan(ev, now);
             return (
               <div key={ev.id}>
-                {sp && (
-                  <div
-                    className={'vspan' + (sp.open ? ' vspan--open' : '')}
-                    style={{
-                      top: yFor(sp.end),
-                      height: Math.max(3, (sp.end - sp.start) * px),
-                      background: `var(--nvr-c-${k})`,
-                    }}
+                {g.events.map((m) => {
+                  const sp = eventSpan(m, now);
+                  return (
+                    sp && (
+                      <div
+                        key={m.id}
+                        className={'vspan' + (sp.open ? ' vspan--open' : '')}
+                        style={{
+                          top: yFor(sp.end),
+                          height: Math.max(3, (sp.end - sp.start) * px),
+                          background: `var(--nvr-c-${classOf(m)})`,
+                        }}
+                      />
+                    )
+                  );
+                })}
+                {n > 1 ? (
+                  <button
+                    className="vev vev--group"
+                    style={{ top: y, background: `var(--nvr-c-${k})` }}
+                    onClick={() => openGroup(g)}
+                    aria-label={`${t('nvr.timeline.zoomIn')}: ${n} × ${classLabel(t, k)} ${hhmmss(g.oldest.timestamp)}–${hhmmss(ev.timestamp)}`}
+                    title={`${n} × ${hhmmss(g.oldest.timestamp)}–${hhmmss(ev.timestamp)}`}
+                  >
+                    {groupCountLabel(n)}
+                  </button>
+                ) : (
+                  <button
+                    className={'vev' + (thumb ? '' : ' vev--minor')}
+                    style={{ top: y, background: `var(--nvr-c-${k})` }}
+                    onClick={() => p.onEvent(ev)}
+                    aria-label={`${classLabel(t, k)} ${hhmmss(ev.timestamp)}`}
+                    title={hhmmss(eventPlayTs(ev))}
                   />
                 )}
-                <button
-                  className={'vev' + (thumb ? '' : ' vev--minor')}
-                  style={{ top: y, background: `var(--nvr-c-${k})` }}
-                  onClick={() => p.onEvent(ev)}
-                  aria-label={`${classLabel(t, k)} ${hhmmss(ev.timestamp)}`}
-                  title={hhmmss(eventPlayTs(ev))}
-                />
                 {thumb && (
                   <>
                     <div className="vlink" style={{ top: y }}>

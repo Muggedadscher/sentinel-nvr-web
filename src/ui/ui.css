@@ -796,6 +796,19 @@
   box-shadow: none;
   opacity: 0.85;
 }
+.nvr-vtl .vev--group {
+  /* several events closer than GROUP_PX (timeline-groups.ts): one marker with the count, a tap zooms into the group */
+  left: 68px;
+  width: 34px;
+  height: 14px;
+  border-radius: 7px;
+  color: var(--on-accent);
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 .nvr-vtl .vthumb {
   position: absolute;
   z-index: 2;

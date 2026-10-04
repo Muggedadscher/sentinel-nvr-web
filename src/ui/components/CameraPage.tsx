@@ -369,6 +369,21 @@ export function CameraPage(p: CameraPageProps) {
     c.posterEvent(ev.timestamp);
     c.playAt(sentinelEventPlayTs(ev), {});
   }, []);
+  // tap on a group of timeline markers: the timeline zoomed in and put the group on the playhead line — play from there,
+  // a jump like an event click (still picture until the new picture), but no event poster; seconds before now = live
+  const seekTo = useCallback(
+    (ts: number) => {
+      const c = ctl.current;
+      if (!c) return;
+      if (Date.now() - ts < 8000) {
+        goLive();
+        return;
+      }
+      c.freezeCurrent();
+      c.playAt(ts, {});
+    },
+    [goLive],
+  );
   const jumpEvent = useCallback(
     (dir: 1 | -1) => {
       const c = ctl.current;
@@ -636,6 +651,7 @@ export function CameraPage(p: CameraPageProps) {
               following={() => !psRef.current.paused && !ctl.current?.scrubSettling()}
               filterOff={filterOff}
               onEvent={playEvent}
+              onSeekTo={seekTo}
               onGoLive={goLive}
               scrub={scrub}
               onCenter={onCenter}
