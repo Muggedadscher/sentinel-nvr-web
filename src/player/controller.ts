@@ -19,6 +19,17 @@ import { WebRtcSession, mobileClient } from './webrtc';
 import { skipTarget } from './skip';
 import { carryClipIndex } from './clips';
 import { settleStart, settleStep, SETTLE_CAP_MS, type SettleTrack } from './settle';
+import {
+  avoidWidth,
+  isMarkerFrame,
+  LIFT_FADE_MS,
+  LIFT_FRAMES,
+  MARK_CAP_MS,
+  seekLift,
+  STILL_CAP_MS,
+  SWAP_MS,
+} from './stills';
+import { DEAD_POLLS, relayFailure, relayPosVerdict } from './relaystate';
 
 /** `label` is an i18n key suffix: nvr.player.<label> */
 export type PlayerLabel =
@@ -53,18 +64,7 @@ export interface PlayerOptions {
 type Opts = PlayerOptions;
 
 const MSCls: typeof MediaSource | undefined = (window as any).ManagedMediaSource || window.MediaSource;
-/** Seek → picture. After a jump the OLD position keeps playing until the new one has crossed the pipeline (measured 24.09.2026,
- *  sink passthrough: 1.3–1.4 s on the LAN, more on slow links). A still picture (event frame / frozen picture) covers that and
- *  is lifted on the EXACT first frame of the new position: the server restarts its transcoder with a marker width it names in
- *  the relay-seek answer ({w}); the first presented frame of that width (rVFC metadata / `resize`) is the new position.
- *  Servers without markers (plain 204): lifted SWAP_MS after the answer plus one presented frame. MARK_CAP_MS = safety net. */
-const SWAP_MS = 2600;
-const MARK_CAP_MS = 12000;
-/** Lifting a still: wait this many further presented frames after the "new content" signal, then fade it out. iOS/Safari
- *  draw video on a separate layer that may still be empty for a moment after the frame callback — hiding the still at
- *  once let the grey stage background flash through (user 25.09.2026, iPhone). ~100 ms + 120 ms fade at 20 fps. */
-const LIFT_FRAMES = 2;
-const LIFT_FADE_MS = 120;
+// still-picture rules (SWAP_MS, MARK_CAP_MS, LIFT_FRAMES, …): see stills.ts
 /** Scrub profile (640 all-intra) → normal (1280) only after the gesture has been quiet this long: a scroll–pause–scroll pattern
  *  restarted the transcoder twice per pause (server log: profile switch every 1–2 s, 30 restarts in one session).
  *  A steered relay gesture then waits on until the picture has reached the target (see settle.ts), checked every
@@ -578,7 +578,7 @@ export class PlayerController {
   }
   /** a presented frame of width w: is it the first frame of the marked seek's new position? */
   private markerCheck(w: number): void {
-    if (this.swapPending && this.swapW && w === this.swapW) this.swapVisible('marker');
+    if (isMarkerFrame(this.swapPending, this.swapW, w)) this.swapVisible('marker');
   }
   presentedFrames(): number {
     if ((this.v as any).requestVideoFrameCallback) return this.fc.n;
@@ -590,7 +590,7 @@ export class PlayerController {
   }
   private freezeArm(hold: boolean): void {
     if (this.freezeT) clearTimeout(this.freezeT);
-    this.freezeT = window.setTimeout(() => this.freezeHide(), 90000); // safety net only — a still stays until the video really runs
+    this.freezeT = window.setTimeout(() => this.freezeHide(), STILL_CAP_MS); // safety net only — a still stays until the video really runs
     const v: any = this.v;
     if (hold && v.requestVideoFrameCallback) {
       const tok = {};
@@ -756,7 +756,7 @@ export class PlayerController {
   freezeHold(): void {
     if (this.freezeT) {
       clearTimeout(this.freezeT);
-      this.freezeT = window.setTimeout(() => this.freezeHide(), 90000);
+      this.freezeT = window.setTimeout(() => this.freezeHide(), STILL_CAP_MS);
     }
   }
   /** Event click: the stored frame is the poster until the seek lands. */
@@ -1356,7 +1356,7 @@ export class PlayerController {
     this.recWebrtcTeardown();
     if (this.live || this.destroyed) return;
     this.recoveries++;
-    if (this.recoveries <= 2) {
+    if (relayFailure(this.recoveries) === 'retry') {
       rlog('relay-retry', { n: this.recoveries });
       this.recWebrtcStart(ts);
       return;
@@ -1434,11 +1434,13 @@ export class PlayerController {
         return;
       }
       if (this.swapPending && seq === this.cmdSeq) {
-        if (w) {
+        const lift = seekLift(w, this.shownW); // marker path or timer (see stills.ts SWAP_MS)
+        if (lift === 'timer')
+          this.swapArm(); // server without markers
+        else {
           this.swapW = w;
-          if (this.shownW === w) this.swapVisible('marker');
-        } // marker path (see SWAP_MS)
-        else this.swapArm(); // server without markers: timer
+          if (lift === 'now') this.swapVisible('marker');
+        }
       }
       const p = this.rwPending;
       this.rwPending = null;
@@ -1446,7 +1448,7 @@ export class PlayerController {
     };
     const q =
       `api/relay-seek?session=${encodeURIComponent(s.id)}&start=${Math.round(ts)}&rate=${rate}&srate=${srate}` +
-      (mark ? `&mark=1&avoid=${this.shownW || this.v.videoWidth || 0}` : '');
+      (mark ? `&mark=1&avoid=${avoidWidth(this.shownW, this.v.videoWidth)}` : '');
     fetch(this.api.url(q), { cache: 'no-store', signal: timeoutSignal(10000) }) // bounded: a hanging seek blocked every later jump
       .then((r) => {
         if (!r.ok) return done(false, 0);
@@ -1550,7 +1552,7 @@ export class PlayerController {
     const t = this.rwPosTs ?? this.rwStartMs;
     this.recoveries++;
     rlog('relay-recover', { n: this.recoveries });
-    if (this.recoveries > 2) {
+    if (relayFailure(this.recoveries) === 'mse') {
       this.recoveries--;
       this.recFallbackMse(t);
       return;
@@ -1630,9 +1632,16 @@ export class PlayerController {
       })
         .then((r) => r.json())
         .then((d: any) => {
-          if (this.rw !== s || seq !== this.cmdSeq) return; // other session, or answered across a seek/rate change → stale
-          if (d && d.t > 0 && Date.now() - this.seekAt < 2500 && Math.abs(d.t - this.seekTarget) > 5000) return; // pre-swap position
-          if (d && d.t > 0) {
+          // other session, answered across a seek/rate change, or the pre-swap position right after a seek (relaystate.ts)
+          const verdict = relayPosVerdict(
+            d,
+            this.rw === s && seq === this.cmdSeq,
+            Date.now(),
+            this.seekAt,
+            this.seekTarget,
+          );
+          if (verdict === 'stale' || verdict === 'pre-swap') return;
+          if (verdict === 'position') {
             this.wdDead = 0;
             this.rwPosTs = d.t;
             this.rwPosAt = Date.now();
@@ -1647,8 +1656,8 @@ export class PlayerController {
             if ((this.rwScrub || this.scrubMoves > 0) && typeof d.r === 'number' && isFinite(d.r) && d.r)
               this.rwRate = d.r;
             this.emit();
-          } else if (d && d.t <= 0) {
-            if (++this.wdDead >= 3) {
+          } else if (verdict === 'dead') {
+            if (++this.wdDead >= DEAD_POLLS) {
               this.wdDead = 0;
               this.relayRecover();
             }
