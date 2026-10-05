@@ -1,5 +1,6 @@
 /** Event list (camera page "Events" tab): newest first over all loaded days, a day header at every day change. */
 import { Fragment } from 'react';
+import { Download } from 'lucide-react';
 import {
   sentinelDuration,
   sentinelEventHidden,
@@ -16,11 +17,14 @@ export function EventList({
   events,
   filterOff,
   onPick,
+  onClip,
 }: {
   camId: string;
   events: SentinelEvent[];
   filterOff: Record<string, boolean>;
   onPick: (ev: SentinelEvent) => void;
+  /** "Event as clip" next to each row (only when the plugin can export clips) */
+  onClip?: ((ev: SentinelEvent) => void) | undefined;
 }) {
   const { client, t, locale } = useSentinelUi();
   const evs = events
@@ -38,18 +42,31 @@ export function EventList({
         return (
           <Fragment key={ev.id}>
             {head && <div className="nvr-evlist__day nvr-data">{fmtDay(ev.timestamp, locale)}</div>}
-            <button type="button" className="nvr-evrow" onClick={() => onPick(ev)}>
-              <img className="nvr-evrow__img" src={client.eventThumbUrl(camId, ev.timestamp)} alt="" loading="lazy" />
-              <span className="nvr-evrow__text">
-                <span className="nvr-evrow__cls">
-                  <EventBadges ev={ev} size={16} t={t} /> {eventLabel(t, ev)}
+            <div className={'nvr-evrow-wrap' + (onClip ? ' nvr-evrow-wrap--clip' : '')}>
+              <button type="button" className="nvr-evrow" onClick={() => onPick(ev)}>
+                <img className="nvr-evrow__img" src={client.eventThumbUrl(camId, ev.timestamp)} alt="" loading="lazy" />
+                <span className="nvr-evrow__text">
+                  <span className="nvr-evrow__cls">
+                    <EventBadges ev={ev} size={16} t={t} /> {eventLabel(t, ev)}
+                  </span>
+                  <span className="nvr-evrow__t nvr-data">
+                    {fmtTimeSec(ev.timestamp, locale)}
+                    <EventSpanNote ev={ev} t={t} />
+                  </span>
                 </span>
-                <span className="nvr-evrow__t nvr-data">
-                  {fmtTimeSec(ev.timestamp, locale)}
-                  <EventSpanNote ev={ev} t={t} />
-                </span>
-              </span>
-            </button>
+              </button>
+              {onClip && (
+                <button
+                  type="button"
+                  className="nvr-iconbtn nvr-evrow__clip"
+                  aria-label={`${t('nvr.clip.event')} ${fmtTimeSec(ev.timestamp, locale)}`}
+                  title={t('nvr.clip.event')}
+                  onClick={() => onClip(ev)}
+                >
+                  <Download size={16} />
+                </button>
+              )}
+            </div>
           </Fragment>
         );
       })}

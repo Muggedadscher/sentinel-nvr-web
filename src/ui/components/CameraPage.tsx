@@ -12,6 +12,10 @@
  *
  * Deep link: `startAt` (+ `posterTs`) starts playback there with the event
  * frame as poster (the events strip / home card link here).
+ *
+ * Clip mode (plugin with `features: ["export"]`): "Download clip" in the info bar
+ * or next to an event in the list shows the range as a band on the timeline and
+ * the ClipBar under it; its edges are set over the playhead line.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
@@ -19,6 +23,7 @@ import {
   Camera,
   ChevronLeft,
   ChevronRight,
+  Download,
   FastForward,
   Maximize2,
   Pause,
@@ -39,6 +44,7 @@ import {
   sentinelDayOf as dayOf,
   sentinelEventPlayTs,
   sentinelMergeDays,
+  sentinelHasFeature,
   fmtDay,
   type SentinelClip,
   type SentinelClipsResponse,
@@ -50,7 +56,16 @@ import { isIosHomeScreenApp, outsideAppHref } from '../outside';
 import { useSentinelUi } from '../context';
 import { dateChipNav, eventsOnDay, shouldHandleKey, stageStatus, todayRefreshAllowed } from '../camera-logic';
 import { lastTileSnapshot } from '../snapshot-cache';
+import {
+  CLIP_MAX_MS,
+  clampClipRange,
+  clipProposal,
+  clipRangeForEvent,
+  clipSetEdge,
+  type ClipEdge,
+} from '../clip-logic';
 import { ClassBadge, classLabel } from './ClassBadge';
+import { ClipBar } from './ClipBar';
 import { EventList } from './EventList';
 import { VerticalTimeline, type ScrubHandlers } from './VerticalTimeline';
 
@@ -165,6 +180,14 @@ export function CameraPage(p: CameraPageProps) {
   const camRef = useRef(camId);
   camRef.current = camId;
   const deepRef = useRef(''); // camera|startAt the page last opened or jumped to (deep links)
+  // clip mode: the range (null = off), `open` = it comes from a running event; the edge that follows the playhead line
+  const [clip, setClip] = useState<{ from: number; to: number; open: boolean } | null>(null);
+  const [clipEdge, setClipEdge] = useState<ClipEdge | null>(null);
+  const clipRef = useRef(clip);
+  clipRef.current = clip;
+  const clipEdgeRef = useRef(clipEdge);
+  clipEdgeRef.current = clipEdge;
+  const lineTs = useRef<number | null>(null); // time under the playhead line as the timeline last reported it
   const gestureAt = useRef(0); // last activity of the running timeline gesture, 0 = none (the today refresh waits for its end)
 
   // ---- data: one request per day, merged into a continuous range
@@ -223,6 +246,7 @@ export function CameraPage(p: CameraPageProps) {
   );
   const onCenter = useCallback(
     (ts: number) => {
+      lineTs.current = ts;
       const d = dayOf(ts);
       setCenterDay(d);
       for (const x of [d, addDays(d, -1), addDays(d, 1)]) ensureDay(x).catch(() => setLoadError(true));
@@ -277,6 +301,8 @@ export function CameraPage(p: CameraPageProps) {
     daysRef.current = {};
     setFilterOff({});
     setTab('tl');
+    setClip(null);
+    setClipEdge(null);
     setLoadError(false);
     loading.current.clear();
     if (startAt) c.posterEvent(posterTs || startAt);
@@ -433,6 +459,95 @@ export function CameraPage(p: CameraPageProps) {
     },
     [ensureDay, camId, goLive, mergedNow],
   );
+  // ---- clip mode
+  const canExport = useMemo(() => Object.values(days).some((d) => sentinelHasFeature(d, 'export')), [days]);
+  const oldestRec = earliest ?? merged.clips[0]?.startTime;
+  /** the clip range of an event: band + bar, the timeline tab, the video at the clip start (an edge stays inactive) */
+  const clipEvent = useCallback(
+    (ev: SentinelEvent) => {
+      const now = Date.now();
+      const r = clipRangeForEvent(ev, now);
+      setClip({ ...clampClipRange(r, { now, oldest: oldestRec }), open: r.open });
+      setClipEdge(null);
+      setTab('tl');
+      const c = ctl.current;
+      if (!c) return;
+      c.freezeCurrent();
+      c.posterEvent(ev.timestamp);
+      c.playAt(Math.max(r.from, oldestRec ?? -Infinity), {});
+    },
+    [oldestRec],
+  );
+  const closeClip = useCallback(() => {
+    setClip(null);
+    setClipEdge(null);
+  }, []);
+  /** info-bar button: on = the proposal (the event under the playhead, else ± 30 s, live the last minute), off = close */
+  const toggleClip = useCallback(() => {
+    if (clipRef.current) {
+      closeClip();
+      return;
+    }
+    const s = psRef.current;
+    setClip(
+      clipProposal({
+        live: s.live,
+        playhead: s.live ? null : (ctl.current?.currentTs() ?? s.playhead),
+        now: Date.now(),
+        events: visEvents,
+        oldest: oldestRec,
+      }),
+    );
+    setClipEdge(null);
+    setTab('tl');
+  }, [closeClip, visEvents, oldestRec]);
+  /** a chip was tapped: that edge goes onto the playhead line (the view jumps there, the video too) and follows the
+   *  line while the user scrolls; null = no edge active */
+  const activateEdge = useCallback((e: ClipEdge | null) => {
+    setClipEdge(e);
+    const r = clipRef.current;
+    if (!e || !r) return;
+    const ts = e === 'from' ? r.from : r.to;
+    setJump({ ts, n: Date.now() });
+    lineTs.current = ts;
+    const c = ctl.current;
+    // an edge in the last seconds (or above LIVE) only moves the view — playing there would mean live
+    if (c && ts < Date.now() - 8000) {
+      c.freezeCurrent();
+      c.playAt(ts, {});
+    }
+  }, []);
+  /** the user scrolled: the active edge follows the line (and takes over the other's role when it passes it) */
+  const onUserCenter = useCallback((ts: number) => {
+    lineTs.current = ts;
+    const e = clipEdgeRef.current,
+      r = clipRef.current;
+    if (!e || !r) return;
+    const n = clipSetEdge(r, e, ts);
+    setClip({ ...n.range, open: false });
+    if (n.edge !== e) setClipEdge(n.edge);
+  }, []);
+  /** i / o: set the start / end to the time on the line (keyboard) */
+  const setEdgeToLine = useCallback((e: ClipEdge) => {
+    const r = clipRef.current;
+    if (!r) return;
+    const s = psRef.current;
+    const ts = clipEdgeRef.current
+      ? lineTs.current
+      : s.live
+        ? Date.now()
+        : (ctl.current?.currentTs() ?? lineTs.current);
+    if (ts == null) return;
+    const n = clipSetEdge(r, e, ts);
+    setClip({ ...n.range, open: false });
+    if (clipEdgeRef.current) setClipEdge(n.edge);
+  }, []);
+  /** an event marker / thumbnail on the timeline: in clip mode it sets the range, otherwise it plays */
+  const onTimelineEvent = useCallback(
+    (ev: SentinelEvent) => (clipRef.current ? clipEvent(ev) : playEvent(ev)),
+    [clipEvent, playEvent],
+  );
+
   const scrub = useMemo<ScrubHandlers>(
     () => ({
       begin: () => {
@@ -465,6 +580,12 @@ export function CameraPage(p: CameraPageProps) {
       if (dt || !shouldHandleKey(e)) return;
       const c = ctl.current;
       if (!c) return;
+      if (clipRef.current && (e.key === 'Escape' || e.key === 'i' || e.key === 'o')) {
+        e.preventDefault();
+        if (e.key === 'Escape') closeClip();
+        else setEdgeToLine(e.key === 'i' ? 'from' : 'to');
+        return;
+      }
       if (e.key === ' ') {
         e.preventDefault();
         c.togglePlayPause();
@@ -479,7 +600,7 @@ export function CameraPage(p: CameraPageProps) {
     };
     document.addEventListener('keydown', k);
     return () => document.removeEventListener('keydown', k);
-  }, [dt, jumpEvent, goLive]);
+  }, [dt, jumpEvent, goLive, closeClip, setEdgeToLine]);
 
   const mjpeg = ps.transport === 'mjpeg';
   const oldestAllowed = earliest ? dayOf(earliest) : -Infinity;
@@ -567,6 +688,18 @@ export function CameraPage(p: CameraPageProps) {
                 >
                   <Camera size={16} />
                 </button>
+                {canExport && (
+                  <button
+                    type="button"
+                    className={'nvr-iconbtn' + (clip ? ' nvr-iconbtn--on' : '')}
+                    aria-label={t('nvr.clip.download')}
+                    title={t('nvr.clip.download')}
+                    aria-pressed={!!clip}
+                    onClick={toggleClip}
+                  >
+                    <Download size={16} />
+                  </button>
+                )}
                 <button type="button" className="nvr-iconbtn" aria-label={t('nvr.player.pip')} onClick={onPip}>
                   <PictureInPicture2 size={16} />
                 </button>
@@ -609,7 +742,7 @@ export function CameraPage(p: CameraPageProps) {
           </div>
         </div>
 
-        <aside className="nvr-card nvr-cam__right">
+        <aside className={'nvr-card nvr-cam__right' + (clip ? ' nvr-cam__right--clip' : '')}>
           <div className="nvr-tabs" role="tablist">
             <button
               type="button"
@@ -658,43 +791,68 @@ export function CameraPage(p: CameraPageProps) {
               playhead={() => ctl.current?.currentTs() ?? null}
               following={() => !psRef.current.paused && !ctl.current?.scrubSettling()}
               filterOff={filterOff}
-              onEvent={playEvent}
+              onEvent={onTimelineEvent}
               onSeekTo={seekTo}
               onGoLive={goLive}
               scrub={scrub}
               onCenter={onCenter}
               jump={jump}
+              clip={
+                clip ? { from: clip.from, to: clip.to, edge: clipEdge, bad: clip.to - clip.from > CLIP_MAX_MS } : null
+              }
+              hold={!!clip && !!clipEdge}
+              onUserCenter={onUserCenter}
             />
           ) : (
-            <EventList camId={camId} events={merged.events} filterOff={filterOff} onPick={playEvent} />
+            <EventList
+              camId={camId}
+              events={merged.events}
+              filterOff={filterOff}
+              onPick={playEvent}
+              onClip={canExport ? clipEvent : undefined}
+            />
           )}
-          <div className={'nvr-datechip' + (ps.live ? '' : ' nvr-datechip--rec')}>
-            <button
-              type="button"
-              onClick={() => goToDay(addDays(centerDay, -1)).catch(() => setLoadError(true))}
-              disabled={nav.prevDisabled}
-              aria-label={t('nvr.date.prevDay')}
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <button
-              type="button"
-              className="nvr-datechip__lbl nvr-data"
-              onClick={() => setDt(true)}
-              aria-label={t('nvr.date.title')}
-            >
-              <Calendar size={13} />
-              {fmtDay(centerDay, locale)}
-            </button>
-            <button
-              type="button"
-              onClick={() => goToDay(addDays(centerDay, 1)).catch(() => setLoadError(true))}
-              disabled={nav.nextDisabled}
-              aria-label={t('nvr.date.nextDay')}
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
+          {clip && (
+            <ClipBar
+              key={camId}
+              camId={camId}
+              range={clip}
+              open={clip.open}
+              edge={clipEdge}
+              clips={merged.clips}
+              onEdge={activateEdge}
+              onClose={closeClip}
+            />
+          )}
+          {!clip && (
+            <div className={'nvr-datechip' + (ps.live ? '' : ' nvr-datechip--rec')}>
+              <button
+                type="button"
+                onClick={() => goToDay(addDays(centerDay, -1)).catch(() => setLoadError(true))}
+                disabled={nav.prevDisabled}
+                aria-label={t('nvr.date.prevDay')}
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button
+                type="button"
+                className="nvr-datechip__lbl nvr-data"
+                onClick={() => setDt(true)}
+                aria-label={t('nvr.date.title')}
+              >
+                <Calendar size={13} />
+                {fmtDay(centerDay, locale)}
+              </button>
+              <button
+                type="button"
+                onClick={() => goToDay(addDays(centerDay, 1)).catch(() => setLoadError(true))}
+                disabled={nav.nextDisabled}
+                aria-label={t('nvr.date.nextDay')}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
         </aside>
       </div>
 
