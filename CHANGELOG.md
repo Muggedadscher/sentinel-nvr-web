@@ -4,6 +4,35 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.17.0 — 2026-10-06
+
+- Clip download on the camera page (plugin with `features: ["export"]` in `api/clips`; older plugins show no button,
+  nothing else changes). "Download clip" in the info bar (between snapshot and Picture-in-Picture) proposes the event
+  under the playhead, else the position ± 30 s, live the last minute; a download button next to every event in the
+  events list proposes that event ± 5 s (its start at most 10 s before the trigger — events up to plugin 1.3.0 carry
+  the first sighting, hours earlier for a parked car; a running event ends now). Both open clip mode on the timeline
+  tab: the range is a band on the timeline and a bar under it shows the chips From/To with the length, a hint line and
+  the buttons. Tapping a chip puts that edge on the playhead line (the video goes there); it follows the line only
+  while the user scrolls — never the running playback — and stays put once the gesture settles; passing the other
+  edge swaps their roles; the zoom buttons zoom around the edge. A tap on a single marker sets the event's range and
+  plays from its start, a group marker zooms in as before. Hints: more than 30 min (end chip red, create locked), no
+  recording, gaps are skipped, the end is not recorded yet; on the 25-h day the chips add the UTC offset to an
+  ambiguous time. Keys: Esc ends clip mode, i / o set start / end to the line. The date chip is hidden in clip mode.
+- "Create clip" starts a job on the plugin (`api/export`), the bar shows "Preparing … N %" with "Cancel" (status
+  every 0.7 s, paused in a hidden tab); closing the bar or leaving the camera cancels a running job. Finished: "Save"
+  is a link to `api/export-file` (Content-Disposition; same-origin with `download`). Where the browser can share files
+  and the clip is ≤ 100 MB, the file is loaded into the page first ("Loading …") and "Share" calls `navigator.share`
+  inside the tap (WebKit refuses it after an await). In an iPhone/iPad Home-Screen app "Save" uses that loaded file
+  (`<a download>`, like the snapshot); above 100 MB it offers "Open in Safari". An expired file (15 min on the
+  server) offers "Create again". Telemetry `clip` (`ms`, `bytes`, `w` = download/blob/share/safari, `standalone`,
+  `ok`, `err`).
+- `/api`: `SentinelClient.startExport(camera, from, to, tz)`, `exportStatus(id)`, `exportFileUrl(id)`,
+  `cancelExport(id)`, `postJson(path)`; `SentinelHttpError` carries the server's `error` as `code` and the JSON body as
+  `body` (old two-argument constructor unchanged); types `SentinelExportStart`/`SentinelExportStatus`, `features` on
+  `SentinelClipsResponse`/`SentinelStats`, `sentinelHasFeature()`. Pure rules in `src/ui/clip-logic.ts`; 27 texts
+  `nvr.clip.*` in all 7 languages. Tests in `test/ui/clip-logic.test.ts`, `test/ui/clip-dst.test.ts`,
+  `test/ui/clipbar.test.tsx`, `test/api/client-export.test.ts`.
+
 ## 0.16.11 — 2026-10-05
 
 - Camera page: `header` and `externalUrl` may now be functions of the playback position (`at` in ms, `undefined` while
