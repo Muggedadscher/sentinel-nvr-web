@@ -4,6 +4,15 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## Unreleased
+
+- Camera page: a link with a time but no event (`at` without `ev` — HAPulse's "Open in Sentinel" during playback or
+  pause, "Open in Safari", reloading such a page, a shared link) no longer asks the plugin for an event frame at that
+  time. There is almost never one, so `api/evframe` answered 404 and the stage stayed grey anyway; now no request is
+  made. Event links (`ev`) bring their frame as before. The stage still stays grey until the day loads — a picture for
+  an arbitrary time would need a new plugin endpoint (decided against: the case is rare). Test in
+  `test/ui/camerapage-deeplink.test.tsx`.
+
 ## 0.16.11 — 2026-10-05
 
 - Camera page: `header` and `externalUrl` may now be functions of the playback position (`at` in ms, `undefined` while

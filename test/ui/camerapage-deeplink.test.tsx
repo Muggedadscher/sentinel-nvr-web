@@ -183,4 +183,71 @@ describe('CameraPage deep link', () => {
     expect(goLive).toHaveBeenCalledTimes(1); // a failed day load neither blocks nor repeats it
     root.unmount();
   });
+
+  it('a time-only link (no event) asks for no event frame — opening and a second jump on the same camera', async () => {
+    posterEvent.mockClear();
+    playAt.mockClear();
+    goLive.mockClear();
+    freezeCurrent.mockClear();
+    const today = new Date().setHours(0, 0, 0, 0);
+    const at = today + 5 * 3600e3 + 1234; // "Open in Sentinel" during playback: a playhead, no event there
+    const client = {
+      corsMedia: true,
+      url: (p: string) => p,
+      getJson: () =>
+        Promise.resolve({ clips: [{ id: 'c', startTime: at - 30000, duration: 3600e3 }], events: [], motion: [] }),
+      eventThumbUrl: () => '',
+      snapshotUrl: () => '',
+      segmentThumbUrl: () => '',
+    } as any;
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    const root = createRoot(div);
+    const page = (startAt: number, posterTs?: number) => (
+      <SentinelUiProvider
+        value={{
+          client,
+          t: (k: string) => k,
+          locale: 'de-DE',
+          nav: {
+            openCamera: () => {
+              /* */
+            },
+          },
+        }}
+      >
+        <CameraPage
+          camId="33"
+          name="Cam"
+          startAt={startAt}
+          posterTs={posterTs}
+          storagePrefix="t-"
+          brand="test"
+          renderDatePicker={() => null}
+        />
+      </SentinelUiProvider>
+    );
+    await act(async () => {
+      root.render(page(at));
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+    // api/evframe?ts=<at> was a 404: only `ev` names a stored frame
+    expect(posterEvent).not.toHaveBeenCalled();
+    expect(playAt).toHaveBeenCalledWith(at, {});
+    expect(goLive).not.toHaveBeenCalled();
+    // back/forward to another time-only entry of the same camera: the current picture is frozen, still no event frame
+    await act(async () => {
+      root.render(page(at + 60000));
+    });
+    expect(freezeCurrent).toHaveBeenCalledTimes(1);
+    expect(posterEvent).not.toHaveBeenCalled();
+    // an event link on the same camera still brings its frame
+    await act(async () => {
+      root.render(page(at + 120000 - 3000, at + 120000));
+    });
+    expect(posterEvent).toHaveBeenCalledWith(at + 120000);
+    root.unmount();
+  });
 });
