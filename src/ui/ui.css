@@ -1798,11 +1798,13 @@
     font-size: 0.74rem;
     line-height: 1.3;
   }
-  /* one line (the full text is the title / read out); an error keeps all its lines */
+  /* at most two lines (the full text is the title / read out); an error keeps all its lines */
   .nvr-clipbar__note:not(.nvr-clipbar__note--bad) {
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     overflow: hidden;
-    text-overflow: ellipsis;
   }
 }
 
