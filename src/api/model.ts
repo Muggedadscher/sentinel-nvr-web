@@ -205,8 +205,9 @@ export function sentinelEntryUrl(origin: string, prefix = ''): string {
 /**
  * Absolute URL for an API/media path below the public base, with the token as
  * a query parameter (a `GET` with a query token is a CORS "simple request" —
- * the `x-sentinel-token` header would force a preflight the plugin does not
- * answer; `<img>`/`<video>` sources need the query form anyway).
+ * the `x-sentinel-token` header would cost an extra preflight round trip; the
+ * plugin answers OPTIONS since 2026-09-12, builds before that did not;
+ * `<img>`/`<video>` sources need the query form anyway).
  */
 export function sentinelUrl(base: string, token: string, path: string): string {
   const u = base + path;
