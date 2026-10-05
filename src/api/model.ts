@@ -192,13 +192,14 @@ export function sentinelPublicBase(origin: string, prefix = ''): string {
  * `sentinelEntryUrl` (the public base without a token shows Sentinel's sign-in
  * page, or redirects straight here when a session exists).
  */
-export function sentinelLoginBase(origin: string): string {
-  return `${origin.replace(/\/+$/, '')}${SENTINEL_ENDPOINT_PATH}/`;
+export function sentinelLoginBase(origin: string, prefix = ''): string {
+  return `${origin.replace(/\/+$/, '')}${prefix.replace(/\/+$/, '')}${SENTINEL_ENDPOINT_PATH}/`;
 }
 
-/** Where a human opens Sentinel's own UI: the public base WITHOUT a token (sign-in page / 302 into the session). */
-export function sentinelEntryUrl(origin: string): string {
-  return sentinelPublicBase(origin);
+/** Where a human opens Sentinel's own UI: the public base WITHOUT a token (sign-in page / 302 into the session).
+ *  `prefix` = reverse-proxy path prefix (`SentinelSetup.prefix`), as for the request base. */
+export function sentinelEntryUrl(origin: string, prefix = ''): string {
+  return sentinelPublicBase(origin, prefix);
 }
 
 /**
@@ -218,9 +219,9 @@ export function sentinelUrl(base: string, token: string, path: string): string {
  * URL (sign-in or 302 into the session; browsers carry the `#` fragment across
  * the redirect).
  */
-export function sentinelTimelineLink(origin: string, cameraId: string, atMs?: number): string {
+export function sentinelTimelineLink(origin: string, cameraId: string, atMs?: number, prefix = ''): string {
   const q = atMs ? `?at=${Math.round(atMs)}` : '';
-  return `${sentinelEntryUrl(origin)}#/timeline/${encodeURIComponent(cameraId)}${q}`;
+  return `${sentinelEntryUrl(origin, prefix)}#/timeline/${encodeURIComponent(cameraId)}${q}`;
 }
 
 // ---------------------------------------------------------------------------

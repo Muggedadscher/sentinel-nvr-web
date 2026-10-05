@@ -196,6 +196,30 @@ describe('reverse-proxy prefix (0.10.0)', () => {
     );
     expect(sentinelPublicBase('https://h:10443')).toBe('https://h:10443/endpoint/@local/sentinel-nvr/public/');
   });
+  it('goes into the links for humans: entry URL, timeline deep link, login base', async () => {
+    const { SentinelClient, sentinelEntryUrl, sentinelLoginBase } = await import('../../src/api');
+    const P = 'https://proxy.example/scrypted/endpoint/@local/sentinel-nvr/';
+    expect(sentinelEntryUrl('https://proxy.example', '/scrypted/')).toBe(P + 'public/');
+    expect(sentinelTimelineLink('https://proxy.example', '33', 1000, '/scrypted')).toBe(
+      P + 'public/#/timeline/33?at=1000',
+    );
+    expect(sentinelTimelineLink('https://proxy.example', '33', undefined, '/scrypted')).toBe(
+      P + 'public/#/timeline/33',
+    );
+    expect(sentinelLoginBase('https://proxy.example', '/scrypted')).toBe(P);
+    // without a prefix: as before
+    expect(sentinelEntryUrl('https://h')).toBe('https://h/endpoint/@local/sentinel-nvr/public/');
+    expect(sentinelTimelineLink('https://h', '33')).toBe('https://h/endpoint/@local/sentinel-nvr/public/#/timeline/33');
+    expect(sentinelLoginBase('https://h')).toBe('https://h/endpoint/@local/sentinel-nvr/');
+    // the client: request base and "Open Sentinel" target behind the proxy
+    const c = new SentinelClient('https://proxy.example', 't', { prefix: '/scrypted' });
+    expect(c.base).toBe(P + 'public/');
+    expect(c.entryUrl).toBe(P + 'public/');
+    const d = new SentinelClient('https://proxy.example', 't', { base: P + 'public', prefix: '/scrypted' });
+    expect(d.base).toBe(P + 'public/');
+    expect(d.entryUrl).toBe(P + 'public/');
+    expect(new SentinelClient('https://h', 't').entryUrl).toBe('https://h/endpoint/@local/sentinel-nvr/public/');
+  });
 });
 
 describe('event as a time span (plugin ≥ 1.3.0)', () => {
