@@ -32,12 +32,15 @@ export class SentinelClient {
    *   under a reverse-proxy prefix, or behind the Scrypted login path
    *   (`…/endpoint/@local/sentinel-nvr/`, cookie session, no token). Defaults to
    *   the token-guarded public base below `origin`.
+   * @param opts.prefix  reverse-proxy path prefix (`SentinelSetup.prefix`): goes into the default base and into
+   *   `entryUrl` — an overridden `base` does not tell it (it may be the login path), so pass both behind a proxy.
    */
-  constructor(origin: string, token: string, opts: { base?: string } = {}) {
+  constructor(origin: string, token: string, opts: { base?: string; prefix?: string } = {}) {
     this.origin = origin;
     this.token = token;
-    this.base = opts.base ? opts.base.replace(/\/*$/, '/') : sentinelPublicBase(origin);
-    this.entryUrl = sentinelEntryUrl(origin);
+    const prefix = opts.prefix ?? '';
+    this.base = opts.base ? opts.base.replace(/\/*$/, '/') : sentinelPublicBase(origin, prefix);
+    this.entryUrl = sentinelEntryUrl(origin, prefix);
   }
 
   /** Cache key — a new client is built whenever origin/token change. */

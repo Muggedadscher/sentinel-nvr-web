@@ -305,8 +305,11 @@ export function CameraPage(p: CameraPageProps) {
     setClipEdge(null);
     setLoadError(false);
     loading.current.clear();
-    if (startAt) c.posterEvent(posterTs || startAt);
-    else {
+    // a stored event frame exists only for an event (posterTs = `ev` of the link); a time-only link (`at` from "Open in
+    // Sentinel", "Open in Safari", a reload) asked api/evframe for `at` and got a 404
+    if (startAt) {
+      if (posterTs) c.posterEvent(posterTs);
+    } else {
       c.posterFromSnapshot(lastTileSnapshot(camId));
       // live needs no clips: start it now instead of after the day loads (two api/clips answers, several hundred KB on a
       // phone — the grey stage waited for them). Only the MSE-live fallback reads the codec from the clips: a fallback
@@ -347,7 +350,7 @@ export function CameraPage(p: CameraPageProps) {
     deepRef.current = key;
     const c = ctl.current;
     c.freezeCurrent();
-    c.posterEvent(posterTs || startAt);
+    if (posterTs) c.posterEvent(posterTs);
     goToDay(dayOf(startAt), startAt).catch(() => setLoadError(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startAt, posterTs]);
