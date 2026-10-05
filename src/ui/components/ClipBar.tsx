@@ -374,6 +374,7 @@ export function ClipBar(p: ClipBarProps) {
     note = { text: t('nvr.clip.endsAt', { time: fmtClipTime(hints.endsAt, locale) }), tone: 'info' };
   else if (hints.gaps) note = { text: t('nvr.clip.gaps'), tone: 'info' };
 
+  const lenText = t('nvr.clip.length', { d: clipLength(p.range) });
   const ready = job.s === 'ready' || job.s === 'loading' ? job : null;
   const fileUrl = ready ? client.exportFileUrl(ready.id) : '';
   let state: string | null = null;
@@ -470,20 +471,26 @@ export function ClipBar(p: ClipBarProps) {
           <X size={16} />
         </button>
       </div>
-      <div className="nvr-clipbar__note" role="status">
-        <span className="nvr-clipbar__len nvr-data">{t('nvr.clip.length', { d: clipLength(p.range) })}</span>
-        {state && (
-          <>
-            {' · '}
-            <span className="nvr-clipbar__state">{state}</span>
-          </>
-        )}
-        {note && (
-          <>
-            {' · '}
-            <span className={note.tone === 'bad' ? 'nvr-clipbar__bad' : undefined}>{note.text}</span>
-          </>
-        )}
+      <div
+        className={'nvr-clipbar__note' + (note?.tone === 'bad' ? ' nvr-clipbar__note--bad' : '')}
+        title={[lenText, state, note?.text].filter(Boolean).join(' · ')}
+      >
+        {/* the length changes with every scroll step of an edge: outside the live region (never read out each time) */}
+        <span className="nvr-clipbar__len nvr-data">{lenText}</span>
+        <span role="status">
+          {state && (
+            <>
+              {' · '}
+              <span className="nvr-clipbar__state">{state}</span>
+            </>
+          )}
+          {note && (
+            <>
+              {' · '}
+              <span className={note.tone === 'bad' ? 'nvr-clipbar__bad' : undefined}>{note.text}</span>
+            </>
+          )}
+        </span>
       </div>
       {pct != null && (
         <div className="nvr-clipbar__prog" aria-hidden="true">

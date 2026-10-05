@@ -1632,6 +1632,10 @@
 .nvr-clipbar__close {
   margin-left: auto;
 }
+/* clip mode hides the date chip: the live pill moves down to its place (else it covers the LIVE chip / a marker) */
+.nvr-cam__right--clip .nvr-vtl .livejump {
+  bottom: 10px;
+}
 .nvr-clipbar__note {
   font-size: 0.76rem;
   line-height: 1.35;
@@ -1770,7 +1774,11 @@
   .nvr-cam__body.nvr-cam__body--clip {
     --stage-maxh: 28vh;
   }
-  .nvr-cam__right--clip .nvr-filters {
+  /* … and neither tabs, class filters nor the info bar (the clip bar has its own close button; a smaller picture
+     would crush the info bar's title, the page header names the camera) */
+  .nvr-cam__right--clip .nvr-filters,
+  .nvr-cam__right--clip .nvr-tabs,
+  .nvr-cam__body--clip .nvr-stage-bar {
     display: none;
   }
   .nvr-clipbar {
@@ -1789,6 +1797,12 @@
   .nvr-clipbar__note {
     font-size: 0.74rem;
     line-height: 1.3;
+  }
+  /* one line (the full text is the title / read out); an error keeps all its lines */
+  .nvr-clipbar__note:not(.nvr-clipbar__note--bad) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 

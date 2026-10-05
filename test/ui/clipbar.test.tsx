@@ -524,6 +524,14 @@ describe('ClipBar', () => {
     expect(q('.nvr-clipbar__note')?.textContent).toContain('nvr.clip.failed');
   });
 
+  it('the length is outside the live region (an edge scroll is not read out at every step)', async () => {
+    await bar(makeClient());
+    const live = div.querySelector('.nvr-clipbar [role="status"]') as HTMLElement;
+    expect(live).toBeTruthy();
+    expect(live.querySelector('.nvr-clipbar__len')).toBeNull();
+    expect(q('.nvr-clipbar__note')?.getAttribute('title')).toContain('nvr.clip.length');
+  });
+
   it('the chips read "From 12:00:00" (label and time apart)', async () => {
     await bar(makeClient());
     const c = div.querySelector('.nvr-clipchip') as HTMLElement;
