@@ -615,7 +615,7 @@ export function CameraPage(p: CameraPageProps) {
   return (
     <div className="nvr-cam">
       {header}
-      <div className="nvr-cam__body" ref={body}>
+      <div className={'nvr-cam__body' + (clip ? ' nvr-cam__body--clip' : '')} ref={body}>
         <div className="nvr-cam__left">
           <div className="nvr-card nvr-stage-card">
             <div className="nvr-stage-wrap">

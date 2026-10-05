@@ -1627,8 +1627,6 @@
   outline-offset: 2px;
 }
 .nvr-clipbar__len {
-  font-size: 0.76rem;
-  color: var(--text-dim);
   white-space: nowrap;
 }
 .nvr-clipbar__close {
@@ -1767,6 +1765,17 @@
   .nvr-filters {
     padding: 0.3rem 0.4rem;
     min-height: 30px;
+  }
+  /* clip mode on a phone: the timeline needs the room (the edges are set on it) — a smaller picture, no class filters */
+  .nvr-cam__body.nvr-cam__body--clip {
+    --stage-maxh: 28vh;
+  }
+  .nvr-cam__right--clip .nvr-filters {
+    display: none;
+  }
+  .nvr-clipbar {
+    gap: 0.3rem;
+    padding: 0.4rem 0.5rem 0.5rem;
   }
 }
 

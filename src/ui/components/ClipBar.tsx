@@ -449,7 +449,6 @@ export function ClipBar(p: ClipBarProps) {
       <div className="nvr-clipbar__row">
         {chip('from')}
         {chip('to')}
-        <span className="nvr-clipbar__len nvr-data">{t('nvr.clip.length', { d: clipLength(p.range) })}</span>
         <button
           type="button"
           className="nvr-iconbtn nvr-clipbar__close"
@@ -459,13 +458,21 @@ export function ClipBar(p: ClipBarProps) {
           <X size={16} />
         </button>
       </div>
-      {(state || note) && (
-        <div className="nvr-clipbar__note" role="status">
-          {state && <span className="nvr-clipbar__state">{state}</span>}
-          {state && note && ' · '}
-          {note && <span className={note.tone === 'bad' ? 'nvr-clipbar__bad' : undefined}>{note.text}</span>}
-        </div>
-      )}
+      <div className="nvr-clipbar__note" role="status">
+        <span className="nvr-clipbar__len nvr-data">{t('nvr.clip.length', { d: clipLength(p.range) })}</span>
+        {state && (
+          <>
+            {' · '}
+            <span className="nvr-clipbar__state">{state}</span>
+          </>
+        )}
+        {note && (
+          <>
+            {' · '}
+            <span className={note.tone === 'bad' ? 'nvr-clipbar__bad' : undefined}>{note.text}</span>
+          </>
+        )}
+      </div>
       {pct != null && (
         <div className="nvr-clipbar__prog" aria-hidden="true">
           <i style={{ width: `${pct}%` }} />
