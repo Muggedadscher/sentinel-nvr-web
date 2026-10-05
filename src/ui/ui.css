@@ -398,6 +398,12 @@
 .nvr-strip__time {
   font-size: 0.7rem;
   color: var(--text-faint);
+  max-width: 100%;
+  text-align: center;
+}
+.nvr-strip__day,
+.nvr-strip__clock {
+  white-space: nowrap;
 }
 @media (max-width: 899px) {
   .nvr-strip__item,
@@ -479,6 +485,10 @@
 .nvr-camtile__dot--off {
   background: var(--text-faint);
   box-shadow: none;
+}
+/* a badge sits top left: the name pill keeps clear of it */
+.nvr-camtile--badged .nvr-camtile__name {
+  max-width: calc(50% - 18px);
 }
 .nvr-camtile__offline {
   position: absolute;

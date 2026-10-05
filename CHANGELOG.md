@@ -13,6 +13,29 @@ are listed in the README compatibility table.
   is the player state's playhead (updated with every `timeupdate`, about 4× a second; in pause the paused frame).
   Tests in `test/ui/camerapage-position.test.tsx`.
 
+## 0.16.10 — 2026-10-05
+
+- Recording that hangs is shown: a camera tile says "Recording stalled" (badge top left, recording dot grey) and the
+  status pill counts it ("1 recording stalled", next to "N cameras offline" when both happen). Until now such a
+  camera looked healthy — the plugin only reported whether its ffmpeg was running, not whether it still wrote
+  segments. The plugin's new recording watchdog (server ≥ 2026-10-05) restarts an ffmpeg that wrote no segment for
+  3 minutes and sends `stalled: true` in `api/cameras` until a segment arrives again; it outranks `online: false`
+  during that restart, so the tile does not flicker to "Offline". A hanging camera counts as online in the hero
+  (its own count is the pill). New `sentinelRecordingState(cam)` (`off`/`stalled`/`offline`/`ok`) in `/api` for host
+  cards; texts `nvr.hero.stalled`, `nvr.cameras.stalled`, `nvr.cameras.stalledHint` in all 7 languages. Older
+  servers send no `stalled`: nothing changes there. Tests in `test/ui/camera-status.test.tsx`.
+
+## 0.16.9 — 2026-10-05
+
+- Overview events strip: since the plugin's `api/recent-events` returns the last 24 h, the strip held events from yesterday
+  evening that looked exactly like today's — "19:41" with nothing to tell them apart but the order. Events before the
+  viewer's local midnight now carry the locale's word for yesterday in front of the time ("gestern 19:41",
+  "yesterday 07:41 PM", "i går 19:41"; from `Intl.RelativeTimeFormat`, no new dictionary keys), older ones a short
+  date ("3.10. 19:41"); today's stay time only. The accessible label says the same. Word and clock never break inside;
+  only where both don't fit on one line — English at 107/96 px — the clock moves to a second line under the word.
+  Calendar days of the viewer's time zone (DST days count as one day). `fmtDayPrefix(ts, locale, now)` in `api/format.ts`;
+  tests in `test/ui/events-strip.test.tsx`.
+
 ## 0.16.8 — 2026-10-04
 
 - Camera page: the number in the "Events (N)" tab counts only the day centred in the timeline (the date chip's day).
