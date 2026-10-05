@@ -4,6 +4,15 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.16.11 — 2026-10-05
+
+- Camera page: `header` and `externalUrl` may now be functions of the playback position (`at` in ms, `undefined` while
+  live; plain values work as before). A host link built with `sentinelTimelineLink(origin, id, at)` then opens Sentinel
+  at the moment on screen — HAPulse's "Open in Sentinel" button opened the camera live since the camera page moved into
+  the package (22.09.), and so did "Open in Safari" in the Picture-in-Picture note of a Home-Screen app. The position
+  is the player state's playhead (updated with every `timeupdate`, about 4× a second; in pause the paused frame).
+  Tests in `test/ui/camerapage-position.test.tsx`.
+
 ## 0.16.10 — 2026-10-05
 
 - Recording that hangs is shown: a camera tile says "Recording stalled" (badge top left, recording dot grey) and the

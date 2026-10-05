@@ -91,13 +91,15 @@ export interface CameraPageProps {
   brand: string;
   /** media elements load with CORS (a cross-origin host needs it for canvas snapshots) */
   crossOrigin?: boolean | undefined;
-  /** rendered above the two columns — the host's page header (see `CameraTitle`) */
-  header?: ReactNode;
+  /** rendered above the two columns — the host's page header (see `CameraTitle`). As a function it gets the playback
+   *  position (`at`, ms; `undefined` while live), e.g. for a link that opens this camera at the same moment elsewhere. */
+  header?: ReactNode | ((at: number | undefined) => ReactNode);
   /** the host wraps the date picker in its own modal primitive */
   renderDatePicker: (req: DatePickerRequest) => ReactNode;
   /** This camera outside the app (Sentinel's public entry, no token). Offered as "open in Safari" when a Home-Screen
-   *  web app on iPhone/iPad cannot do Picture-in-Picture (Apple blocks it there; Safari allows it). */
-  externalUrl?: string | undefined;
+   *  web app on iPhone/iPad cannot do Picture-in-Picture (Apple blocks it there; Safari allows it). As a function it
+   *  gets the playback position like `header` (`sentinelTimelineLink(origin, id, at)`), so Safari continues there. */
+  externalUrl?: string | ((at: number | undefined) => string) | undefined;
 }
 
 /** Host header row: back button + camera name (+ host actions on the right). Same metrics in every host. */
@@ -484,10 +486,14 @@ export function CameraPage(p: CameraPageProps) {
   const statusText = stageStatus(ps, t, locale, loadError);
   const nav = dateChipNav(centerDay, oldestAllowed);
   const cors = p.crossOrigin ? 'anonymous' : undefined;
+  // playback position for the host's links (state is re-emitted on every timeupdate, ~4×/s); live = no position
+  const at = !ps.live && ps.playhead != null ? ps.playhead : undefined;
+  const header = typeof p.header === 'function' ? p.header(at) : p.header;
+  const externalUrl = typeof p.externalUrl === 'function' ? p.externalUrl(at) : p.externalUrl;
 
   return (
     <div className="nvr-cam">
-      {p.header}
+      {header}
       <div className="nvr-cam__body" ref={body}>
         <div className="nvr-cam__left">
           <div className="nvr-card nvr-stage-card">
@@ -577,13 +583,15 @@ export function CameraPage(p: CameraPageProps) {
             {pipNote && (
               <div className="nvr-pipnote" role="status">
                 <span>{t(pipNote === 'homescreen' ? 'nvr.player.pipHomeScreen' : 'nvr.player.pipUnsupported')}</span>
-                {pipNote === 'homescreen' && p.externalUrl && (
+                {pipNote === 'homescreen' && externalUrl && (
                   <a
                     className="nvr-pipnote__open"
-                    href={outsideAppHref(p.externalUrl)}
+                    href={outsideAppHref(externalUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={() => rlog('pip-outside', { href: outsideAppHref(p.externalUrl!).split(':')[0] })}
+                    onClick={() =>
+                      rlog('pip-outside', { href: outsideAppHref(externalUrl).split(':')[0], at: at != null })
+                    }
                   >
                     {t('nvr.player.openInSafari')}
                   </a>
