@@ -164,10 +164,10 @@
   "nvr.clip.gaps": "Les interruptions de l’enregistrement sont ignorées",
   "nvr.clip.endsAt": "Se termine à {time} (pas encore enregistré)",
   "nvr.clip.streamChange": "Les réglages de la caméra changent à {time} – choisissez une période plus courte",
-  "nvr.clip.busy": "Un export est déjà en cours – réessayez dans un instant",
-  "nvr.clip.noSpace": "Pas assez d’espace sur le serveur pour le clip",
-  "nvr.clip.failed": "Le clip n’a pas pu être créé",
-  "nvr.clip.oldServer": "Ce serveur Sentinel ne sait pas encore créer de clips",
-  "nvr.clip.eventRunning": "Événement encore en cours – le clip se termine maintenant",
+  "nvr.clip.busy": "Une exportation est déjà en cours – réessayez dans un instant",
+  "nvr.clip.noSpace": "Pas assez d’espace pour le clip sur le serveur",
+  "nvr.clip.failed": "Impossible de créer le clip",
+  "nvr.clip.oldServer": "Ce serveur Sentinel ne peut pas encore créer de clips",
+  "nvr.clip.eventRunning": "Événement en cours – le clip se termine maintenant",
   "nvr.clip.tooLarge": "Trop volumineux pour être partagé ici – enregistrez-le dans Safari"
 }

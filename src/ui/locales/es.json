@@ -148,7 +148,7 @@
   "nvr.clip.from": "Desde",
   "nvr.clip.to": "Hasta",
   "nvr.clip.length": "Duración {d}",
-  "nvr.clip.edgeHint": "Mueve la línea de tiempo – la línea fija el borde",
+  "nvr.clip.edgeHint": "Desplaza la línea de tiempo: la línea fija el límite",
   "nvr.clip.create": "Crear clip",
   "nvr.clip.preparing": "Preparando … {pct} %",
   "nvr.clip.loading": "Cargando …",
@@ -161,13 +161,13 @@
   "nvr.clip.expired": "El clip ha caducado",
   "nvr.clip.tooLong": "Como máximo {max} min",
   "nvr.clip.noRecording": "No hay grabación en este intervalo",
-  "nvr.clip.gaps": "Se omiten los huecos de la grabación",
+  "nvr.clip.gaps": "Los huecos de la grabación se omiten",
   "nvr.clip.endsAt": "Termina a las {time} (aún no grabado)",
-  "nvr.clip.streamChange": "La configuración de la cámara cambia a las {time} – elige un intervalo más corto",
-  "nvr.clip.busy": "Ya hay una exportación en curso – inténtalo de nuevo en un momento",
+  "nvr.clip.streamChange": "La configuración de la cámara cambia a las {time}: elige un intervalo más corto",
+  "nvr.clip.busy": "Ya hay una exportación en curso; inténtalo de nuevo en un momento",
   "nvr.clip.noSpace": "No hay espacio para el clip en el servidor",
   "nvr.clip.failed": "No se pudo crear el clip",
   "nvr.clip.oldServer": "Este servidor Sentinel aún no puede crear clips",
-  "nvr.clip.eventRunning": "El evento sigue en curso – el clip termina ahora",
-  "nvr.clip.tooLarge": "Demasiado grande para compartir aquí – guárdalo en Safari"
+  "nvr.clip.eventRunning": "El evento sigue en curso: el clip termina ahora",
+  "nvr.clip.tooLarge": "Demasiado grande para compartir aquí: guárdalo en Safari"
 }

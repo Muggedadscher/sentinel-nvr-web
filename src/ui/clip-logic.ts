@@ -24,6 +24,8 @@ export const CLIP_GAP_MS = 2_000;
 export const CLIP_SHARE_MAX = 100 * 1024 * 1024;
 /** Status poll interval of a running export. */
 export const CLIP_POLL_MS = 700;
+/** A running job whose status could not be read for this long is given up (server gone, network lost). */
+export const CLIP_POLL_GIVEUP_MS = 60_000;
 
 export interface ClipRange {
   from: number;

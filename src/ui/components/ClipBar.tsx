@@ -16,6 +16,7 @@ import { humanBytes } from '../format';
 import { isIosHomeScreenApp, outsideAppHref } from '../outside';
 import {
   CLIP_MAX_MS,
+  CLIP_POLL_GIVEUP_MS,
   CLIP_POLL_MS,
   clipErrorKind,
   clipHints,
@@ -118,19 +119,19 @@ export function ClipBar(p: ClipBarProps) {
     };
   }, [cancelRunning, release]);
 
-  // a new range makes a finished clip or an error stale (a running job keeps running: the chips are locked meanwhile)
+  // a new range makes every job stale: a running one is cancelled on the server (the chips are locked meanwhile, but
+  // another event's download button still sets a new range), a finished clip or an error is dropped
   const rangeKey = `${p.range.from}|${p.range.to}`;
   const lastKey = useRef(rangeKey);
   useEffect(() => {
     if (lastKey.current === rangeKey) return;
     lastKey.current = rangeKey;
-    const j = jobRef.current;
-    if (j.s === 'ready' || j.s === 'error' || j.s === 'loading') {
-      gen.current++;
-      release();
-      setJob({ s: 'idle' });
-    }
-  }, [rangeKey, release, setJob]);
+    if (jobRef.current.s === 'idle') return;
+    cancelRunning();
+    gen.current++; // also drops a POST still on its way (`create` cancels the job it answers)
+    release();
+    setJob({ s: 'idle' });
+  }, [rangeKey, cancelRunning, release, setJob]);
 
   const fail = useCallback(
     (kind: ClipErrorKind, vars?: Record<string, string | number>, extra?: Record<string, unknown>) => {
@@ -147,8 +148,12 @@ export function ClipBar(p: ClipBarProps) {
       const kind = clipErrorKind(st, code);
       const vars: Record<string, string | number> = {};
       if (kind === 'tooLong') vars.max = Math.round(Number(body?.maxMs ?? CLIP_MAX_MS) / 60_000);
-      if (kind === 'streamChange' && typeof body?.at === 'number') vars.time = fmtClipTime(body.at, locale);
-      fail(kind, vars, { status: st, code });
+      let k = kind;
+      if (kind === 'streamChange') {
+        if (typeof body?.at === 'number') vars.time = fmtClipTime(body.at, locale);
+        else k = 'failed'; // without the time the text would show a bare "{time}"
+      }
+      fail(k, vars, { status: st, code });
     },
     [fail, locale],
   );
@@ -200,6 +205,7 @@ export function ClipBar(p: ClipBarProps) {
     const g = gen.current;
     let timer = 0;
     let busy = false;
+    let lastOk = Date.now();
     const poll = async () => {
       if (busy || g !== gen.current) return;
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
@@ -207,6 +213,7 @@ export function ClipBar(p: ClipBarProps) {
       try {
         const st = await client.exportStatus(running);
         if (g !== gen.current || !alive.current) return;
+        lastOk = Date.now();
         const j = jobRef.current;
         if (j.s !== 'running') return;
         if (st.state === 'running') setJob({ ...j, pct: Math.max(0, Math.min(1, st.progress || 0)) });
@@ -229,10 +236,14 @@ export function ClipBar(p: ClipBarProps) {
         }
       } catch (e) {
         if (g !== gen.current || !alive.current) return;
-        // a lost poll is retried; a job the server forgot (restart) is over
-        if (e instanceof SentinelHttpError && e.status === 404) {
+        // a lost poll is retried; a job the server forgot (restart), a refused login or a minute without an answer
+        // ends the wait (the job is cancelled on the server as far as it can still be reached)
+        const status = e instanceof SentinelHttpError ? e.status : 0;
+        if (status === 404 || status === 401 || status === 403 || Date.now() - lastOk > CLIP_POLL_GIVEUP_MS) {
           window.clearInterval(timer);
-          fail('failed', undefined, { code: e.code });
+          if (status !== 404) void client.cancelExport(running);
+          gen.current++;
+          fail('failed', undefined, { status, code: e instanceof SentinelHttpError ? e.code : undefined });
         }
       } finally {
         busy = false;
@@ -327,16 +338,18 @@ export function ClipBar(p: ClipBarProps) {
     const ts = e === 'from' ? p.range.from : p.range.to;
     const active = p.edge === e;
     const bad = e === 'to' && hints.tooLong;
+    const k = t(e === 'from' ? 'nvr.clip.from' : 'nvr.clip.to');
+    const v = fmtClipTime(ts, locale);
     return (
       <button
         type="button"
         className={'nvr-clipchip' + (active ? ' nvr-clipchip--active' : '') + (bad ? ' nvr-clipchip--bad' : '')}
         aria-pressed={active}
+        aria-label={`${k} ${v}`}
         disabled={busy}
         onClick={() => p.onEdge(active ? null : e)}
       >
-        <span className="nvr-clipchip__k">{t(e === 'from' ? 'nvr.clip.from' : 'nvr.clip.to')}</span>
-        <span className="nvr-clipchip__v nvr-data">{fmtClipTime(ts, locale)}</span>
+        <span className="nvr-clipchip__k">{k}</span> <span className="nvr-clipchip__v nvr-data">{v}</span>
       </button>
     );
   };
@@ -355,11 +368,10 @@ export function ClipBar(p: ClipBarProps) {
   else if (hints.tooLong) note = { text: t('nvr.clip.tooLong', { max: CLIP_MAX_MS / 60_000 }), tone: 'bad' };
   else if (hints.noRecording) note = { text: t('nvr.clip.noRecording'), tone: 'bad' };
   else if (p.edge) note = { text: t('nvr.clip.edgeHint'), tone: 'info' };
+  // a running event: its range was already cut to "now − 10 s" (no endsAt), the clip ends now
+  else if (p.open) note = { text: t('nvr.clip.eventRunning'), tone: 'info' };
   else if (hints.endsAt != null)
-    note = {
-      text: p.open ? t('nvr.clip.eventRunning') : t('nvr.clip.endsAt', { time: fmtClipTime(hints.endsAt, locale) }),
-      tone: 'info',
-    };
+    note = { text: t('nvr.clip.endsAt', { time: fmtClipTime(hints.endsAt, locale) }), tone: 'info' };
   else if (hints.gaps) note = { text: t('nvr.clip.gaps'), tone: 'info' };
 
   const ready = job.s === 'ready' || job.s === 'loading' ? job : null;

@@ -413,6 +413,124 @@ describe('ClipBar', () => {
     expect(client.startExport).toHaveBeenCalledTimes(2);
   });
 
+  it('a new range while the job runs (another event) cancels it and offers Create for the new range', async () => {
+    const client = makeClient({
+      startExport: vi.fn(() => Promise.resolve(START())),
+      exportStatus: vi.fn(() => Promise.resolve({ id: 'job1', state: 'running', progress: 0.3, filename: 'Cam.mp4' })),
+    });
+    const r1 = { from: now0() - 10 * MIN, to: now0() - 9 * MIN };
+    const el = (range: typeof r1) => (
+      <SentinelUiProvider value={{ client, t: t as any, locale: 'de-DE', nav: { openCamera: () => {} } }}>
+        <ClipBar camId="33" range={range} edge={null} clips={recClips()} onEdge={() => {}} onClose={() => {}} />
+      </SentinelUiProvider>
+    );
+    await bar(client, r1);
+    await click(btn('nvr.clip.create'));
+    expect(btn('nvr.clip.cancel')).toBeTruthy();
+    await act(async () => root!.render(el({ from: r1.from - 5 * MIN, to: r1.to - 5 * MIN })));
+    expect(client.cancelExport).toHaveBeenCalledWith('job1');
+    expect(btn('nvr.clip.create')).toBeTruthy();
+    expect(q('.nvr-clipbar__note')?.textContent).not.toContain('nvr.clip.preparing');
+    // late status answers of the old job change nothing
+    await act(async () => {
+      await wait(800);
+    });
+    expect(btn('nvr.clip.save')).toBeUndefined();
+  });
+
+  it('a range change while the POST is on its way cancels the job it answers', async () => {
+    let resolve: (v: unknown) => void = () => {};
+    const client = makeClient({ startExport: vi.fn(() => new Promise((r) => (resolve = r))) });
+    const r1 = { from: now0() - 10 * MIN, to: now0() - 9 * MIN };
+    await bar(client, r1);
+    await click(btn('nvr.clip.create'));
+    await act(async () =>
+      root!.render(
+        <SentinelUiProvider value={{ client, t: t as any, locale: 'de-DE', nav: { openCamera: () => {} } }}>
+          <ClipBar
+            camId="33"
+            range={{ from: r1.from - MIN, to: r1.to }}
+            edge={null}
+            clips={recClips()}
+            onEdge={() => {}}
+            onClose={() => {}}
+          />
+        </SentinelUiProvider>,
+      ),
+    );
+    await act(async () => resolve(START({ id: 'late' })));
+    expect(client.cancelExport).toHaveBeenCalledWith('late');
+    expect(btn('nvr.clip.create')).toBeTruthy();
+  });
+
+  it('a running event says so (its range ends at now − 10 s, no "ends at")', async () => {
+    const n = now0();
+    await render(
+      <ClipBar
+        camId="33"
+        range={{ from: n - 2 * MIN, to: n - 10_000 }}
+        open
+        edge={null}
+        clips={recClips()}
+        onEdge={() => {}}
+        onClose={() => {}}
+      />,
+      makeClient(),
+    );
+    expect(q('.nvr-clipbar__note')?.textContent).toContain('nvr.clip.eventRunning');
+  });
+
+  it('a refused login while polling ends the wait (no endless "Preparing")', async () => {
+    const client = makeClient({
+      startExport: vi.fn(() => Promise.resolve(START())),
+      exportStatus: vi.fn(() => Promise.reject(new SentinelHttpError(401, 'api/export-status'))),
+    });
+    await bar(client);
+    await click(btn('nvr.clip.create'));
+    await act(async () => {
+      await wait(800);
+    });
+    expect(q('.nvr-clipbar__note')?.textContent).toContain('nvr.clip.failed');
+    expect(client.cancelExport).toHaveBeenCalledWith('job1');
+    expect(client.exportStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it('a lost poll is retried (no error for a single network failure)', async () => {
+    let n = 0;
+    const client = makeClient({
+      startExport: vi.fn(() => Promise.resolve(START())),
+      exportStatus: vi.fn(() =>
+        n++ === 0
+          ? Promise.reject(new SentinelHttpError(0, 'api/export-status'))
+          : Promise.resolve({ id: 'job1', state: 'running', progress: 0.5, filename: 'Cam.mp4' }),
+      ),
+    });
+    await bar(client);
+    await click(btn('nvr.clip.create'));
+    await act(async () => {
+      await wait(1500);
+    });
+    expect(q('.nvr-clipbar__note')?.textContent).toContain('nvr.clip.preparing{"pct":50}');
+  });
+
+  it('409 stream change without a time: the general error, never a bare "{time}"', async () => {
+    const client = makeClient({
+      startExport: vi.fn(() =>
+        Promise.reject(new SentinelHttpError(409, 'p', 'stream change', { error: 'stream change' })),
+      ),
+    });
+    await bar(client);
+    await click(btn('nvr.clip.create'));
+    expect(q('.nvr-clipbar__note')?.textContent).toContain('nvr.clip.failed');
+  });
+
+  it('the chips read "From 12:00:00" (label and time apart)', async () => {
+    await bar(makeClient());
+    const c = div.querySelector('.nvr-clipchip') as HTMLElement;
+    expect(c.getAttribute('aria-label')).toMatch(/^nvr\.clip\.from \d\d:\d\d:\d\d$/);
+    expect(c.textContent).toMatch(/^nvr\.clip\.from \d\d:\d\d:\d\d$/);
+  });
+
   it('a failed job shows "could not be created"', async () => {
     const client = makeClient({
       startExport: vi.fn(() => Promise.resolve(START())),
