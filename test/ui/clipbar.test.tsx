@@ -554,6 +554,96 @@ describe('ClipBar', () => {
     expect(q('.nvr-clipbar__note')?.textContent).toContain('nvr.clip.failed');
   });
 
+  it('plugin on another origin (HAPulse): the file is loaded into the page, Save is a blob link with download', async () => {
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:xo', revokeObjectURL: vi.fn() }));
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      blob: async () => new Blob([new Uint8Array(10)], { type: 'video/mp4' }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = makeClient({
+      exportFileUrl: (id: string) => `https://nvr.example/endpoint/@local/sentinel-nvr/public/api/export-file?id=${id}`,
+      startExport: vi.fn(() => Promise.resolve(START())),
+      exportStatus: vi.fn(() =>
+        Promise.resolve({
+          id: 'job1',
+          state: 'done',
+          progress: 1,
+          bytes: 150 * 1024 * 1024,
+          filename: 'Cam.mp4',
+          expiresAt: Date.now() + 15 * MIN,
+        }),
+      ),
+    });
+    await bar(client);
+    await click(btn('nvr.clip.create'));
+    await act(async () => {
+      await wait(800);
+    });
+    await act(async () => {
+      await wait(20);
+    });
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toContain('https://nvr.example/');
+    const save = btn('nvr.clip.save') as HTMLAnchorElement;
+    expect(save.tagName).toBe('A');
+    expect(save.getAttribute('href')).toBe('blob:xo');
+    expect(save.getAttribute('download')).toBe('Cam.mp4');
+    expect(save.getAttribute('target')).toBeNull();
+    // over 100 MB: no Share
+    expect(btn('nvr.clip.share')).toBeUndefined();
+  });
+
+  it('another origin above 200 MB: Save opens the file in a new tab (the host page stays), nothing is loaded', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const url = 'https://nvr.example/endpoint/@local/sentinel-nvr/public/api/export-file?id=job1';
+    const client = makeClient({
+      exportFileUrl: () => url,
+      startExport: vi.fn(() => Promise.resolve(START())),
+      exportStatus: vi.fn(() =>
+        Promise.resolve({ id: 'job1', state: 'done', progress: 1, bytes: 250 * 1024 * 1024, filename: 'Cam.mp4' }),
+      ),
+    });
+    await bar(client);
+    await click(btn('nvr.clip.create'));
+    await act(async () => {
+      await wait(800);
+    });
+    const save = btn('nvr.clip.save') as HTMLAnchorElement;
+    expect(save.getAttribute('href')).toBe(url);
+    expect(save.getAttribute('target')).toBe('_blank');
+    expect(save.hasAttribute('download')).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('another origin, loading the file fails: Save falls back to a new tab, never the same tab', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Promise.reject(new TypeError('Load failed'))),
+    );
+    const url = 'https://nvr.example/endpoint/@local/sentinel-nvr/public/api/export-file?id=job1';
+    const client = makeClient({
+      exportFileUrl: () => url,
+      startExport: vi.fn(() => Promise.resolve(START())),
+      exportStatus: vi.fn(() =>
+        Promise.resolve({ id: 'job1', state: 'done', progress: 1, bytes: 1000, filename: 'Cam.mp4' }),
+      ),
+    });
+    await bar(client);
+    await click(btn('nvr.clip.create'));
+    await act(async () => {
+      await wait(800);
+    });
+    await act(async () => {
+      await wait(20);
+    });
+    const save = btn('nvr.clip.save') as HTMLAnchorElement;
+    expect(save.getAttribute('href')).toBe(url);
+    expect(save.getAttribute('target')).toBe('_blank');
+    expect(rlog).toHaveBeenCalledWith('clip', expect.objectContaining({ err: 'prefetch', xo: true }));
+  });
+
   it('Share: the file is loaded first ("Loading …"), then share() runs synchronously inside the tap', async () => {
     const share = vi.fn(() => Promise.resolve());
     vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { canShare: () => true, share }));

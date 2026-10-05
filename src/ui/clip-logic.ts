@@ -22,6 +22,9 @@ export const CLIP_LIVE_MS = 60_000;
 export const CLIP_GAP_MS = 2_000;
 /** Largest file loaded into the page for "Share" / a Home-Screen app (a blob plus its File copy live in the tab). */
 export const CLIP_SHARE_MAX = 100 * 1024 * 1024;
+/** Largest file loaded into the page to SAVE it when the plugin is another origin (a host like HAPulse): `download` is
+ *  ignored across origins, a plain link would navigate the host page away to the video. */
+export const CLIP_BLOB_MAX = 200 * 1024 * 1024;
 /** Status poll interval of a running export. */
 export const CLIP_POLL_MS = 700;
 /** A running job whose status could not be read for this long is given up (server gone, network lost). */
@@ -189,22 +192,49 @@ export function fmtClipTime(ts: number, locale: string): string {
  * - `prefetch`: load the file into the page first (Share needs a fresh user gesture — a fetch after the tap is too late
  *   on WebKit — and a Home-Screen app saves from a blob like the snapshot);
  * - `share`: offer "Share" (`navigator.canShare({files})`), only with a prefetched file;
- * - `save`: 'link' = a link to `api/export-file` (Content-Disposition: attachment), 'blob' = the prefetched file through
- *   `<a download>` (Home-Screen app), 'safari' = too large for the page in a Home-Screen app: open the file in Safari.
+ * - `save`: 'link' = a link to `api/export-file` (Content-Disposition: attachment; same origin), 'blob' = the
+ *   prefetched file through `<a download>` (Home-Screen app; a plugin on another origin up to CLIP_BLOB_MAX), 'tab' =
+ *   another origin, too large for the page: the link opens in a new tab (the server's attachment header saves it there,
+ *   the host page stays), 'safari' = too large for the page in a Home-Screen app: open the file in Safari.
+ *
+ * `crossOrigin`: `api/export-file` is not the page's origin (the package inside a host such as HAPulse). Browsers ignore
+ * `download` across origins and a same-tab link would leave the host for the video file.
  */
 export interface ClipWays {
   prefetch: boolean;
   share: boolean;
-  save: 'link' | 'blob' | 'safari';
+  save: 'link' | 'blob' | 'tab' | 'safari';
 }
-export function clipWays(s: { bytes: number; canShareFiles: boolean; standalone: boolean }): ClipWays {
-  const fits = s.bytes > 0 && s.bytes <= CLIP_SHARE_MAX;
+export function clipWays(s: {
+  bytes: number;
+  canShareFiles: boolean;
+  standalone: boolean;
+  crossOrigin?: boolean;
+}): ClipWays {
+  const known = s.bytes > 0;
+  const fits = known && s.bytes <= CLIP_SHARE_MAX;
   if (s.standalone)
     return fits
       ? { prefetch: true, share: s.canShareFiles, save: 'blob' }
       : { prefetch: false, share: false, save: 'safari' };
+  if (s.crossOrigin)
+    return known && s.bytes <= CLIP_BLOB_MAX
+      ? { prefetch: true, share: fits && s.canShareFiles, save: 'blob' }
+      : { prefetch: false, share: false, save: 'tab' };
   if (fits && s.canShareFiles) return { prefetch: true, share: true, save: 'link' };
   return { prefetch: false, share: false, save: 'link' };
+}
+
+/** `url` is another origin than the page (relative URLs are the page's own). */
+export function isCrossOrigin(
+  url: string,
+  base: string = typeof location !== 'undefined' ? location.href : '',
+): boolean {
+  try {
+    return new URL(url, base).origin !== new URL(base).origin;
+  } catch {
+    return false;
+  }
 }
 
 /** Texts of an export error (`SentinelHttpError` status/code, or the `error` of a failed job). */

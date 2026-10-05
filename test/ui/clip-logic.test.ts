@@ -1,6 +1,7 @@
 /** Clip download rules: event range, proposal, bounds, edges, coverage, hints, delivery way, errors, ambiguous times. */
 import { describe, expect, it } from 'vitest';
 import {
+  CLIP_BLOB_MAX,
   CLIP_MAX_MS,
   CLIP_SHARE_MAX,
   clampClipRange,
@@ -12,6 +13,7 @@ import {
   clipRangeForEvent,
   clipSetEdge,
   clipWays,
+  isCrossOrigin,
 } from '../../src/ui/clip-logic';
 
 const S = 1000,
@@ -201,6 +203,44 @@ describe('clipWays (how the file reaches the viewer)', () => {
       share: false,
       save: 'safari',
     });
+  });
+});
+
+describe('clipWays on another origin (package inside a host such as HAPulse)', () => {
+  const MB = 1024 * 1024;
+  it('up to 200 MB the file is loaded to save it (download is ignored across origins); Share only up to 100 MB', () => {
+    expect(clipWays({ bytes: 20 * MB, canShareFiles: false, standalone: false, crossOrigin: true })).toEqual({
+      prefetch: true,
+      share: false,
+      save: 'blob',
+    });
+    expect(clipWays({ bytes: 20 * MB, canShareFiles: true, standalone: false, crossOrigin: true }).share).toBe(true);
+    expect(clipWays({ bytes: 150 * MB, canShareFiles: true, standalone: false, crossOrigin: true })).toEqual({
+      prefetch: true,
+      share: false,
+      save: 'blob',
+    });
+    expect(clipWays({ bytes: CLIP_BLOB_MAX, canShareFiles: false, standalone: false, crossOrigin: true }).save).toBe(
+      'blob',
+    );
+  });
+  it('above 200 MB or unknown size: a new tab, never the same tab', () => {
+    for (const bytes of [CLIP_BLOB_MAX + 1, 0])
+      expect(clipWays({ bytes, canShareFiles: true, standalone: false, crossOrigin: true })).toEqual({
+        prefetch: false,
+        share: false,
+        save: 'tab',
+      });
+  });
+  it('a Home-Screen app keeps its own rule (blob up to 100 MB, else Safari)', () => {
+    expect(clipWays({ bytes: 150 * MB, canShareFiles: true, standalone: true, crossOrigin: true }).save).toBe('safari');
+  });
+  it('isCrossOrigin', () => {
+    const base = 'https://hapulse.example/nvr/33';
+    expect(isCrossOrigin('https://nvr.example/api/export-file?id=1', base)).toBe(true);
+    expect(isCrossOrigin('/endpoint/@local/sentinel-nvr/api/export-file?id=1', base)).toBe(false);
+    expect(isCrossOrigin('api/export-file?id=1', base)).toBe(false);
+    expect(isCrossOrigin('https://hapulse.example:8443/x', base)).toBe(true);
   });
 });
 
