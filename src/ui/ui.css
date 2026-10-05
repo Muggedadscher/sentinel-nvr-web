@@ -486,6 +486,10 @@
   background: var(--text-faint);
   box-shadow: none;
 }
+/* a badge sits top left: the name pill keeps clear of it */
+.nvr-camtile--badged .nvr-camtile__name {
+  max-width: calc(50% - 18px);
+}
 .nvr-camtile__offline {
   position: absolute;
   top: 10px;

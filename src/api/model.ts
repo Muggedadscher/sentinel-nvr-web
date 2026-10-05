@@ -31,6 +31,11 @@ export interface SentinelCamera {
   name: string;
   recording: boolean;
   online: boolean;
+  /** plugin ≥ 2026-10-05: recording watchdog — ffmpeg ran ≥ 3 min without a new segment and is being restarted; stays set
+   *  (also while the restart is pending, `online` false) until a segment arrives again. */
+  stalled?: boolean;
+  /** plugin ≥ 2026-10-05: since when nothing was recorded (ms) */
+  stalledSince?: number;
   lastSegmentAt?: number;
   eventsToday: number;
   lastEventTs?: number;
@@ -40,9 +45,25 @@ export interface SentinelCamera {
   codecs?: string;
 }
 
+/**
+ * Recording state of a camera tile: `off` = recording switched off, `stalled` = recording hangs (watchdog, outranks
+ * `offline`: during the restart after a stall ffmpeg is briefly down), `offline` = ffmpeg not running (camera
+ * unreachable), `ok` = recording.
+ */
+export type SentinelRecordingState = 'off' | 'stalled' | 'offline' | 'ok';
+
+export function sentinelRecordingState(
+  cam: Pick<SentinelCamera, 'recording' | 'online' | 'stalled'>,
+): SentinelRecordingState {
+  if (!cam.recording) return 'off';
+  if (cam.stalled) return 'stalled';
+  return cam.online ? 'ok' : 'offline';
+}
+
 /** `api/stats`. */
 export interface SentinelStats {
   cameras: number;
+  /** cameras recording right now (plugin ≥ 2026-10-05; before: cameras with recording switched on) */
   recording: number;
   eventsToday: number;
   segments: number;
