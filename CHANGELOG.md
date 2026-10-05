@@ -4,6 +4,18 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.16.10 — 2026-10-05
+
+- Recording that hangs is shown: a camera tile says "Recording stalled" (badge top left, recording dot grey) and the
+  status pill counts it ("1 recording stalled", next to "N cameras offline" when both happen). Until now such a
+  camera looked healthy — the plugin only reported whether its ffmpeg was running, not whether it still wrote
+  segments. The plugin's new recording watchdog (server ≥ 2026-10-05) restarts an ffmpeg that wrote no segment for
+  3 minutes and sends `stalled: true` in `api/cameras` until a segment arrives again; it outranks `online: false`
+  during that restart, so the tile does not flicker to "Offline". A hanging camera counts as online in the hero
+  (its own count is the pill). New `sentinelRecordingState(cam)` (`off`/`stalled`/`offline`/`ok`) in `/api` for host
+  cards; texts `nvr.hero.stalled`, `nvr.cameras.stalled`, `nvr.cameras.stalledHint` in all 7 languages. Older
+  servers send no `stalled`: nothing changes there. Tests in `test/ui/camera-status.test.tsx`.
+
 ## 0.16.8 — 2026-10-04
 
 - Camera page: the number in the "Events (N)" tab counts only the day centred in the timeline (the date chip's day).

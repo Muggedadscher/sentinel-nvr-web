@@ -1,7 +1,7 @@
-/** Camera tiles ("CAMERAS"): fresh snapshot every 5 s → newest segment thumbnail → placeholder; name + recording dot, offline badge, meta. */
+/** Camera tiles ("CAMERAS"): fresh snapshot every 5 s → newest segment thumbnail → placeholder; name + recording dot, offline / recording-stalled badge, meta. */
 import { useEffect, useState, type KeyboardEvent } from 'react';
-import { Camera, WifiOff } from 'lucide-react';
-import type { SentinelCamera } from '../../api';
+import { Camera, VideoOff, WifiOff } from 'lucide-react';
+import { sentinelRecordingState, type SentinelCamera } from '../../api';
 import { useSentinelUi } from '../context';
 import { fmtRelative } from '../format';
 import { rememberTileSnapshot } from '../snapshot-cache';
@@ -31,6 +31,7 @@ function CameraTile({ cam, tick, n }: { cam: SentinelCamera; tick: number; n: nu
         ? client.segmentThumbUrl(cam.latestThumbId)
         : null;
   const open = () => nav.openCamera(cam.id);
+  const rec = sentinelRecordingState(cam);
   const meta = [
     t('nvr.cameras.eventsToday', { count: cam.eventsToday }),
     cam.lastEventTs ? fmtRelative(cam.lastEventTs, t) : null,
@@ -39,7 +40,7 @@ function CameraTile({ cam, tick, n }: { cam: SentinelCamera; tick: number; n: nu
     .join(' · ');
   return (
     <div
-      className="nvr-card nvr-camtile"
+      className={`nvr-card nvr-camtile${rec === 'offline' || rec === 'stalled' ? ' nvr-camtile--badged' : ''}`}
       role="button"
       tabIndex={0}
       onClick={open}
@@ -68,13 +69,20 @@ function CameraTile({ cam, tick, n }: { cam: SentinelCamera; tick: number; n: nu
       <span className="nvr-camtile__name">
         {cam.name}
         {cam.recording && (
-          <i className={`nvr-camtile__dot${cam.online ? '' : ' nvr-camtile__dot--off'}`} aria-hidden="true" />
+          <i className={`nvr-camtile__dot${rec === 'ok' ? '' : ' nvr-camtile__dot--off'}`} aria-hidden="true" />
         )}
       </span>
-      {cam.recording && !cam.online && (
+      {rec === 'offline' && (
         <span className="nvr-camtile__offline">
           <WifiOff size={12} strokeWidth={2.25} />
           {t('nvr.cameras.offline')}
+        </span>
+      )}
+      {rec === 'stalled' && (
+        // ffmpeg runs (or restarts) but writes nothing — the server's watchdog restarts it
+        <span className="nvr-camtile__offline" title={t('nvr.cameras.stalledHint')}>
+          <VideoOff size={12} strokeWidth={2.25} />
+          {t('nvr.cameras.stalled')}
         </span>
       )}
       <span className="nvr-camtile__meta nvr-data">{meta}</span>
