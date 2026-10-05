@@ -8,7 +8,13 @@
  * treats an unreadable reply as delivered; media fetches fall into the next fallback.
  */
 
-import { sentinelPublicBase, sentinelEntryUrl, sentinelUrl } from './model';
+import {
+  sentinelPublicBase,
+  sentinelEntryUrl,
+  sentinelUrl,
+  type SentinelExportStart,
+  type SentinelExportStatus,
+} from './model';
 
 export class SentinelClient {
   readonly origin: string;
@@ -53,8 +59,48 @@ export class SentinelClient {
     // AbortSignal.any is Chrome 116 / Safari 17.4+; older engines get the timeout signal alone.
     const combined = typeof AbortSignal.any === 'function' ? AbortSignal.any(signals) : signals[0]!;
     const r = await fetch(this.url(path), { cache: 'no-store', signal: combined });
-    if (!r.ok) throw new SentinelHttpError(r.status, path);
+    if (!r.ok) throw await httpError(r, path);
     return (await r.json()) as T;
+  }
+
+  /** JSON POST (parameters in the query, no body) with a timeout; 204 resolves `undefined`. Errors like `getJson`,
+   *  a network error as status 0. */
+  async postJson<T>(path: string, timeoutMs = 10_000): Promise<T> {
+    let r: Response;
+    try {
+      r = await fetch(this.url(path), { method: 'POST', cache: 'no-store', signal: timeoutSignal(timeoutMs) });
+    } catch {
+      throw new SentinelHttpError(0, path);
+    }
+    if (!r.ok) throw await httpError(r, path);
+    if (r.status === 204) return undefined as T;
+    return (await r.json()) as T;
+  }
+
+  // ---- clip export (plugin with `features: ["export"]`, its docs/API.md) ----
+  /** Start an export job for [from, to] (ms). `tz` = the viewer's time zone (file name). Rejects with
+   *  `SentinelHttpError` (`code` = the server's `error`: 'bad range', 'no recording', 'too long', 'busy', …). */
+  startExport(cameraId: string, from: number, to: number, tz?: string): Promise<SentinelExportStart> {
+    const q =
+      `api/export?camera=${encodeURIComponent(cameraId)}&from=${Math.round(from)}&to=${Math.round(to)}` +
+      (tz ? `&tz=${encodeURIComponent(tz)}` : '');
+    return this.postJson<SentinelExportStart>(q);
+  }
+  exportStatus(id: string): Promise<SentinelExportStatus> {
+    return this.getJson<SentinelExportStatus>(`api/export-status?id=${encodeURIComponent(id)}`);
+  }
+  /** The finished file (`Content-Disposition: attachment`, Range). */
+  exportFileUrl(id: string): string {
+    return this.url(`api/export-file?id=${encodeURIComponent(id)}`);
+  }
+  /** Stop a running job / drop its file. Best effort: resolves false on any failure. */
+  async cancelExport(id: string): Promise<boolean> {
+    try {
+      await this.postJson<void>(`api/export-cancel?id=${encodeURIComponent(id)}`, 5000);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -116,11 +162,32 @@ export class SentinelClient {
 
 export class SentinelHttpError extends Error {
   readonly status: number;
-  constructor(status: number, path: string) {
-    super(`${status} ${path}`);
+  /** the server's `error` from a JSON error body (e.g. 'busy'); undefined for plain-text answers and network errors */
+  readonly code: string | undefined;
+  /** the whole JSON error body (extra fields like `at` or `maxMs`) */
+  readonly body: Record<string, unknown> | undefined;
+  constructor(status: number, path: string, code?: string, body?: Record<string, unknown>) {
+    super(`${status} ${path}${code ? ` (${code})` : ''}`);
     this.name = 'SentinelHttpError';
     this.status = status;
+    this.code = code;
+    this.body = body;
   }
+}
+
+/** Error for a non-ok answer: reads `{error}` when the body is JSON (the export routes), else the status only. */
+async function httpError(r: Response, path: string): Promise<SentinelHttpError> {
+  let body: Record<string, unknown> | undefined;
+  try {
+    if ((r.headers.get('content-type') || '').includes('json')) {
+      const j: unknown = await r.json();
+      if (j && typeof j === 'object' && !Array.isArray(j)) body = j as Record<string, unknown>;
+    }
+  } catch {
+    /* not JSON after all */
+  }
+  const code = typeof body?.error === 'string' ? body.error : undefined;
+  return new SentinelHttpError(r.status, path, code, body);
 }
 
 /**

@@ -77,6 +77,8 @@ export interface SentinelStats {
   storageOk?: boolean;
   /** why not: 'marker' (share not mounted), 'missing', 'error', 'timeout' */
   storageProblem?: string;
+  /** optional server features (plugin ≥ 2026-10-06: `"export"` = clip export, `api/export*`) */
+  features?: string[];
 }
 
 /** `api/recent-events` entry (short form). */
@@ -134,6 +136,49 @@ export interface SentinelClipsResponse {
   events: SentinelEvent[];
   motion: [number, number][];
   codecs?: string;
+  /** optional server features (plugin ≥ 2026-10-06: `"export"` = clip export, `api/export*`) */
+  features?: string[];
+}
+
+/** A server answer (`api/clips`, `api/stats`) announces `feature` — older plugins send no `features` at all. */
+export function sentinelHasFeature(
+  r: { features?: string[] | undefined } | null | undefined,
+  feature: string,
+): boolean {
+  return Array.isArray(r?.features) && r.features.includes(feature);
+}
+
+/** `POST api/export` (202): a clip export job was started. Times in ms; `from`/`to` as the server cut them (`from` raised
+ *  to the oldest recording, `to` lowered to "now − 10 s" = `clipped`). */
+export interface SentinelExportStart {
+  id: string;
+  camera: string;
+  from: number;
+  to: number;
+  /** `to` was lowered: the end was not recorded yet */
+  clipped: boolean;
+  /** length of the clip without the gaps */
+  durationMs: number;
+  segments: number;
+  /** recording gaps inside the range (skipped in the clip) */
+  gaps: [number, number][];
+  estBytes: number;
+  filename: string;
+}
+
+export type SentinelExportState = 'running' | 'done' | 'failed' | 'cancelled';
+
+/** `GET api/export-status`. */
+export interface SentinelExportStatus {
+  id: string;
+  state: SentinelExportState;
+  /** 0 … 1 */
+  progress: number;
+  bytes?: number;
+  filename: string;
+  error?: string;
+  /** done: the file is deleted after this (ms) */
+  expiresAt?: number;
 }
 
 export const SENTINEL_DAY_MS = 24 * 60 * 60 * 1000;
