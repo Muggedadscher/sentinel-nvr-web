@@ -10,6 +10,21 @@ export function fmtTime(ts: number, locale: string): string {
   return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(ts);
 }
 
+/**
+ * Day in front of a time where "HH:MM" alone is ambiguous: '' on the viewer's today (and for a clock running a bit
+ * ahead), the locale's word for yesterday ("gestern", "yesterday", "i går" — Intl, no dictionary key), else a short
+ * numeric date ("3.10.", "10/3"). Calendar days of the viewer's time zone, so DST days (23/25 h) count as one day.
+ */
+export function fmtDayPrefix(ts: number, locale: string, now: number = Date.now()): string {
+  const day = new Date(ts).setHours(0, 0, 0, 0);
+  const today = new Date(now).setHours(0, 0, 0, 0);
+  if (day >= today) return '';
+  const y = new Date(today);
+  y.setDate(y.getDate() - 1);
+  if (day === y.getTime()) return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(-1, 'day');
+  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric' }).format(ts);
+}
+
 /** HH:MM:SS. */
 export function fmtTimeSec(ts: number, locale: string): string {
   return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(ts);

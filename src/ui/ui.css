@@ -398,6 +398,12 @@
 .nvr-strip__time {
   font-size: 0.7rem;
   color: var(--text-faint);
+  max-width: 100%;
+  text-align: center;
+}
+.nvr-strip__day,
+.nvr-strip__clock {
+  white-space: nowrap;
 }
 @media (max-width: 899px) {
   .nvr-strip__item,
