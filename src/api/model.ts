@@ -30,7 +30,7 @@ export interface SentinelDetection {
   /** ok | stalled (no frames for > 10 s) | error (also: engine hangs) | no-engine (camera's own detector or motion only)
    *  | off (detection or recording switched off) */
   state: 'ok' | 'stalled' | 'error' | 'no-engine' | 'off';
-  /** engine | camera | motion | none — absent when switched off */
+  /** engine | camera | motion | none — may be absent when switched off */
   mode?: string;
   fps?: number;
   lastFrameAgoMs?: number;
@@ -101,7 +101,8 @@ export interface SentinelStats {
   minFreeBytes: number;
   /** plugin ≥ 2026-09-26: storage root usable (storage guard); false = not recording, nothing deleted. */
   storageOk?: boolean;
-  /** why not: 'marker' (share not mounted), 'missing', 'error' (file system error), 'timeout' (hung mount) */
+  /** why not: 'marker' (share not mounted), 'missing', 'error' (file system error), 'timeout' (hung mount); treat a
+   *  value a newer plugin may add like 'error' */
   storageProblem?: 'missing' | 'marker' | 'error' | 'timeout';
   /** optional server features (plugin ≥ 2026-10-06: `"export"` = clip export, `api/export*`) */
   features?: string[];

@@ -9,7 +9,8 @@ are listed in the README compatibility table.
 - Types follow the plugin's answers completely: `SentinelCamera.detection` (`SentinelDetection`: state of the object
   detection, Coral share, engine watchdog, analysis gaps), `SentinelEvent.backfill` (found afterwards in the recording),
   `SentinelHistogram` for `api/events-histogram`, and `SentinelStats.storageProblem` as the four values the plugin
-  sends instead of `string`. Types only, no behaviour change. The plugin checks its answers against these types when it
+  sends instead of `string` (code that assigns an arbitrary string there no longer compiles). Types only, no behaviour
+  change. The plugin checks its answers against these types when it
   builds its UI.
 
 ## 0.17.1 — 2026-10-06
