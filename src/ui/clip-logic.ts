@@ -24,7 +24,7 @@ export const CLIP_GAP_MS = 2_000;
 export const CLIP_SHARE_MAX = 100 * 1024 * 1024;
 /** Largest file loaded into the page to SAVE it when the plugin is another origin (a host like HAPulse): `download` is
  *  ignored across origins, a plain link would navigate the host page away to the video. */
-export const CLIP_BLOB_MAX = 200 * 1024 * 1024;
+export const CLIP_BLOB_MAX = CLIP_SHARE_MAX;
 /** Status poll interval of a running export. */
 export const CLIP_POLL_MS = 700;
 /** A running job whose status could not be read for this long is given up (server gone, network lost). */

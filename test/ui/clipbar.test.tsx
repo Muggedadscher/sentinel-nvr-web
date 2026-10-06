@@ -570,7 +570,7 @@ describe('ClipBar', () => {
           id: 'job1',
           state: 'done',
           progress: 1,
-          bytes: 150 * 1024 * 1024,
+          bytes: 50 * 1024 * 1024,
           filename: 'Cam.mp4',
           expiresAt: Date.now() + 15 * MIN,
         }),
@@ -590,11 +590,122 @@ describe('ClipBar', () => {
     expect(save.getAttribute('href')).toBe('blob:xo');
     expect(save.getAttribute('download')).toBe('Cam.mp4');
     expect(save.getAttribute('target')).toBeNull();
-    // over 100 MB: no Share
+    // no file sharing in jsdom: no Share
     expect(btn('nvr.clip.share')).toBeUndefined();
   });
 
-  it('another origin above 200 MB: Save opens the file in a new tab (the host page stays), nothing is loaded', async () => {
+  // ---- another origin: what the page holds is released (abort a running load, revoke the blob URL)
+  const xoClient = (bytes = 1000) =>
+    makeClient({
+      exportFileUrl: (id: string) => `https://nvr.example/endpoint/@local/sentinel-nvr/public/api/export-file?id=${id}`,
+      startExport: vi.fn(() => Promise.resolve(START())),
+      exportStatus: vi.fn(() =>
+        Promise.resolve({ id: 'job1', state: 'done', progress: 1, bytes, filename: 'Cam.mp4' }),
+      ),
+    });
+  /** fetch that waits for `open()`; remembers the signal */
+  const gatedFetch = () => {
+    const st: { signal?: AbortSignal; open: () => void } = { open: () => {} };
+    const gate = new Promise<void>((r) => (st.open = r));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_u: string, init?: RequestInit) => {
+        st.signal = init?.signal ?? undefined;
+        await gate;
+        return { ok: true, status: 200, blob: async () => new Blob([new Uint8Array(10)], { type: 'video/mp4' }) };
+      }),
+    );
+    return st;
+  };
+  const urlStub = () => {
+    const create = vi.fn(() => 'blob:xo');
+    const revoke = vi.fn();
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke }));
+    return { create, revoke };
+  };
+  const rerender = async (client: any, range: { from: number; to: number }) =>
+    act(async () =>
+      root!.render(
+        <SentinelUiProvider value={{ client, t: t as any, locale: 'de-DE', nav: { openCamera: () => {} } }}>
+          <ClipBar camId="33" range={range} edge={null} clips={recClips()} onEdge={() => {}} onClose={() => {}} />
+        </SentinelUiProvider>,
+      ),
+    );
+
+  it('another origin: a new range while the file loads aborts the load, no blob URL, Create for the new range', async () => {
+    const { create } = urlStub();
+    const f = gatedFetch();
+    const client = xoClient();
+    const r1 = { from: now0() - 10 * MIN, to: now0() - 9 * MIN };
+    await bar(client, r1);
+    await click(btn('nvr.clip.create'));
+    await act(async () => {
+      await wait(800);
+    });
+    expect(q('.nvr-clipbar__note')?.textContent).toContain('nvr.clip.loading');
+    await rerender(client, { from: r1.from - MIN, to: r1.to });
+    expect(f.signal?.aborted).toBe(true);
+    await act(async () => {
+      f.open();
+      await wait(20);
+    });
+    expect(create).not.toHaveBeenCalled();
+    expect(btn('nvr.clip.create')).toBeTruthy();
+  });
+
+  it('another origin: a held blob URL is revoked on a new range and when the bar goes away', async () => {
+    const { revoke } = urlStub();
+    const f = gatedFetch();
+    f.open();
+    const client = xoClient();
+    const r1 = { from: now0() - 10 * MIN, to: now0() - 9 * MIN };
+    await bar(client, r1);
+    await click(btn('nvr.clip.create'));
+    await act(async () => {
+      await wait(800);
+    });
+    await act(async () => {
+      await wait(20);
+    });
+    expect(btn('nvr.clip.save')?.getAttribute('href')).toBe('blob:xo');
+    await rerender(client, { from: r1.from - MIN, to: r1.to });
+    expect(revoke).toHaveBeenCalledWith('blob:xo');
+    // again, then unmount
+    revoke.mockClear();
+    await click(btn('nvr.clip.create'));
+    await act(async () => {
+      await wait(800);
+    });
+    await act(async () => {
+      await wait(20);
+    });
+    expect(btn('nvr.clip.save')?.getAttribute('href')).toBe('blob:xo');
+    await act(async () => root!.unmount());
+    root = null;
+    expect(revoke).toHaveBeenCalledWith('blob:xo');
+  });
+
+  it('another origin: closing the bar while the file loads aborts the load', async () => {
+    const { create } = urlStub();
+    const f = gatedFetch();
+    const client = xoClient();
+    await bar(client);
+    await click(btn('nvr.clip.create'));
+    await act(async () => {
+      await wait(800);
+    });
+    expect(q('.nvr-clipbar__note')?.textContent).toContain('nvr.clip.loading');
+    await act(async () => root!.unmount());
+    root = null;
+    expect(f.signal?.aborted).toBe(true);
+    f.open();
+    await wait(20);
+    expect(create).not.toHaveBeenCalled();
+    // a finished job is not cancelled on the server (a download may still run)
+    expect(client.cancelExport).not.toHaveBeenCalled();
+  });
+
+  it('another origin above 100 MB: Save opens the file in a new tab (the host page stays), nothing is loaded', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     const url = 'https://nvr.example/endpoint/@local/sentinel-nvr/public/api/export-file?id=job1';
@@ -602,7 +713,7 @@ describe('ClipBar', () => {
       exportFileUrl: () => url,
       startExport: vi.fn(() => Promise.resolve(START())),
       exportStatus: vi.fn(() =>
-        Promise.resolve({ id: 'job1', state: 'done', progress: 1, bytes: 250 * 1024 * 1024, filename: 'Cam.mp4' }),
+        Promise.resolve({ id: 'job1', state: 'done', progress: 1, bytes: 150 * 1024 * 1024, filename: 'Cam.mp4' }),
       ),
     });
     await bar(client);

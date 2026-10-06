@@ -208,24 +208,20 @@ describe('clipWays (how the file reaches the viewer)', () => {
 
 describe('clipWays on another origin (package inside a host such as HAPulse)', () => {
   const MB = 1024 * 1024;
-  it('up to 200 MB the file is loaded to save it (download is ignored across origins); Share only up to 100 MB', () => {
+  it('up to 100 MB (like a Home-Screen app) the file is loaded to save it (download is ignored across origins)', () => {
     expect(clipWays({ bytes: 20 * MB, canShareFiles: false, standalone: false, crossOrigin: true })).toEqual({
       prefetch: true,
       share: false,
       save: 'blob',
     });
     expect(clipWays({ bytes: 20 * MB, canShareFiles: true, standalone: false, crossOrigin: true }).share).toBe(true);
-    expect(clipWays({ bytes: 150 * MB, canShareFiles: true, standalone: false, crossOrigin: true })).toEqual({
-      prefetch: true,
-      share: false,
-      save: 'blob',
-    });
     expect(clipWays({ bytes: CLIP_BLOB_MAX, canShareFiles: false, standalone: false, crossOrigin: true }).save).toBe(
       'blob',
     );
   });
-  it('above 200 MB or unknown size: a new tab, never the same tab', () => {
-    for (const bytes of [CLIP_BLOB_MAX + 1, 0])
+  it('above 100 MB or unknown size: a new tab, never the same tab', () => {
+    expect(CLIP_BLOB_MAX).toBe(CLIP_SHARE_MAX);
+    for (const bytes of [CLIP_BLOB_MAX + 1, 150 * MB, 0])
       expect(clipWays({ bytes, canShareFiles: true, standalone: false, crossOrigin: true })).toEqual({
         prefetch: false,
         share: false,
