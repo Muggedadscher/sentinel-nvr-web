@@ -23,6 +23,7 @@ import {
   clipLength,
   clipWays,
   fmtClipTime,
+  isCrossOrigin,
   type ClipEdge,
   type ClipErrorKind,
   type ClipRange,
@@ -158,10 +159,11 @@ export function ClipBar(p: ClipBarProps) {
     [fail, locale],
   );
 
-  /** the file is done: load it into the page when sharing / a Home-Screen app needs it, else offer the link */
+  /** the file is done: load it into the page when sharing, a Home-Screen app or another origin needs it, else offer the link */
   const finish = useCallback(
     async (g: number, d: Omit<Done, 'ways'>) => {
-      const ways = clipWays({ bytes: d.bytes, canShareFiles: canShareFiles(), standalone });
+      const crossOrigin = isCrossOrigin(client.exportFileUrl(d.id));
+      const ways = clipWays({ bytes: d.bytes, canShareFiles: canShareFiles(), standalone, crossOrigin });
       if (!ways.prefetch) {
         setJob({ s: 'ready', ...d, ways });
         return;
@@ -182,15 +184,17 @@ export function ClipBar(p: ClipBarProps) {
         setJob({ s: 'ready', ...d, ways, file, blobUrl: URL.createObjectURL(blob) });
       } catch (e) {
         if (g !== gen.current || !alive.current) return;
-        // the page could not hold the file: the link still works (no share, no blob)
+        // the page could not hold the file: the link still works (no share, no blob; another origin in a new tab, so
+        // the host page stays)
         rlog('clip', {
           ok: false,
           err: 'prefetch',
           msg: String((e as Error)?.message ?? e).slice(0, 80),
           bytes: d.bytes,
           standalone,
+          xo: crossOrigin,
         });
-        setJob({ s: 'ready', ...d, ways: { prefetch: false, share: false, save: 'link' } });
+        setJob({ s: 'ready', ...d, ways: { prefetch: false, share: false, save: crossOrigin ? 'tab' : 'link' } });
       } finally {
         if (abort.current === ac) abort.current = null;
       }
@@ -309,7 +313,7 @@ export function ClipBar(p: ClipBarProps) {
     setJob({ s: 'idle' });
   }, [cancelRunning, release, setJob]);
 
-  const log = (w: 'download' | 'blob' | 'share' | 'safari', ok = true, err?: string) => {
+  const log = (w: 'download' | 'blob' | 'tab' | 'share' | 'safari', ok = true, err?: string) => {
     const j = jobRef.current;
     if (j.s !== 'ready' && j.s !== 'loading') return;
     rlog('clip', { ms: Date.now() - j.t0, bytes: j.bytes, w, standalone, ok, ...(err ? { err } : {}) });
@@ -417,6 +421,17 @@ export function ClipBar(p: ClipBarProps) {
             {t('nvr.clip.save')}
           </button>
         )
+      ) : ready.ways.save === 'tab' ? (
+        // another origin, too large for the page: a new tab saves it (attachment), the host page stays
+        <a
+          className="nvr-btn nvr-btn--primary"
+          href={fileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => log('tab')}
+        >
+          {t('nvr.clip.save')}
+        </a>
       ) : (
         <a
           className="nvr-btn nvr-btn--primary"

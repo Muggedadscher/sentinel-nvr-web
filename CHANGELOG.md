@@ -4,6 +4,19 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.17.1 — 2026-10-06
+
+- Clip download inside a host on another origin (HAPulse): "Save" no longer navigates the host page to the video. The
+  `download` attribute is ignored across origins, so the link opened `api/export-file` in the same tab and left
+  HAPulse. When `api/export-file` is not the page's origin, the finished clip is now loaded into the page first
+  ("Loading …", up to 100 MB like a Home-Screen app) and "Save" is an `<a download>` on that copy. Above 100 MB (or
+  when loading fails) "Save" opens the file in a new tab, where the server's
+  attachment header saves it and the host page stays. Same origin (Sentinel's own UI) and Home-Screen apps are
+  unchanged. Telemetry `clip` gains `w: "tab"` and `xo` on a failed load. `clipWays({…, crossOrigin})`,
+  `isCrossOrigin(url)`, `CLIP_BLOB_MAX` (= `CLIP_SHARE_MAX`) in `src/ui/clip-logic.ts`; tests in
+  `test/ui/clip-logic.test.ts` and `test/ui/clipbar.test.tsx` (including aborting a running load and revoking the blob
+  URL on a new range, on closing and on leaving the camera).
+
 ## 0.17.0 — 2026-10-06
 
 - Clip download on the camera page (plugin with `features: ["export"]` in `api/clips`; older plugins show no button,
