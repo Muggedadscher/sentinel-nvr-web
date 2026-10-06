@@ -27,7 +27,7 @@ The server contract is the plugin's `docs/API.md`. The package keeps its own typ
 |---|---|---|
 | `@sentinel-nvr/web/api` | `src/api/` | DOM-free, no framework: data model + types (`model.ts`), `SentinelClient` (`client.ts`, fetch/WebSocket), Intl formatters (`format.ts`, no dictionary words). |
 | `@sentinel-nvr/web/player` | `src/player/` | Framework-free. `PlayerController` (`controller.ts`) owns the `<video>`, the freeze canvas and the MJPEG `<img>` and reports state; pure decisions are split into small tested modules (`stills.ts`, `relaystate.ts`, `settle.ts`, `skip.ts`, `clips.ts`). `rlog.ts` = client telemetry to the plugin. |
-| `@sentinel-nvr/web/ui` | `src/ui/` | React components (`components/`, the whole `CameraPage`), i18n (`i18n.ts`, `locales/*.json`), themes (`theme.ts`, `themes-data.ts`), styles `ui.css`. DOM-free page logic in `camera-logic.ts`, `timeline-groups.ts`. |
+| `@sentinel-nvr/web/ui` | `src/ui/` | React components (`components/`, the whole `CameraPage`), i18n (`i18n.ts`, `locales/*.json`), themes (`theme.ts`, `themes-data.ts`), styles `ui.css`. DOM-free page logic in `camera-logic.ts`, `timeline-groups.ts`, `clip-logic.ts` (clip download). |
 
 Tests mirror this in `test/api/` and `test/ui/` (vitest; jsdom where a test needs the DOM).
 
@@ -61,8 +61,9 @@ commits go into `.git-blame-ignore-revs`.
   when HAPulse takes the new version.
 - **Numbers, dates, times:** through `Intl` with the UI locale (German shows a decimal comma, English a point). Days are
   calendar days in the viewer's time zone; DST days have 23/25 hours — that is why tests run in three time zones.
-- **Older servers:** a new client feature must degrade gracefully when the plugin does not support it yet. Note the
-  needed plugin version in the README's server-compatibility table.
+- **Older servers:** a new client feature must degrade gracefully when the plugin does not support it yet. Where the
+  plugin announces a capability in `features` (e.g. `"export"` for the clip download, checked in `src/api/model.ts`),
+  the client offers it only then. Note the needed plugin version or feature in the README's server-compatibility table.
 - Telemetry (`rlog`) also logs success paths: phones have no console, and silence was ambiguous more than once.
 
 ## Changes and releases
