@@ -4,6 +4,61 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.17.1 — 2026-10-06
+
+- Clip download inside a host on another origin (HAPulse): "Save" no longer navigates the host page to the video. The
+  `download` attribute is ignored across origins, so the link opened `api/export-file` in the same tab and left
+  HAPulse. When `api/export-file` is not the page's origin, the finished clip is now loaded into the page first
+  ("Loading …", up to 100 MB like a Home-Screen app) and "Save" is an `<a download>` on that copy. Above 100 MB (or
+  when loading fails) "Save" opens the file in a new tab, where the server's
+  attachment header saves it and the host page stays. Same origin (Sentinel's own UI) and Home-Screen apps are
+  unchanged. Telemetry `clip` gains `w: "tab"` and `xo` on a failed load. `clipWays({…, crossOrigin})`,
+  `isCrossOrigin(url)`, `CLIP_BLOB_MAX` (= `CLIP_SHARE_MAX`) in `src/ui/clip-logic.ts`; tests in
+  `test/ui/clip-logic.test.ts` and `test/ui/clipbar.test.tsx` (including aborting a running load and revoking the blob
+  URL on a new range, on closing and on leaving the camera).
+
+## 0.17.0 — 2026-10-06
+
+- Clip download on the camera page (plugin with `features: ["export"]` in `api/clips`; older plugins show no button,
+  nothing else changes). "Download clip" in the info bar (between snapshot and Picture-in-Picture) proposes the event
+  under the playhead, else the position ± 30 s, live the last minute; a download button next to every event in the
+  events list proposes that event ± 5 s (its start at most 10 s before the trigger — events up to plugin 1.3.0 carry
+  the first sighting, hours earlier for a parked car; a running event ends now). Both open clip mode on the timeline
+  tab: the range is a band on the timeline and a bar under it shows the chips From/To with the length, a hint line and
+  the buttons. Tapping a chip puts that edge on the playhead line (the video goes there); it follows the line only
+  while the user scrolls — never the running playback — and stays put once the gesture settles; passing the other
+  edge swaps their roles; the zoom buttons zoom around the edge. A tap on a single marker sets the event's range and
+  plays from its start, a group marker zooms in as before. Hints: more than 30 min (end chip red, create locked), no
+  recording, gaps are skipped, the end is not recorded yet; on the 25-h day the chips add the UTC offset to an
+  ambiguous time. Keys: Esc ends clip mode, i / o set start / end to the line. The date chip is hidden in clip mode.
+- "Create clip" starts a job on the plugin (`api/export`), the bar shows "Preparing … N %" with "Cancel" (status
+  every 0.7 s, paused in a hidden tab); closing the bar or leaving the camera cancels a running job. Finished: "Save"
+  is a link to `api/export-file` (Content-Disposition; same-origin with `download`). Where the browser can share files
+  and the clip is ≤ 100 MB, the file is loaded into the page first ("Loading …") and "Share" calls `navigator.share`
+  inside the tap (WebKit refuses it after an await). In an iPhone/iPad Home-Screen app "Save" uses that loaded file
+  (`<a download>`, like the snapshot); above 100 MB it offers "Open in Safari". An expired file (15 min on the
+  server) offers "Create again". Telemetry `clip` (`ms`, `bytes`, `w` = download/blob/share/safari, `standalone`,
+  `ok`, `err`).
+- `/api`: `SentinelClient.startExport(camera, from, to, tz)`, `exportStatus(id)`, `exportFileUrl(id)`,
+  `cancelExport(id)`, `postJson(path)`; `SentinelHttpError` carries the server's `error` as `code` and the JSON body as
+  `body` (old two-argument constructor unchanged); types `SentinelExportStart`/`SentinelExportStatus`, `features` on
+  `SentinelClipsResponse`/`SentinelStats`, `sentinelHasFeature()`. Pure rules in `src/ui/clip-logic.ts`; 27 texts
+  `nvr.clip.*` in all 7 languages. Tests in `test/ui/clip-logic.test.ts`, `test/ui/clip-dst.test.ts`,
+  `test/ui/clipbar.test.tsx`, `test/api/client-export.test.ts`.
+- Camera page: a link with a time but no event (`at` without `ev` — HAPulse's "Open in Sentinel" during playback or
+  pause, "Open in Safari", reloading such a page, a shared link) no longer asks the plugin for an event frame at that
+  time. There is almost never one, so `api/evframe` answered 404 and the stage stayed grey anyway; now no request is
+  made. Event links (`ev`) bring their frame as before. The stage still stays grey until the day loads — a picture for
+  an arbitrary time would need a new plugin endpoint (decided against: the case is rare). Test in
+  `test/ui/camerapage-deeplink.test.tsx`.
+- Reverse-proxy path prefix in the links for humans: `sentinelEntryUrl(origin, prefix)`,
+  `sentinelTimelineLink(origin, id, at, prefix)` and `sentinelLoginBase(origin, prefix)` take the prefix that
+  `parseSentinelSetup` already reads (`SentinelSetup.prefix`), and `new SentinelClient(origin, token, { prefix })` puts it
+  into its default base and into `entryUrl`. Until now only the request base had it, so "Open Sentinel" behind a proxy
+  under a path (`https://host/scrypted/…`) pointed past the proxy. The parameter is optional; without a prefix every
+  URL stays as it was. Hosts that use a prefix pass it to see the change (HAPulse: `clientFor`, `NvrCameraPage`).
+  Tests in `test/api/model.test.ts`.
+
 ## 0.16.11 — 2026-10-05
 
 - Camera page: `header` and `externalUrl` may now be functions of the playback position (`at` in ms, `undefined` while

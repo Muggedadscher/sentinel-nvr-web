@@ -64,6 +64,13 @@ export interface TimelineProps {
   onCenter: (ts: number) => void;
   /** imperative jump: scroll the centre to ts (date chip / picker) */
   jump: { ts: number; n: number } | null;
+  /** clip mode: the range as a band; `edge` = the edge that follows the playhead line (drawn stronger), `bad` = too long */
+  clip?: { from: number; to: number; edge: 'from' | 'to' | null; bad?: boolean } | null;
+  /** the view stays where it is (no auto-follow of now/playhead): an active clip edge sits on the line */
+  hold?: boolean;
+  /** centre under the line while the USER scrolls (every scroll frame of a gesture) — never for auto-follow, jumps,
+   *  zoom or the range-end compensation (`onCenter` fires for all of them) */
+  onUserCenter?: (ts: number) => void;
 }
 /**
  * Scrypted-style vertical timeline over SEVERAL days: newest at the top, the
@@ -228,7 +235,7 @@ export function VerticalTimeline(p: TimelineProps) {
   // listeners below on every render — every 100 ms — was pure churn, and wheel events could fall into the gap).
   const followTick = () => {
     const v = VT.current;
-    if (!v.user) {
+    if (!v.user && !p.hold) {
       const ts = p.live ? Date.now() : p.following() ? p.playhead() : null;
       if (ts != null) {
         // diagnostics: a follow step that moves the centre by > 3 s AND > 1.5 px is a visible jump — log why (user report "springt vor
@@ -344,6 +351,7 @@ export function VerticalTimeline(p: TimelineProps) {
     v.lastC = { ts: c, at: now };
     v.smooth = v.smooth == null ? c : v.smooth + 0.45 * (c - v.smooth);
     p.scrub.move(c, v.vel, v.smooth);
+    p.onUserCenter?.(clampRange(c));
     notifyCenter();
     tick((n) => n + 1);
     clearTimeout(v.holdT);
@@ -386,7 +394,7 @@ export function VerticalTimeline(p: TimelineProps) {
   // anchor: live = now; following = the playhead; otherwise (parked on a scrub target, paused) the centre the view
   // shows — zooming around the playhead there lost the parked position
   const zoomStep = (f: number) => {
-    const a = p.live ? Date.now() : p.following() ? (p.playhead() ?? centerTs()) : centerTs();
+    const a = p.hold ? centerTs() : p.live ? Date.now() : p.following() ? (p.playhead() ?? centerTs()) : centerTs();
     applyZoom(px * f, a, vh * HEAD);
   };
 
@@ -448,7 +456,7 @@ export function VerticalTimeline(p: TimelineProps) {
   // the centre label shows what the view shows: the scroll centre while the user scrubs or the view is not following
   // (paused, scrub settling), else the playhead the view follows
   const viewCenter = clamp(centerTs(), p.rangeStart, p.rangeEnd - 1);
-  const center = VT.current.user || !p.following() ? viewCenter : p.live ? now : (p.playhead() ?? viewCenter);
+  const center = VT.current.user || p.hold || !p.following() ? viewCenter : p.live ? now : (p.playhead() ?? viewCenter);
   const centerIsToday = new Date(center).toDateString() === new Date().toDateString();
   const down = () => {
     VT.current.down = true;
@@ -480,6 +488,13 @@ export function VerticalTimeline(p: TimelineProps) {
               <span className="nvr-data">{dayLbl(t)}</span>
             </div>
           ))}
+          {p.clip && inWin(Math.min(p.clip.from, p.clip.to), Math.max(p.clip.from, p.clip.to)) && (
+            <div
+              className={'vclip' + (p.clip.edge ? ` vclip--${p.clip.edge}` : '') + (p.clip.bad ? ' vclip--bad' : '')}
+              style={{ top: yFor(p.clip.to), height: Math.max(2, (p.clip.to - p.clip.from) * px) }}
+              aria-hidden="true"
+            />
+          )}
           {runs.map(
             (r, i) =>
               inWin(r.s, r.e) && (

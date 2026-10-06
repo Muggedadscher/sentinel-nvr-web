@@ -798,6 +798,28 @@
     animation: none;
   }
 }
+.nvr-vtl .vclip {
+  /* clip mode: the range to download as a band right of the time column, its edges as accent lines (the active one,
+     which follows the playhead line, stronger); under the markers and thumbnails */
+  position: absolute;
+  left: 62px;
+  right: 0;
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-top: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  pointer-events: none;
+}
+.nvr-vtl .vclip--to {
+  border-top-width: 4px;
+}
+.nvr-vtl .vclip--from {
+  border-bottom-width: 4px;
+}
+.nvr-vtl .vclip--bad {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border-color: var(--danger);
+}
 .nvr-vtl .vev--minor {
   width: 6px;
   left: 82px;
@@ -995,6 +1017,9 @@
   .nvr-vtl .vlive-line {
     left: 62px;
   }
+  .nvr-vtl .vclip {
+    left: 50px;
+  }
   .nvr-vtl .vlive-chip {
     left: 60px;
   }
@@ -1140,6 +1165,11 @@
     transform 180ms ease-out;
 }
 .nvr-iconbtn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.nvr-iconbtn--on,
+.nvr-iconbtn--on:hover {
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -1525,6 +1555,129 @@
 .nvr-evrow:hover {
   background: var(--bg-subtle);
 }
+/* a row with "Event as clip" next to it (two buttons side by side, not nested) */
+.nvr-evrow-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+.nvr-evrow-wrap > .nvr-evrow {
+  flex: 1;
+  min-width: 0;
+}
+.nvr-evrow__clip {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+}
+/* clip bar (clip mode): under the timeline in the same card — chips + length, a status/hint line, buttons ≥ 44 px.
+   A row of its own, so it never covers the zoom buttons, the live pill or the timeline's LIVE chip */
+.nvr-clipbar {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem 0.6rem;
+  border-top: 1px solid var(--line);
+  background: var(--bg-card);
+}
+.nvr-clipbar__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.nvr-clipchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 32px;
+  padding: 0 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.nvr-clipchip__k {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.nvr-clipchip--active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.nvr-clipchip--bad,
+.nvr-clipchip--bad .nvr-clipchip__k {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.nvr-clipchip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.nvr-clipchip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.nvr-clipbar__len {
+  white-space: nowrap;
+}
+.nvr-clipbar__close {
+  margin-left: auto;
+}
+/* clip mode hides the date chip: the live pill moves down to its place (else it covers the LIVE chip / a marker) */
+.nvr-cam__right--clip .nvr-vtl .livejump {
+  bottom: 10px;
+}
+.nvr-clipbar__note {
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: var(--text-dim);
+  padding: 0 0.15rem;
+}
+.nvr-clipbar__state {
+  color: var(--text);
+  font-weight: 600;
+}
+.nvr-clipbar__bad {
+  color: var(--danger);
+  font-weight: 600;
+}
+.nvr-clipbar__prog {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-subtle);
+  overflow: hidden;
+}
+.nvr-clipbar__prog > i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 300ms ease-out;
+}
+.nvr-clipbar__actions {
+  flex-wrap: nowrap;
+}
+.nvr-clipbar__actions .nvr-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 0.75rem;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nvr-clipbar__actions .nvr-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
 .nvr-evrow__img {
   width: 84px;
   height: 56px;
@@ -1616,6 +1769,42 @@
   .nvr-filters {
     padding: 0.3rem 0.4rem;
     min-height: 30px;
+  }
+  /* clip mode on a phone: the timeline needs the room (the edges are set on it) — a smaller picture, no class filters */
+  .nvr-cam__body.nvr-cam__body--clip {
+    --stage-maxh: 28vh;
+  }
+  /* … and neither tabs, class filters nor the info bar (the clip bar has its own close button; a smaller picture
+     would crush the info bar's title, the page header names the camera) */
+  .nvr-cam__right--clip .nvr-filters,
+  .nvr-cam__right--clip .nvr-tabs,
+  .nvr-cam__body--clip .nvr-stage-bar {
+    display: none;
+  }
+  .nvr-clipbar {
+    gap: 0.25rem;
+    padding: 0.375rem 0.5rem;
+  }
+  /* touch targets ≥ 44 px (the bar stays around 140 px: chips, two lines of hints, the button row) */
+  .nvr-clipchip,
+  .nvr-clipbar__close {
+    min-height: 44px;
+  }
+  .nvr-clipbar__close {
+    width: 44px;
+    height: 44px;
+  }
+  .nvr-clipbar__note {
+    font-size: 0.74rem;
+    line-height: 1.3;
+  }
+  /* at most two lines (the full text is the title / read out); an error keeps all its lines */
+  .nvr-clipbar__note:not(.nvr-clipbar__note--bad) {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
   }
 }
 

@@ -77,6 +77,8 @@ export interface SentinelStats {
   storageOk?: boolean;
   /** why not: 'marker' (share not mounted), 'missing', 'error', 'timeout' */
   storageProblem?: string;
+  /** optional server features (plugin ≥ 2026-10-06: `"export"` = clip export, `api/export*`) */
+  features?: string[];
 }
 
 /** `api/recent-events` entry (short form). */
@@ -134,6 +136,49 @@ export interface SentinelClipsResponse {
   events: SentinelEvent[];
   motion: [number, number][];
   codecs?: string;
+  /** optional server features (plugin ≥ 2026-10-06: `"export"` = clip export, `api/export*`) */
+  features?: string[];
+}
+
+/** A server answer (`api/clips`, `api/stats`) announces `feature` — older plugins send no `features` at all. */
+export function sentinelHasFeature(
+  r: { features?: string[] | undefined } | null | undefined,
+  feature: string,
+): boolean {
+  return Array.isArray(r?.features) && r.features.includes(feature);
+}
+
+/** `POST api/export` (202): a clip export job was started. Times in ms; `from`/`to` as the server cut them (`from` raised
+ *  to the oldest recording, `to` lowered to "now − 10 s" = `clipped`). */
+export interface SentinelExportStart {
+  id: string;
+  camera: string;
+  from: number;
+  to: number;
+  /** `to` was lowered: the end was not recorded yet */
+  clipped: boolean;
+  /** length of the clip without the gaps */
+  durationMs: number;
+  segments: number;
+  /** recording gaps inside the range (skipped in the clip) */
+  gaps: [number, number][];
+  estBytes: number;
+  filename: string;
+}
+
+export type SentinelExportState = 'running' | 'done' | 'failed' | 'cancelled';
+
+/** `GET api/export-status`. */
+export interface SentinelExportStatus {
+  id: string;
+  state: SentinelExportState;
+  /** 0 … 1 */
+  progress: number;
+  bytes?: number;
+  filename: string;
+  error?: string;
+  /** done: the file is deleted after this (ms) */
+  expiresAt?: number;
 }
 
 export const SENTINEL_DAY_MS = 24 * 60 * 60 * 1000;
@@ -192,20 +237,22 @@ export function sentinelPublicBase(origin: string, prefix = ''): string {
  * `sentinelEntryUrl` (the public base without a token shows Sentinel's sign-in
  * page, or redirects straight here when a session exists).
  */
-export function sentinelLoginBase(origin: string): string {
-  return `${origin.replace(/\/+$/, '')}${SENTINEL_ENDPOINT_PATH}/`;
+export function sentinelLoginBase(origin: string, prefix = ''): string {
+  return `${origin.replace(/\/+$/, '')}${prefix.replace(/\/+$/, '')}${SENTINEL_ENDPOINT_PATH}/`;
 }
 
-/** Where a human opens Sentinel's own UI: the public base WITHOUT a token (sign-in page / 302 into the session). */
-export function sentinelEntryUrl(origin: string): string {
-  return sentinelPublicBase(origin);
+/** Where a human opens Sentinel's own UI: the public base WITHOUT a token (sign-in page / 302 into the session).
+ *  `prefix` = reverse-proxy path prefix (`SentinelSetup.prefix`), as for the request base. */
+export function sentinelEntryUrl(origin: string, prefix = ''): string {
+  return sentinelPublicBase(origin, prefix);
 }
 
 /**
  * Absolute URL for an API/media path below the public base, with the token as
  * a query parameter (a `GET` with a query token is a CORS "simple request" —
- * the `x-sentinel-token` header would force a preflight the plugin does not
- * answer; `<img>`/`<video>` sources need the query form anyway).
+ * the `x-sentinel-token` header would cost an extra preflight round trip; the
+ * plugin answers OPTIONS since 2026-09-12, builds before that did not;
+ * `<img>`/`<video>` sources need the query form anyway).
  */
 export function sentinelUrl(base: string, token: string, path: string): string {
   const u = base + path;
@@ -218,9 +265,9 @@ export function sentinelUrl(base: string, token: string, path: string): string {
  * URL (sign-in or 302 into the session; browsers carry the `#` fragment across
  * the redirect).
  */
-export function sentinelTimelineLink(origin: string, cameraId: string, atMs?: number): string {
+export function sentinelTimelineLink(origin: string, cameraId: string, atMs?: number, prefix = ''): string {
   const q = atMs ? `?at=${Math.round(atMs)}` : '';
-  return `${sentinelEntryUrl(origin)}#/timeline/${encodeURIComponent(cameraId)}${q}`;
+  return `${sentinelEntryUrl(origin, prefix)}#/timeline/${encodeURIComponent(cameraId)}${q}`;
 }
 
 // ---------------------------------------------------------------------------
