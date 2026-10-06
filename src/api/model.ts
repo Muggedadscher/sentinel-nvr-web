@@ -25,6 +25,30 @@ export const SENTINEL_EVENT_CLASSES: readonly SentinelEventClass[] = [
 
 export type SentinelBox = [number, number, number, number];
 
+/** `api/cameras[].detection` (plugin ≥ 1.3.0): is object detection really working? */
+export interface SentinelDetection {
+  /** ok | stalled (no frames for > 10 s) | error (also: engine hangs) | no-engine (camera's own detector or motion only)
+   *  | off (detection or recording switched off) */
+  state: 'ok' | 'stalled' | 'error' | 'no-engine' | 'off';
+  /** engine | camera | motion | none — may be absent when switched off */
+  mode?: string;
+  fps?: number;
+  lastFrameAgoMs?: number;
+  model?: string;
+  /** share of the shared Coral: level 0 (unthrottled) … 4 */
+  coral?: { level: number; rate: number; share: number; waitP95: number; shed: number };
+  /** plugin ≥ 2026-10-01: engine watchdog; `down` = hung / being reloaded, nothing analysed */
+  engine?: { state: 'ok' | 'suspect' | 'down'; downForMs?: number; reloads?: number };
+  /** plugin ≥ 2026-10-01: spans not analysed live, still to be analysed from the recordings */
+  gaps?: {
+    pending: number;
+    pendingMs: number;
+    /** only during an outage going on right now: since when, and why */
+    openForMs?: number;
+    reason?: 'engine' | 'feed' | 'restart' | 'manual';
+  };
+}
+
 /** `api/cameras` entry. */
 export interface SentinelCamera {
   id: string;
@@ -43,6 +67,8 @@ export interface SentinelCamera {
   latestTs?: number;
   /** RFC-6381 codec string of the recordings (MSE). */
   codecs?: string;
+  /** plugin ≥ 1.3.0: state of the object detection */
+  detection?: SentinelDetection;
 }
 
 /**
@@ -75,8 +101,9 @@ export interface SentinelStats {
   minFreeBytes: number;
   /** plugin ≥ 2026-09-26: storage root usable (storage guard); false = not recording, nothing deleted. */
   storageOk?: boolean;
-  /** why not: 'marker' (share not mounted), 'missing', 'error', 'timeout' */
-  storageProblem?: string;
+  /** why not: 'marker' (share not mounted), 'missing', 'error' (file system error), 'timeout' (hung mount); treat a
+   *  value a newer plugin may add like 'error' */
+  storageProblem?: 'missing' | 'marker' | 'error' | 'timeout';
   /** optional server features (plugin ≥ 2026-10-06: `"export"` = clip export, `api/export*`) */
   features?: string[];
 }
@@ -118,6 +145,8 @@ export interface SentinelEvent {
   endTs?: number;
   /** plugin ≥ 1.3.0: the event is still running (its objects are still there) */
   open?: boolean;
+  /** plugin ≥ 2026-10-01: found afterwards in the recording (the live detection was not running then) */
+  backfill?: boolean;
 }
 
 /** Recording segment (`api/clips.clips`). */
@@ -138,6 +167,11 @@ export interface SentinelClipsResponse {
   codecs?: string;
   /** optional server features (plugin ≥ 2026-10-06: `"export"` = clip export, `api/export*`) */
   features?: string[];
+}
+
+/** `api/events-histogram`: today's events per hour of the viewer's day (index 0–23, `?tz=`). */
+export interface SentinelHistogram {
+  buckets: number[];
 }
 
 /** A server answer (`api/clips`, `api/stats`) announces `feature` — older plugins send no `features` at all. */
