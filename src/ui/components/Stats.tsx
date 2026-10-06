@@ -1,7 +1,13 @@
 /** Hero (system status + events today + 4 stat tiles), histogram card, storage card. */
 import type { ReactNode } from 'react';
 import { Cctv, Video, Database, Clock, Zap, Gauge, BarChart3, HardDrive } from 'lucide-react';
-import { sentinelHumanBytes, sentinelStorageForecast, type SentinelCamera, type SentinelStats } from '../../api';
+import {
+  sentinelHumanBytes,
+  sentinelRecordingState,
+  sentinelStorageForecast,
+  type SentinelCamera,
+  type SentinelStats,
+} from '../../api';
 import { useSentinelUi } from '../context';
 import { fmtDays, humanBytes } from '../format';
 
@@ -65,8 +71,14 @@ export function CardTitle({
 
 export function Hero({ cameras, stats }: { cameras: SentinelCamera[]; stats: SentinelStats }) {
   const { t, locale } = useSentinelUi();
-  const online = cameras.filter((c) => c.online).length;
+  // a camera whose recording hangs counts as online (its ffmpeg runs or is just restarting) and has its own count
+  const stalled = cameras.filter((c) => sentinelRecordingState(c) === 'stalled').length;
+  const online = cameras.filter((c) => c.online || sentinelRecordingState(c) === 'stalled').length;
   const offline = Math.max(0, stats.cameras - online);
+  const problems = [
+    offline > 0 ? t('nvr.hero.offline', { count: offline }) : null,
+    stalled > 0 ? t('nvr.hero.stalled', { count: stalled }) : null,
+  ].filter(Boolean);
   const fc = sentinelStorageForecast(stats);
   const bytes = sentinelHumanBytes(stats.bytes, locale);
   const span = fc.spanDays ? fmtDays(fc.spanDays, t).split(' ') : ['–'];
@@ -81,9 +93,9 @@ export function Hero({ cameras, stats }: { cameras: SentinelCamera[]; stats: Sen
             {t('nvr.hero.storageProblem')}
           </span>
         ) : (
-          <span className={`nvr-pill ${offline > 0 ? 'nvr-pill--danger' : 'nvr-pill--positive'}`}>
+          <span className={`nvr-pill ${problems.length ? 'nvr-pill--danger' : 'nvr-pill--positive'}`}>
             <span className="nvr-pill__dot" aria-hidden="true" />
-            {offline > 0 ? t('nvr.hero.offline', { count: offline }) : t('nvr.hero.allOnline')}
+            {problems.length ? problems.join(' · ') : t('nvr.hero.allOnline')}
           </span>
         )}
       </div>
