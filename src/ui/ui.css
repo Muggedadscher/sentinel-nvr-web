@@ -2046,3 +2046,558 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
   cursor: pointer;
 }
+
+/* ---- Camera page: badge next to the name (CameraTitle `live` / `at`) ------------------------------------------
+   Only rendered when the host passes them; without, the header row is as before. */
+.nvr-cam__name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.nvr-cam__badge {
+  flex: none;
+  white-space: nowrap;
+}
+.nvr-cam__badge--live {
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--nvr-live-bg, var(--danger));
+  color: var(--nvr-live-fg, var(--on-accent));
+  box-shadow: var(--nvr-live-shadow, none);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  letter-spacing: 0.6px;
+}
+.nvr-cam__badge--time {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* ---- Camera page, immersive appearance (CameraPage `appearance="immersive"`, 0.18.0) ----------------------------
+   Phones: the page owns the screen (the host hides its own bars) — the picture edge to edge with the header over it
+   (back, name + badge, the host's `nvr-iconbtn` actions), gradients over the picture, the controls as floating
+   capsules, the tabs as a segment, the timeline down to the bottom edge (safe area kept). From 900 px: the header row
+   above the columns as before, the picture without card frame (radius 18), the timeline column a surface without
+   border. Every rule is scoped to [data-nvr-appearance='immersive']: the default page is unchanged
+   (test/ui/immersive-css.test.ts). The timeline keeps its geometry (the code places markers and thumbnails with
+   these offsets).
+   Hooks (all optional, fallback = the default look): over the picture --nvr-ctl-bg / -filter / -rim / -shadow / -fg /
+   -text-shadow; floating over the timeline (date chip, zoom) --nvr-float-bg / -filter / -rim / -shadow / -fg /
+   -accent; segment --nvr-seg-track / -lens / -shadow; motion --nvr-ease / --nvr-dur; LIVE --nvr-live-bg / -fg (badge,
+   live jump, the live line's label) and --nvr-live-shadow (badge, live jump); the gradients' dark end --nvr-shade-top
+   (104 px under the header, fading down) and --nvr-shade-bottom (120 px under the controls, full from half way). Meant
+   for dark tokens: the host scopes its theme dark on this page. The header's name and time sit on the top gradient,
+   which is dark in every theme: without --nvr-ctl-fg they are white. */
+.nvr-cam[data-nvr-appearance='immersive'] {
+  /* the package derives these on :root and a custom property is computed where it is declared: under a host that
+     scopes dark tokens to this page they would keep the root's (light) values — derive them again here (the overlay
+     with the dark formula, so with the host's dark tokens it is dark with light glyphs) */
+  --nvr-c-person: var(--info);
+  --nvr-c-car: color-mix(in srgb, var(--warning) 58%, var(--danger));
+  --nvr-c-bike: color-mix(in srgb, var(--info) 55%, var(--danger));
+  --nvr-c-animal: var(--positive);
+  --nvr-c-package: var(--warning);
+  --nvr-c-motion: var(--text-faint);
+  --nvr-rec: color-mix(in srgb, var(--info) 60%, var(--bg-subtle));
+  --nvr-rec-motion: var(--positive);
+  --nvr-overlay: color-mix(in srgb, var(--bg) 70%, transparent);
+  --nvr-on-overlay: var(--text);
+  position: relative;
+  color: var(--text);
+}
+/* the 1-px rim of a floating capsule (a gradient, masked to the edge) */
+.nvr-cam[data-nvr-appearance='immersive'] :is(.nvr-pill-ctl, .nvr-mute)::before,
+.nvr-cam[data-nvr-appearance='immersive'] :is(.nvr-datechip, .nvr-vtl .tool)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: var(--nvr-ctl-rim, transparent);
+  -webkit-mask:
+    linear-gradient(black 0 0) content-box,
+    linear-gradient(black 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.nvr-cam[data-nvr-appearance='immersive'] :is(.nvr-datechip, .nvr-vtl .tool)::before {
+  background: var(--nvr-float-rim, transparent);
+}
+
+/* ---- over the picture: control capsule, sound, gradients ---- */
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-stage::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 120px;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(transparent, var(--nvr-shade-bottom, color-mix(in srgb, black 35%, transparent)) 50%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+/* the bottom gradient carries the capsule: shown when the capsule is (the default page shows it on hover or focus,
+   always without a hovering pointer) */
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-stage:is(:hover, :focus-within)::after {
+  opacity: 1;
+}
+@media (hover: none) {
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-stage::after {
+    opacity: 1;
+  }
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-pill-ctl {
+  bottom: 16px;
+  gap: 0;
+  height: 52px;
+  padding: 4px;
+  border-radius: 26px;
+  background: var(--nvr-ctl-bg, var(--nvr-overlay));
+  -webkit-backdrop-filter: var(--nvr-ctl-filter, blur(8px));
+  backdrop-filter: var(--nvr-ctl-filter, blur(8px));
+  box-shadow: var(--nvr-ctl-shadow, none);
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-pb {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  color: var(--nvr-ctl-fg, var(--nvr-on-overlay));
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-pb:disabled {
+  opacity: 0.4;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-pb--speed {
+  width: auto;
+  min-width: 44px;
+  padding: 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-mute {
+  right: 16px;
+  bottom: 20px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: var(--nvr-ctl-bg, var(--nvr-overlay));
+  -webkit-backdrop-filter: var(--nvr-ctl-filter, blur(8px));
+  backdrop-filter: var(--nvr-ctl-filter, blur(8px));
+  box-shadow: var(--nvr-ctl-shadow, none);
+  color: var(--nvr-ctl-fg, var(--nvr-on-overlay));
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-mute[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-stage:fullscreen,
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-stage:-webkit-full-screen {
+  border-radius: 0;
+}
+/* fullscreen is the stage alone: the header and its top gradient stay on the page */
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-stage:fullscreen::before,
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-stage:-webkit-full-screen::before {
+  display: none;
+}
+
+/* ---- info bar, tabs as a segment, filters ---- */
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-stage-bar {
+  min-height: 48px;
+  gap: 8px;
+  padding: 0 4px 0 12px;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-statusdot {
+  width: 8px;
+  height: 8px;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-statusdot--live {
+  box-shadow: none;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-stage-title small {
+  font-size: 13px;
+  line-height: 18px;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-stage-actions {
+  gap: 0;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-stage-actions .nvr-iconbtn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 22px;
+  background: transparent;
+  color: var(--text-dim);
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-stage-actions .nvr-iconbtn--on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+@media (hover: hover) {
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-stage-actions .nvr-iconbtn:not(.nvr-iconbtn--on):hover {
+    background: var(--bg-subtle);
+    color: var(--text);
+  }
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-tabs {
+  position: relative;
+  height: 40px;
+  margin: 8px 12px 4px;
+  padding: 3px;
+  border-radius: 20px;
+  background: var(--nvr-seg-track, var(--bg-subtle));
+}
+/* the lens under the chosen tab, sliding (data-active = the chosen tab) */
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-tabs::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 17px;
+  background: var(--nvr-seg-lens, var(--bg-card));
+  box-shadow: var(--nvr-seg-shadow, var(--shadow-card));
+  transition: translate var(--nvr-dur, 250ms) var(--nvr-ease, ease-out);
+  pointer-events: none;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-tabs[data-active='ev']::before {
+  translate: 100% 0;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-tabs button {
+  position: relative;
+  z-index: 1;
+  height: 34px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 17px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-tabs button.nvr-tabs__tab--active {
+  color: var(--text);
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-tabs button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-filters {
+  gap: 6px;
+  min-height: 0;
+  padding: 4px 12px 8px;
+  border-bottom: 0;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-filters:empty {
+  padding: 0;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-fchip {
+  height: 32px;
+  gap: 6px;
+  padding: 0 12px 0 6px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-fchip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- floating over the timeline: date chip, zoom, live jump ---- */
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-datechip {
+  height: 44px;
+  gap: 0;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--nvr-float-bg, var(--bg-card));
+  -webkit-backdrop-filter: var(--nvr-float-filter, none);
+  backdrop-filter: var(--nvr-float-filter, none);
+  box-shadow: var(--nvr-float-shadow, var(--shadow-elevated));
+  font-size: 15px;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-datechip > button {
+  width: 36px;
+  height: 36px;
+  color: var(--nvr-float-fg, var(--text-dim));
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-datechip .nvr-datechip__lbl {
+  width: auto;
+  padding: 0 6px;
+  border-radius: 18px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--nvr-float-fg, var(--text));
+}
+/* playing a recording: the chip stays a floating surface, its text takes the accent (fallback: the accent chip) */
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-datechip--rec {
+  background: var(--nvr-float-bg, var(--accent));
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-datechip--rec > button,
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-datechip--rec .nvr-datechip__lbl {
+  color: var(--nvr-float-accent, var(--on-accent));
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .tool {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--nvr-float-bg, var(--bg-card));
+  -webkit-backdrop-filter: var(--nvr-float-filter, none);
+  backdrop-filter: var(--nvr-float-filter, none);
+  box-shadow: var(--nvr-float-shadow, var(--shadow-card));
+  color: var(--nvr-float-fg, var(--text-dim));
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vtl-zoom {
+  gap: 8px;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .livejump {
+  bottom: 62px;
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  background: var(--nvr-live-bg, var(--danger));
+  color: var(--nvr-live-fg, var(--on-accent));
+  box-shadow: var(--nvr-live-shadow, var(--shadow-elevated));
+  font-size: 15px;
+  letter-spacing: normal;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-cam__right--clip .nvr-vtl .livejump {
+  bottom: 10px;
+}
+@media (hover: hover) {
+  /* a tint of the glyph colour; the text keeps its colour (recording: the accent text on the chip) */
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-datechip > button:hover:not(:disabled) {
+    background: color-mix(in srgb, currentColor 14%, transparent);
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .tool:hover {
+    background:
+      linear-gradient(color-mix(in srgb, currentColor 12%, transparent) 0 0), var(--nvr-float-bg, var(--bg-card));
+    color: var(--nvr-float-fg, var(--text));
+  }
+}
+/* the live line's label in the LIVE colours */
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vlive-chip {
+  background: var(--nvr-live-bg, var(--danger));
+  color: var(--nvr-live-fg, var(--on-accent));
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vthumb {
+  border-color: transparent;
+  border-radius: 12px;
+}
+
+/* ---- phones: picture edge to edge, header over it, no cards ---- */
+@media (max-width: 899px) {
+  .nvr-cam[data-nvr-appearance='immersive'] {
+    gap: 0;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head {
+    position: absolute;
+    z-index: 5;
+    top: calc(8px + env(safe-area-inset-top, 0px));
+    left: calc(12px + env(safe-area-inset-left, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    display: grid;
+    /* the side columns never get narrower than their buttons; the name takes what is left and ends in an ellipsis */
+    grid-template-columns: minmax(max-content, 1fr) minmax(0, max-content) minmax(max-content, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    pointer-events: none;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-cam__title {
+    display: contents;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head :is(button, a, .nvr-cam__actions) {
+    pointer-events: auto;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-iconbtn {
+    position: relative;
+    justify-self: start;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    border-radius: 22px;
+    background: var(--nvr-ctl-bg, var(--nvr-overlay));
+    -webkit-backdrop-filter: var(--nvr-ctl-filter, blur(8px));
+    backdrop-filter: var(--nvr-ctl-filter, blur(8px));
+    box-shadow: var(--nvr-ctl-shadow, none);
+    color: var(--nvr-ctl-fg, var(--nvr-on-overlay));
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-iconbtn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    pointer-events: none;
+    background: var(--nvr-ctl-rim, transparent);
+    -webkit-mask:
+      linear-gradient(black 0 0) content-box,
+      linear-gradient(black 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head :is(.nvr-cam__h1, .nvr-cam__name) {
+    grid-column: 2;
+    justify-self: center;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-cam__h1 {
+    font-family: inherit;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 22px;
+    letter-spacing: normal;
+    color: var(--nvr-ctl-fg, white);
+    text-shadow: var(--nvr-ctl-text-shadow, 0 1px 2px color-mix(in srgb, black 45%, transparent));
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-cam__badge--time {
+    color: var(--nvr-ctl-fg, white);
+    text-shadow: var(--nvr-ctl-text-shadow, 0 1px 2px color-mix(in srgb, black 45%, transparent));
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-cam__actions {
+    grid-column: 3;
+    justify-self: end;
+    gap: 8px;
+  }
+  /* the top gradient carries the header */
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-stage::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: calc(104px + env(safe-area-inset-top, 0px));
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(var(--nvr-shade-top, color-mix(in srgb, black 70%, transparent)), transparent);
+  }
+  /* the page owns the screen (the host hides its bars): the body is the viewport; on a short screen the picture
+     yields first (down to 12rem), so its bar, the tabs, the filters and the timeline keep ~15rem; clip mode keeps the
+     default's smaller picture */
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-cam__body {
+    gap: 0;
+    height: 100dvh;
+    min-height: 27rem;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-cam__body:not(.nvr-cam__body--clip) {
+    --stage-maxh: max(12rem, min(46vh, 100dvh - 15rem));
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-stage-card {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  /* the name is in the header over the picture; the bar keeps the state */
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-stage-title b {
+    display: none;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-cam__right {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-evlist__day {
+    background: var(--bg);
+  }
+  /* the markers' ring is the page ground (the column has no surface here) */
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vev:not(.vev--minor) {
+    box-shadow: 0 0 0 2px var(--bg);
+  }
+  /* the last row ends above the date chip (44 px at 10 px from the bottom) */
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-evlist {
+    padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-clipbar {
+    padding-bottom: calc(0.375rem + env(safe-area-inset-bottom, 0px));
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-pipnote {
+    margin: 0 12px 8px;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-datechip {
+    left: calc(10px + env(safe-area-inset-left, 0px));
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vtl-zoom {
+    right: calc(8px + env(safe-area-inset-right, 0px));
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .livejump {
+    left: calc(10px + env(safe-area-inset-left, 0px));
+    bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+  }
+  /* clip mode: the clip bar under the timeline keeps the bottom inset */
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-cam__right--clip .nvr-vtl .vtl-zoom {
+    bottom: 10px;
+  }
+}
+
+/* ---- from 900 px: header row above the columns, picture without card frame ---- */
+@media (min-width: 900px) {
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-stage-card {
+    overflow: visible;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-stage {
+    border-radius: 18px;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-cam__right {
+    border: 0;
+    border-radius: 18px;
+    box-shadow: none;
+  }
+}
+
+/* reduced motion: no sliding lens — the chosen tab's own fill fades over in 200 ms */
+@media (prefers-reduced-motion: reduce) {
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-tabs::before {
+    display: none;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-tabs button {
+    transition:
+      background-color 200ms ease,
+      box-shadow 200ms ease,
+      color 200ms ease;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-tabs button.nvr-tabs__tab--active {
+    background-color: var(--nvr-seg-lens, var(--bg-card));
+    box-shadow: var(--nvr-seg-shadow, var(--shadow-card));
+  }
+}
+/* forced colours: the floating surfaces and the lens keep an edge (their fills are dropped) */
+@media (forced-colors: active) {
+  .nvr-cam[data-nvr-appearance='immersive']
+    :is(.nvr-pill-ctl, .nvr-mute, .nvr-datechip, .nvr-vtl .tool, .nvr-vtl .livejump) {
+    border: 1px solid CanvasText;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-tabs {
+    border: 1px solid CanvasText;
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-tabs::before {
+    border: 2px solid Highlight;
+  }
+}
+@media (forced-colors: active) and (max-width: 899px) {
+  .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-iconbtn {
+    border: 1px solid CanvasText;
+  }
+}
+@media (forced-colors: active) and (prefers-reduced-motion: reduce) {
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-tabs button.nvr-tabs__tab--active {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}

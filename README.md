@@ -38,6 +38,7 @@ on older servers, but only get their full behaviour with the matching plugin ver
 | 0.15.x | any (priority order from the server: ≥ 1.3.0; older servers are sorted client-side) | event classes by priority (a cyclist is a person), class filters hide an event only when all its classes are off, chips count every contained class — client only. |
 | 0.16.x | any (spans: ≥ 1.3.0) | events as time spans: bar from first sighting to last movement on the timeline, running events pulse, duration/„running“ in the list (`endTs`/`open`); older servers show plain markers. 0.16.5: storage values in the UI language, today refresh during playback — client only. 0.16.7: overlapping timeline markers grouped with a count, a tap zooms in — client only. 0.16.8: the events tab counts the centred day — client only. 0.16.9: "yesterday" in front of the time in the overview events strip — client only. 0.16.10: "recording stalled" on tiles and in the status pill (`stalled` from plugin ≥ 2026-10-05; older servers: no change). 0.16.11: `header`/`externalUrl` may take the playback position — client only. |
 | 0.17.x | plugin with `features: ["export"]` (older plugins: no clip button, everything else as 0.16.x) | clip download on the camera page: "Download clip" in the info bar and per event in the list, range as a band on the timeline, edges set over the playhead line, `api/export` → `api/export-status` → `api/export-file` (save, or share up to 100 MB); `SentinelClient.startExport/exportStatus/exportFileUrl/cancelExport`, `SentinelHttpError.code`. |
+| 0.18.x | any | opt-in immersive camera page: `CameraPage appearance="immersive"` (`data-nvr-appearance` on the page) — picture edge to edge with the header over it on phones, floating controls, tabs as a segment, styled by the host through `--nvr-ctl-*`, `--nvr-float-*`, `--nvr-seg-*`, `--nvr-live-*`, `--nvr-shade-top`/`-bottom`, `--nvr-ease`/`--nvr-dur`; `header(at, { live })`, `CameraTitle` `live`/`at` (LIVE badge or the picture's time). Without the prop the page is unchanged. Client only. |
 
 Lab note: Scrypted's WebRTC sink re-encodes (1280 px, 15 fps) for clients that are not Windows/macOS/iOS and report a
 screen below 1920 physical pixels, unless the source declares a width ≤ 1280. Plugin ≥ 1.2.0 declares it for recorded
@@ -58,6 +59,25 @@ The server keeps its own types; `docs/API.md` in the plugin repository is the co
   Everything visible inside comes from the package, so both consumers look identical.
   Optional `externalUrl` = this camera outside the app (Sentinel's public entry, no token): offered as "Open in
   Safari" when an iPhone/iPad Home-Screen app refuses Picture-in-Picture.
+- **Immersive camera page** (0.18.0, opt-in): `appearance="immersive"` puts `data-nvr-appearance="immersive"` on
+  `.nvr-cam`; every rule for it is scoped to that attribute, so the default page stays as it is. Below 900 px the page
+  owns the screen: the host hides its own bars and gives the page the viewport (`.nvr-cam__body` is `100dvh`, at least
+  27rem; on a short screen the picture yields first). The picture runs edge to edge and the header row (`CameraTitle`:
+  back, name + badge, host actions) lies over it with a gradient — give icon actions the class `nvr-iconbtn` to get
+  the same round button as back. The controls float as capsules, the tabs are a segment with a sliding lens
+  (`.nvr-tabs[data-active]`, only on this page), the timeline reaches the bottom edge (safe areas kept). From 900 px
+  the header stays above the columns, the picture has no card frame. The timeline keeps its geometry. Meant for dark
+  tokens: the host scopes its theme dark on the page (the package re-derives its own `--nvr-*` colours there). Hooks,
+  all optional (fallback = the default look): over the picture `--nvr-ctl-bg`, `-filter`, `-rim` (1-px edge, may be a
+  gradient), `-shadow`, `-fg`, `-text-shadow`; over the timeline (date chip, zoom) `--nvr-float-bg`, `-filter`,
+  `-rim`, `-shadow`, `-fg`, `-accent` (the chip's text while a recording plays); segment `--nvr-seg-track`, `-lens`,
+  `-shadow`; LIVE badge, live jump and the live line's label `--nvr-live-bg`, `-fg` (badge and live jump also
+  `--nvr-live-shadow`); the gradients' dark end `--nvr-shade-top` (under the header, default black 70 %) and
+  `--nvr-shade-bottom` (under the controls, default black 35 %; on devices with a hovering pointer it shows with the
+  controls); the lens' motion `--nvr-ease`, `--nvr-dur` (with reduced motion the chosen tab's fill fades over in 200
+  ms instead). The name and time in the header lie on the top gradient, which is dark in every theme: without
+  `--nvr-ctl-fg` they are white. `header` as a function gets `(at, { live })`; pass both to `CameraTitle` (`live`, `at`) for the LIVE
+  badge or the picture's time next to the name.
 
 ## Develop
 

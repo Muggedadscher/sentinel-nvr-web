@@ -4,14 +4,40 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
-## Unreleased
+## 0.18.0 — 2026-10-10
 
+- Immersive camera page, opt-in: `<CameraPage appearance="immersive">` (attribute `data-nvr-appearance` on the page).
+  Below 900 px the page owns the screen (the host hides its own bars): the picture runs edge to edge with the host's
+  header over it (back and `nvr-iconbtn` actions as round buttons, the name with a LIVE badge or the picture's time),
+  gradients over the picture, the control capsule (52 px, buttons 44 px) and the sound button float over it; the info
+  bar is 48 px, the tabs are a segment with a sliding lens, the class filters are 32-px capsules, the date chip (44 px)
+  and the live jump float over the timeline, which runs down to the bottom edge (safe areas kept for the floating
+  parts, the clip bar and the events list). Clip mode keeps the default's smaller picture; fullscreen shows the
+  picture without radius and top gradient. From 900 px the header row stays above the columns and the picture has no
+  card frame (radius 18). The timeline keeps its geometry (markers, thumbnails, playhead at 35 %). Hosts style the
+  floating parts through `--nvr-ctl-*`, `--nvr-float-*`, `--nvr-seg-*`, `--nvr-live-*`, `--nvr-shade-top`/`-bottom`,
+  `--nvr-ease`/`--nvr-dur` (README); without them the default colours apply. Reduced motion: the chosen tab's fill
+  fades over in 200 ms instead of the sliding lens; forced colours: floating parts and the lens keep an edge. Meant for
+  dark tokens: the page re-derives the package's own colours (`--nvr-c-*`, `--nvr-rec*`, `--nvr-overlay` with the dark
+  formula) so a host can scope its theme dark on it. HAPulse's "Glas" style uses it.
+- `header` as a function gets a second argument `{ live }` (the position `at` may also be `undefined` when no
+  position is known yet, e.g. while a recording session starts); `CameraTitle` takes optional `live` / `at` and then
+  shows "LIVE" (`nvr.live`) or the picture's time (with "yesterday" or a short date in front on another day) next to
+  the name. On the immersive page the name and time lie on the top gradient, dark in every theme: without
+  `--nvr-ctl-fg` they are white; a long name ends in an ellipsis between the header's buttons. On devices with a
+  hovering pointer the bottom gradient shows with the controls (on hover or focus).
+- Without `appearance` (or with `"default"`) the page is unchanged: its markup equals 0.17.1
+  (`test/ui/camerapage-immersive.test.tsx` against a fixture of 0.17.1), `ui.css` starts with the stylesheet of 0.17.1
+  byte for byte and every new rule is scoped to the immersive page or the new badge (`test/ui/immersive-css.test.ts`).
 - Types follow the plugin's answers completely: `SentinelCamera.detection` (`SentinelDetection`: state of the object
   detection, Coral share, engine watchdog, analysis gaps), `SentinelEvent.backfill` (found afterwards in the recording),
   `SentinelHistogram` for `api/events-histogram`, and `SentinelStats.storageProblem` as the four values the plugin
   sends instead of `string` (code that assigns an arbitrary string there no longer compiles). Types only, no behaviour
   change. The plugin checks its answers against these types when it
   builds its UI.
+- Overview: the number of segments in the storage card and today's events in the hero group their digits in the UI
+  language ("48.210" in German, "48,210" in English; before "48210"). New formatter `fmtCount` in
+  `@sentinel-nvr/web/api`.
 
 ## 0.17.1 — 2026-10-06
 

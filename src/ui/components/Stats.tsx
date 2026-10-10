@@ -2,6 +2,7 @@
 import type { ReactNode } from 'react';
 import { Cctv, Video, Database, Clock, Zap, Gauge, BarChart3, HardDrive } from 'lucide-react';
 import {
+  fmtCount,
   sentinelHumanBytes,
   sentinelRecordingState,
   sentinelStorageForecast,
@@ -104,7 +105,7 @@ export function Hero({ cameras, stats }: { cameras: SentinelCamera[]; stats: Sen
           <Zap size={14} strokeWidth={2} />
           {t('nvr.hero.eventsToday')}
         </span>
-        <span className="nvr-hero__primary-value nvr-data">{stats.eventsToday}</span>
+        <span className="nvr-hero__primary-value nvr-data">{fmtCount(stats.eventsToday, locale)}</span>
       </div>
       <div className="nvr-hero__stats">
         <StatTile
@@ -251,7 +252,7 @@ export function StorageCard({ stats }: { stats: SentinelStats }) {
         </li>
         <li>
           <span>{t('nvr.storage.segments')}</span>
-          <b className="nvr-data">{stats.segments}</b>
+          <b className="nvr-data">{fmtCount(stats.segments, locale)}</b>
         </li>
       </ul>
       <p className={`nvr-note${fc.status === 'unreachable' ? ' nvr-note--warn' : ''}`}>{note}</p>

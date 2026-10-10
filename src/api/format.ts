@@ -52,3 +52,19 @@ export function hhmmInput(ts: number): string {
   const d = new Date(ts);
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+const countFmt = new Map<string, Intl.NumberFormat | null>();
+/** A whole number with the locale's digit grouping ("48.210" in German, "48,210" in English); an unknown tag falls
+ *  back to the plain digits. */
+export function fmtCount(n: number, locale: string): string {
+  let f = countFmt.get(locale);
+  if (f === undefined) {
+    try {
+      f = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+    } catch {
+      f = null;
+    }
+    countFmt.set(locale, f);
+  }
+  return f ? f.format(n) : String(Math.round(n));
+}

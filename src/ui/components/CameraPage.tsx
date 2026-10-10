@@ -46,6 +46,8 @@ import {
   sentinelMergeDays,
   sentinelHasFeature,
   fmtDay,
+  fmtDayPrefix,
+  fmtTimeSec,
   type SentinelClip,
   type SentinelClipsResponse,
   type SentinelEvent,
@@ -107,8 +109,16 @@ export interface CameraPageProps {
   /** media elements load with CORS (a cross-origin host needs it for canvas snapshots) */
   crossOrigin?: boolean | undefined;
   /** rendered above the two columns — the host's page header (see `CameraTitle`). As a function it gets the playback
-   *  position (`at`, ms; `undefined` while live), e.g. for a link that opens this camera at the same moment elsewhere. */
-  header?: ReactNode | ((at: number | undefined) => ReactNode);
+   *  position (`at`, ms; `undefined` while live), e.g. for a link that opens this camera at the same moment elsewhere,
+   *  and whether the page shows live (`info.live`; `at` may also be `undefined` when no position is known yet, e.g.
+   *  while a recording session starts). */
+  header?: ReactNode | ((at: number | undefined, info: CameraHeaderInfo) => ReactNode);
+  /** `'immersive'`: the picture edge to edge with the header over it on phones, controls as floating capsules, the
+   *  tabs as a segment (`data-nvr-appearance="immersive"` on the page; meant for dark tokens, the host scopes them).
+   *  The host can style the floating parts through `--nvr-ctl-*`, `--nvr-float-*`, `--nvr-seg-*`, `--nvr-live-*`,
+   *  `--nvr-shade-top`/`-bottom` and `--nvr-ease`/`--nvr-dur` (README).
+   *  Default `'default'`: the page as before. */
+  appearance?: 'default' | 'immersive' | undefined;
   /** the host wraps the date picker in its own modal primitive */
   renderDatePicker: (req: DatePickerRequest) => ReactNode;
   /** This camera outside the app (Sentinel's public entry, no token). Offered as "open in Safari" when a Home-Screen
@@ -117,16 +127,52 @@ export interface CameraPageProps {
   externalUrl?: string | ((at: number | undefined) => string) | undefined;
 }
 
-/** Host header row: back button + camera name (+ host actions on the right). Same metrics in every host. */
-export function CameraTitle({ name, onBack, children }: { name: string; onBack: () => void; children?: ReactNode }) {
-  const { t } = useSentinelUi();
+/** What a `header` function gets besides the playback position. */
+export interface CameraHeaderInfo {
+  /** the page shows live */
+  live: boolean;
+}
+
+/** Host header row: back button + camera name (+ host actions on the right). Same metrics in every host.
+ *  `live` / `at` (from the `header` function) add a badge next to the name: "LIVE", or the time of the picture
+ *  (with "yesterday" or a short date in front on another day); without them the row is as before. */
+export function CameraTitle({
+  name,
+  onBack,
+  children,
+  live,
+  at,
+}: {
+  name: string;
+  onBack: () => void;
+  children?: ReactNode;
+  live?: boolean | undefined;
+  at?: number | undefined;
+}) {
+  const { t, locale } = useSentinelUi();
+  const day = !live && at != null ? fmtDayPrefix(at, locale) : '';
+  const badge = live ? (
+    <span className="nvr-cam__badge nvr-cam__badge--live">{t('nvr.live')}</span>
+  ) : at != null ? (
+    <span className="nvr-cam__badge nvr-cam__badge--time nvr-data">
+      {day ? `${day} ${fmtTimeSec(at, locale)}` : fmtTimeSec(at, locale)}
+    </span>
+  ) : null;
+  const h1 = <h1 className="nvr-cam__h1">{name}</h1>;
   return (
     <div className="nvr-cam__head">
       <div className="nvr-cam__title">
         <button type="button" className="nvr-iconbtn" aria-label={t('nvr.back')} onClick={onBack}>
           <ChevronLeft size={20} />
         </button>
-        <h1 className="nvr-cam__h1">{name}</h1>
+        {badge ? (
+          <span className="nvr-cam__name">
+            {h1}
+            {badge}
+          </span>
+        ) : (
+          h1
+        )}
       </div>
       {children ? <div className="nvr-cam__actions">{children}</div> : null}
     </div>
@@ -612,11 +658,12 @@ export function CameraPage(p: CameraPageProps) {
   const cors = p.crossOrigin ? 'anonymous' : undefined;
   // playback position for the host's links (state is re-emitted on every timeupdate, ~4×/s); live = no position
   const at = !ps.live && ps.playhead != null ? ps.playhead : undefined;
-  const header = typeof p.header === 'function' ? p.header(at) : p.header;
+  const header = typeof p.header === 'function' ? p.header(at, { live: ps.live }) : p.header;
+  const immersive = p.appearance === 'immersive';
   const externalUrl = typeof p.externalUrl === 'function' ? p.externalUrl(at) : p.externalUrl;
 
   return (
-    <div className="nvr-cam">
+    <div className="nvr-cam" data-nvr-appearance={immersive ? 'immersive' : undefined}>
       {header}
       <div className={'nvr-cam__body' + (clip ? ' nvr-cam__body--clip' : '')} ref={body}>
         <div className="nvr-cam__left">
@@ -746,7 +793,8 @@ export function CameraPage(p: CameraPageProps) {
         </div>
 
         <aside className={'nvr-card nvr-cam__right' + (clip ? ' nvr-cam__right--clip' : '')}>
-          <div className="nvr-tabs" role="tablist">
+          {/* the chosen tab for the immersive segment's lens (the default page keeps the markup of 0.17.1) */}
+          <div className="nvr-tabs" role="tablist" data-active={immersive ? tab : undefined}>
             <button
               type="button"
               role="tab"
