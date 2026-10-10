@@ -15,7 +15,7 @@ are listed in the README compatibility table.
   parts, the clip bar and the events list). Clip mode keeps the default's smaller picture; fullscreen shows the
   picture without radius and top gradient. From 900 px the header row stays above the columns and the picture has no
   card frame (radius 18). The timeline keeps its geometry (markers, thumbnails, playhead at 35 %). Hosts style the
-  floating parts through `--nvr-ctl-*`, `--nvr-float-*`, `--nvr-seg-*`, `--nvr-live-*`, `--nvr-shade`,
+  floating parts through `--nvr-ctl-*`, `--nvr-float-*`, `--nvr-seg-*`, `--nvr-live-*`, `--nvr-shade-top`/`-bottom`,
   `--nvr-ease`/`--nvr-dur` (README); without them the default colours apply. Reduced motion: the chosen tab's fill
   fades over in 200 ms instead of the sliding lens; forced colours: floating parts and the lens keep an edge. Meant for
   dark tokens: the page re-derives the package's own colours (`--nvr-c-*`, `--nvr-rec*`, `--nvr-overlay` with the dark
@@ -32,6 +32,9 @@ are listed in the README compatibility table.
   sends instead of `string` (code that assigns an arbitrary string there no longer compiles). Types only, no behaviour
   change. The plugin checks its answers against these types when it
   builds its UI.
+- Overview: the number of segments in the storage card and today's events in the hero group their digits in the UI
+  language ("48.210" in German, "48,210" in English; before "48210"). New formatter `fmtCount` in
+  `@sentinel-nvr/web/api`.
 
 ## 0.17.1 — 2026-10-06
 

@@ -2087,8 +2087,10 @@
    these offsets).
    Hooks (all optional, fallback = the default look): over the picture --nvr-ctl-bg / -filter / -rim / -shadow / -fg /
    -text-shadow; floating over the timeline (date chip, zoom, live jump) --nvr-float-bg / -filter / -rim / -shadow /
-   -fg / -accent; segment --nvr-seg-track / -lens / -shadow; motion --nvr-ease / --nvr-dur; LIVE --nvr-live-bg / -fg /
-   -shadow; gradient colour --nvr-shade. Meant for dark tokens: the host scopes its theme dark on this page. */
+   -fg / -accent; segment --nvr-seg-track / -lens / -shadow; motion --nvr-ease / --nvr-dur; LIVE (badge, live jump,
+   the live line's label) --nvr-live-bg / -fg / -shadow; the gradients' dark end --nvr-shade-top (104 px under the
+   header, fading down) and --nvr-shade-bottom (120 px under the controls, full from half way). Meant for dark tokens:
+   the host scopes its theme dark on this page. */
 .nvr-cam[data-nvr-appearance='immersive'] {
   /* the package derives these on :root and a custom property is computed where it is declared: under a host that
      scopes dark tokens to this page they would keep the root's (light) values — derive them again here (the overlay
@@ -2134,7 +2136,7 @@
   height: 120px;
   z-index: 2;
   pointer-events: none;
-  background: linear-gradient(transparent, color-mix(in srgb, var(--nvr-shade, black) 55%, transparent));
+  background: linear-gradient(transparent, var(--nvr-shade-bottom, color-mix(in srgb, black 35%, transparent)) 50%);
 }
 .nvr-cam[data-nvr-appearance='immersive'] .nvr-pill-ctl {
   bottom: 16px;
@@ -2359,6 +2361,11 @@
 .nvr-cam[data-nvr-appearance='immersive'] .nvr-cam__right--clip .nvr-vtl .livejump {
   bottom: 10px;
 }
+/* the live line's label in the LIVE colours */
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vlive-chip {
+  background: var(--nvr-live-bg, var(--danger));
+  color: var(--nvr-live-fg, var(--on-accent));
+}
 .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vthumb {
   border-color: transparent;
   border-radius: 12px;
@@ -2446,7 +2453,7 @@
     height: 104px;
     z-index: 2;
     pointer-events: none;
-    background: linear-gradient(color-mix(in srgb, var(--nvr-shade, black) 45%, transparent), transparent);
+    background: linear-gradient(var(--nvr-shade-top, color-mix(in srgb, black 70%, transparent)), transparent);
   }
   /* the page owns the screen (the host hides its bars): the body is the viewport; on a short screen the picture
      yields first (down to 12rem), so its bar, the tabs, the filters and the timeline keep ~15rem; clip mode keeps the
@@ -2477,6 +2484,10 @@
   }
   .nvr-cam[data-nvr-appearance='immersive'] .nvr-evlist__day {
     background: var(--bg);
+  }
+  /* the markers' ring is the page ground (the column has no surface here) */
+  .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vev:not(.vev--minor) {
+    box-shadow: 0 0 0 2px var(--bg);
   }
   .nvr-cam[data-nvr-appearance='immersive'] .nvr-evlist {
     padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));

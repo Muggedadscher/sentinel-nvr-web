@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { weekdayShorts, fmtMonthYear, hhmmInput } from '../../src/api';
+import { weekdayShorts, fmtMonthYear, hhmmInput, fmtCount } from '../../src/api';
 
 describe('format (locale, TZ-independent bits)', () => {
   it('weekdayShorts returns 7 entries starting Monday', () => {
@@ -15,5 +15,11 @@ describe('format (locale, TZ-independent bits)', () => {
   it('hhmmInput pads to HH:MM', () => {
     const ts = new Date(2026, 5, 15, 9, 5).getTime();
     expect(hhmmInput(ts)).toBe('09:05');
+  });
+  it('fmtCount groups digits in the UI language', () => {
+    expect(fmtCount(48210, 'de-DE')).toBe('48.210');
+    expect(fmtCount(48210, 'en')).toBe('48,210');
+    expect(fmtCount(7, 'de')).toBe('7');
+    expect(fmtCount(1234, 'not a tag!')).toBe('1234');
   });
 });
