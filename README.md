@@ -71,10 +71,12 @@ The server keeps its own types; `docs/API.md` in the plugin repository is the co
   all optional (fallback = the default look): over the picture `--nvr-ctl-bg`, `-filter`, `-rim` (1-px edge, may be a
   gradient), `-shadow`, `-fg`, `-text-shadow`; over the timeline (date chip, zoom) `--nvr-float-bg`, `-filter`,
   `-rim`, `-shadow`, `-fg`, `-accent` (the chip's text while a recording plays); segment `--nvr-seg-track`, `-lens`,
-  `-shadow`; LIVE badge, live jump and the live line's label `--nvr-live-bg`, `-fg`, `-shadow`; the gradients' dark
-  end `--nvr-shade-top` (under the header, default black 70 %) and `--nvr-shade-bottom` (under the controls, default
-  black 35 %); the lens' motion `--nvr-ease`, `--nvr-dur` (with reduced motion the chosen tab's fill fades over in 200
-  ms instead). `header` as a function gets `(at, { live })`; pass both to `CameraTitle` (`live`, `at`) for the LIVE
+  `-shadow`; LIVE badge, live jump and the live line's label `--nvr-live-bg`, `-fg` (badge and live jump also
+  `--nvr-live-shadow`); the gradients' dark end `--nvr-shade-top` (under the header, default black 70 %) and
+  `--nvr-shade-bottom` (under the controls, default black 35 %; on devices with a hovering pointer it shows with the
+  controls); the lens' motion `--nvr-ease`, `--nvr-dur` (with reduced motion the chosen tab's fill fades over in 200
+  ms instead). The name and time in the header lie on the top gradient, which is dark in every theme: without
+  `--nvr-ctl-fg` they are white. `header` as a function gets `(at, { live })`; pass both to `CameraTitle` (`live`, `at`) for the LIVE
   badge or the picture's time next to the name.
 
 ## Develop

@@ -20,9 +20,12 @@ are listed in the README compatibility table.
   fades over in 200 ms instead of the sliding lens; forced colours: floating parts and the lens keep an edge. Meant for
   dark tokens: the page re-derives the package's own colours (`--nvr-c-*`, `--nvr-rec*`, `--nvr-overlay` with the dark
   formula) so a host can scope its theme dark on it. HAPulse's "Glas" style uses it.
-- `header` as a function gets a second argument `{ live }` (the position `at` is also `undefined` while a recording
-  loads); `CameraTitle` takes optional `live` / `at` and then shows "LIVE" (`nvr.live`) or the picture's time
-  (with "yesterday" or a short date in front on another day) next to the name.
+- `header` as a function gets a second argument `{ live }` (the position `at` may also be `undefined` when no
+  position is known yet, e.g. while a recording session starts); `CameraTitle` takes optional `live` / `at` and then
+  shows "LIVE" (`nvr.live`) or the picture's time (with "yesterday" or a short date in front on another day) next to
+  the name. On the immersive page the name and time lie on the top gradient, dark in every theme: without
+  `--nvr-ctl-fg` they are white; a long name ends in an ellipsis between the header's buttons. On devices with a
+  hovering pointer the bottom gradient shows with the controls (on hover or focus).
 - Without `appearance` (or with `"default"`) the page is unchanged: its markup equals 0.17.1
   (`test/ui/camerapage-immersive.test.tsx` against a fixture of 0.17.1), `ui.css` starts with the stylesheet of 0.17.1
   byte for byte and every new rule is scoped to the immersive page or the new badge (`test/ui/immersive-css.test.ts`).

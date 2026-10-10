@@ -110,11 +110,13 @@ export interface CameraPageProps {
   crossOrigin?: boolean | undefined;
   /** rendered above the two columns — the host's page header (see `CameraTitle`). As a function it gets the playback
    *  position (`at`, ms; `undefined` while live), e.g. for a link that opens this camera at the same moment elsewhere,
-   *  and whether the page shows live (`info.live`; `at` is also `undefined` while a recording loads). */
+   *  and whether the page shows live (`info.live`; `at` may also be `undefined` when no position is known yet, e.g.
+   *  while a recording session starts). */
   header?: ReactNode | ((at: number | undefined, info: CameraHeaderInfo) => ReactNode);
   /** `'immersive'`: the picture edge to edge with the header over it on phones, controls as floating capsules, the
    *  tabs as a segment (`data-nvr-appearance="immersive"` on the page; meant for dark tokens, the host scopes them).
-   *  The host can style the floating parts through `--nvr-ctl-*`, `--nvr-float-*`, `--nvr-seg-*` (README).
+   *  The host can style the floating parts through `--nvr-ctl-*`, `--nvr-float-*`, `--nvr-seg-*`, `--nvr-live-*`,
+   *  `--nvr-shade-top`/`-bottom` and `--nvr-ease`/`--nvr-dur` (README).
    *  Default `'default'`: the page as before. */
   appearance?: 'default' | 'immersive' | undefined;
   /** the host wraps the date picker in its own modal primitive */
