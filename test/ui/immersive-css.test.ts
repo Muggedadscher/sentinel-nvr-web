@@ -1,10 +1,11 @@
 /**
- * The immersive appearance (0.18.0) must not change the default page: ui.css starts with the stylesheet of 0.17.1,
- * byte for byte, and every rule after it is scoped to `[data-nvr-appearance='immersive']` or styles a class that only
+ * The immersive appearance (0.18.0) must not change the default page: ui.css starts with the default stylesheet, byte
+ * for byte, and every rule after it is scoped to `[data-nvr-appearance='immersive']` or styles a class that only
  * renders when the host passes CameraTitle's new `live`/`at` (the badge next to the name).
  * A later release that changes the default rules on purpose updates DEFAULT_BYTES and DEFAULT_SHA256 (sha256 of the
- * part before the new rules) together with its CHANGELOG entry. The added part may hold only style rules (inside
- * @media/@supports at most), no other at-rules, nesting or sibling combinators.
+ * part before the new rules) together with its CHANGELOG entry — 0.19.0 did (the section titles' optional icon, the
+ * clip bar's first row that never wraps). The added part may hold only style rules (inside @media/@supports at most),
+ * no other at-rules, nesting or sibling combinators.
  */
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
@@ -13,8 +14,8 @@ import { resolve } from 'node:path';
 
 // vitest runs from the package root
 const CSS = readFileSync(resolve('src/ui/ui.css'));
-const DEFAULT_BYTES = 44514;
-const DEFAULT_SHA256 = '42ad35c6dcf818f4eeac5c2a9cd1775e1c10af5829ec7c6c2178dfdc6a3bf718';
+const DEFAULT_BYTES = 45096;
+const DEFAULT_SHA256 = '9d01cdadc5733b2e2dcddb945d5db0274b8fe87ec07909f6cc5bd5f8aeacdf04';
 const SCOPE = "[data-nvr-appearance='immersive']";
 /** classes CameraTitle renders only with `live`/`at` */
 const NEW_PROP_CLASS = /^\.nvr-cam__(?:name|badge)(?:--[a-z]+)?(?![\w-])/;
@@ -126,7 +127,7 @@ function check(css: string) {
 }
 
 describe('ui.css: the immersive appearance is an addition', () => {
-  it('starts with the stylesheet of 0.17.1, byte for byte', () => {
+  it('starts with the default stylesheet, byte for byte', () => {
     const head = CSS.subarray(0, DEFAULT_BYTES);
     expect(createHash('sha256').update(head).digest('hex')).toBe(DEFAULT_SHA256);
     expect(head.toString('utf8')).not.toContain('data-nvr-appearance');

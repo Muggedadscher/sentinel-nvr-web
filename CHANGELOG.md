@@ -4,6 +4,24 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.19.0 — 2026-10-10
+
+- Immersive camera page, clip mode: the clip bar floats as a card above the bottom edge (styled through the same
+  `--nvr-float-*` hooks as the date chip, with its rim); the edges are a segment (`.nvr-clipbar__edges`, `data-edge` =
+  the edge that follows the playhead line) with the key over the time in each half and the lens under the active edge,
+  the close button is a round 44-px button, length and hints a caption line, the buttons 50-px capsules. On phones the
+  picture stays edge to edge in clip mode (the sound button where it always is; on a short screen the picture yields
+  first, so the clip bar and the timeline keep ~22rem). Reduced motion: the active edge's fill fades over instead of
+  the sliding lens; forced colours: the bar, the segment, its lens and the buttons keep an edge. `ClipBar` takes
+  `immersive` (`CameraPage` passes it); without it its markup is that of 0.18.0.
+- Clip bar, both appearances: the close button never wraps into a line of its own. A time too wide for its chip
+  (12-hour clock with "PM", a time zone during the repeated hour) now puts the time under "From"/"To" inside the chip;
+  before, the close button took a row of its own on the desktop column (328 px) in English.
+- `EventsStrip` and `CameraGrid` take an optional `icon`: a symbol in front of the section title (`.nvr-section__icon`,
+  hidden from screen readers). Without it their markup is that of 0.18.0.
+- The default stylesheet changed on purpose (the section icon, the clip bar's first row): `test/ui/immersive-css.test.ts`
+  carries its new size and hash; every other new rule is scoped to the immersive page.
+
 ## 0.18.0 — 2026-10-10
 
 - Immersive camera page, opt-in: `<CameraPage appearance="immersive">` (attribute `data-nvr-appearance` on the page).

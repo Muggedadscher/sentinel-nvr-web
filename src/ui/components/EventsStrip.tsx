@@ -1,16 +1,25 @@
 /** Recent-events filmstrip ("EVENTS"): newest first, object crops with class badges, time below — with "yesterday"
  *  (or a short date) in front for events before the viewer's midnight, the strip reaches 24 h back. */
+import type { ReactNode } from 'react';
 import { sentinelEventPlayTs, fmtDayPrefix, fmtTime, type SentinelRecentEvent } from '../../api';
 import { useSentinelUi } from '../context';
 import { EventBadges, eventLabel } from './ClassBadge';
 
-export function EventsStrip({ events }: { events: SentinelRecentEvent[] }) {
+/** `icon`: a symbol in front of the title (a host's look; without it the markup is that of 0.18.0). */
+export function EventsStrip({ events, icon }: { events: SentinelRecentEvent[]; icon?: ReactNode }) {
   const { client, t, locale, nav } = useSentinelUi();
   if (!events.length) return null;
   const now = Date.now();
   return (
     <section className="nvr-section">
-      <h2 className="nvr-section__label">{t('nvr.events.title')}</h2>
+      <h2 className="nvr-section__label">
+        {icon && (
+          <span className="nvr-section__icon" aria-hidden="true">
+            {icon}
+          </span>
+        )}
+        {t('nvr.events.title')}
+      </h2>
       <ul className="nvr-strip">
         {events.map((e) => {
           const day = fmtDayPrefix(e.ts, locale, now);

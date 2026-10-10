@@ -42,6 +42,9 @@ export interface ClipBarProps {
   /** tap on a chip: the edge to activate, null = none */
   onEdge: (edge: ClipEdge | null) => void;
   onClose: () => void;
+  /** the page's immersive appearance (0.19.0): the two chips sit in a segment (`.nvr-clipbar__edges`, `data-edge` =
+   *  the active one); without it the markup is that of 0.18.0 */
+  immersive?: boolean | undefined;
 }
 
 type Job =
@@ -475,8 +478,17 @@ export function ClipBar(p: ClipBarProps) {
   return (
     <div className="nvr-clipbar" role="group" aria-label={t('nvr.clip.download')}>
       <div className="nvr-clipbar__row">
-        {chip('from')}
-        {chip('to')}
+        {p.immersive ? (
+          <div className="nvr-clipbar__edges" data-edge={p.edge ?? undefined}>
+            {chip('from')}
+            {chip('to')}
+          </div>
+        ) : (
+          <>
+            {chip('from')}
+            {chip('to')}
+          </>
+        )}
         <button
           type="button"
           className="nvr-iconbtn nvr-clipbar__close"
