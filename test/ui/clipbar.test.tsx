@@ -539,6 +539,42 @@ describe('ClipBar', () => {
     expect(c.textContent).toMatch(/^nvr\.clip\.from \d\d:\d\d:\d\d$/);
   });
 
+  it('immersive: the chips sit in a segment that names the active edge; without it the markup of 0.18.0', async () => {
+    const range = { from: now0() - 10 * MIN, to: now0() - 9 * MIN };
+    const one = (edge: 'from' | 'to' | null, immersive?: boolean) =>
+      render(
+        <ClipBar
+          camId="33"
+          range={range}
+          edge={edge}
+          clips={recClips()}
+          onEdge={() => {}}
+          onClose={() => {}}
+          immersive={immersive}
+        />,
+        makeClient(),
+      );
+    await one('to', true);
+    const seg = q('.nvr-clipbar__row > .nvr-clipbar__edges');
+    expect(seg?.getAttribute('data-edge')).toBe('to');
+    expect([...seg!.children].map((c) => c.className)).toEqual(['nvr-clipchip', 'nvr-clipchip nvr-clipchip--active']);
+    // the close button stays in the first row, after the segment
+    expect(seg!.nextElementSibling?.className).toContain('nvr-clipbar__close');
+    await act(async () => root?.unmount());
+    document.body.innerHTML = '';
+    await one(null, true);
+    expect(q('.nvr-clipbar__edges')?.hasAttribute('data-edge')).toBe(false);
+    await act(async () => root?.unmount());
+    document.body.innerHTML = '';
+    await one('from');
+    expect(q('.nvr-clipbar__edges')).toBeNull();
+    expect([...q('.nvr-clipbar__row')!.children].map((c) => c.className)).toEqual([
+      'nvr-clipchip nvr-clipchip--active',
+      'nvr-clipchip',
+      'nvr-iconbtn nvr-clipbar__close',
+    ]);
+  });
+
   it('a failed job shows "could not be created"', async () => {
     const client = makeClient({
       startExport: vi.fn(() => Promise.resolve(START())),

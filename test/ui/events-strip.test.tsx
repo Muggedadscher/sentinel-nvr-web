@@ -10,6 +10,7 @@ import { createRoot } from 'react-dom/client';
 import { fmtDayPrefix } from '../../src/api';
 import { SentinelUiProvider } from '../../src/ui/context';
 import { EventsStrip } from '../../src/ui/components/EventsStrip';
+import { CameraGrid } from '../../src/ui/components/CameraGrid';
 
 const d = (y: number, m: number, day: number, h = 0, min = 0) => new Date(y, m - 1, day, h, min).getTime();
 
@@ -101,5 +102,44 @@ describe('EventsStrip', () => {
     const [, yesterday] = render('en');
     expect(yesterday!.querySelector('.nvr-strip__day')!.textContent).toBe('yesterday');
     expect(yesterday!.querySelector('.nvr-strip__clock')!.textContent).toMatch(/^07:41\sPM$/);
+  });
+});
+
+describe('section titles', () => {
+  function titles(icon?: React.ReactNode) {
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    const root = createRoot(div);
+    const ev = { camera: '33', cameraName: 'Einfahrt', ts: Date.now() - 60_000, classes: ['person'], score: 0.9 };
+    act(() =>
+      root.render(
+        <SentinelUiProvider
+          value={{
+            client: { eventThumbUrl: () => '', snapshotUrl: () => '', segmentThumbUrl: () => '' } as any,
+            t: (k: string) => k,
+            locale: 'de-DE',
+            nav: {
+              openCamera: () => {
+                /* */
+              },
+            },
+          }}
+        >
+          <EventsStrip events={[ev]} icon={icon} />
+          <CameraGrid cameras={[]} icon={icon} />
+        </SentinelUiProvider>,
+      ),
+    );
+    const out = [...div.querySelectorAll('h2.nvr-section__label')].map((h) => h.innerHTML);
+    act(() => root.unmount());
+    return out;
+  }
+
+  it('an optional icon in front of the title, hidden from screen readers; without it the markup of 0.18.0', () => {
+    expect(titles(<svg data-i="1" />)).toEqual([
+      '<span class="nvr-section__icon" aria-hidden="true"><svg data-i="1"></svg></span>nvr.events.title',
+      '<span class="nvr-section__icon" aria-hidden="true"><svg data-i="1"></svg></span>nvr.cameras.title',
+    ]);
+    expect(titles()).toEqual(['nvr.events.title', 'nvr.cameras.title']);
   });
 });

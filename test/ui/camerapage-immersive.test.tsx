@@ -3,7 +3,8 @@
  * `data-active` on the tabs, for the segment's lens); every new rule is scoped to it (immersive-css.test.ts). Without
  * it the page renders exactly the markup of 0.17.1 (fixture) — Sentinel's own UI and hosts that do not opt in look as
  * before. `header` as a function also gets `{ live }`; `CameraTitle` shows "LIVE" or the picture's time when the host
- * passes them, and the row is unchanged when it does not.
+ * passes them, and the row is unchanged when it does not. Clip mode (0.19.0): only the immersive page puts the edges
+ * in a segment (`data-edge`, and `data-was` for its lens).
  */
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -169,6 +170,41 @@ describe('CameraPage appearance', () => {
     await act(async () => (tabs.querySelectorAll('button')[1] as HTMLButtonElement).click());
     expect(tabs.getAttribute('data-active')).toBe('ev');
     root.unmount();
+  });
+
+  it('clip mode: the edges as a segment only on the immersive page (0.19.0), its lens knows the edge before', async () => {
+    // a plugin with the clip export
+    const getJson = client.getJson;
+    client.getJson = () => Promise.resolve({ clips: [], events: [], motion: [], features: ['export'] });
+    try {
+      for (const appearance of ['default', 'immersive']) {
+        const { div, root } = await render(page({ appearance }));
+        const download = div.querySelector('[aria-label="nvr.clip.download"]') as HTMLButtonElement;
+        await act(async () => download.click());
+        expect(div.querySelector('.nvr-clipbar')).not.toBeNull();
+        const seg = div.querySelector('.nvr-clipbar__row > .nvr-clipbar__edges');
+        if (appearance === 'default') {
+          expect(seg).toBeNull();
+          root.unmount();
+          continue;
+        }
+        expect(seg).not.toBeNull();
+        expect(seg!.hasAttribute('data-edge')).toBe(false);
+        const chips = () => seg!.querySelectorAll<HTMLButtonElement>('.nvr-clipchip');
+        // none → "To": the lens appears where it is (no edge before)
+        await act(async () => chips()[1]!.click());
+        expect([seg!.getAttribute('data-edge'), seg!.getAttribute('data-was')]).toEqual(['to', null]);
+        // "To" → "From": it slides
+        await act(async () => chips()[0]!.click());
+        expect([seg!.getAttribute('data-edge'), seg!.getAttribute('data-was')]).toEqual(['from', 'to']);
+        // "From" off: it goes where it is
+        await act(async () => chips()[0]!.click());
+        expect([seg!.getAttribute('data-edge'), seg!.getAttribute('data-was')]).toEqual([null, 'from']);
+        root.unmount();
+      }
+    } finally {
+      client.getJson = getJson;
+    }
   });
 });
 

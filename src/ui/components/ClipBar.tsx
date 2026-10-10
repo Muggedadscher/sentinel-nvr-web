@@ -42,6 +42,9 @@ export interface ClipBarProps {
   /** tap on a chip: the edge to activate, null = none */
   onEdge: (edge: ClipEdge | null) => void;
   onClose: () => void;
+  /** the page's immersive appearance (0.19.0): the two chips sit in a segment (`.nvr-clipbar__edges`, `data-edge` =
+   *  the active one, `data-was` = the one before when there was one); without it the markup is that of 0.18.0 */
+  immersive?: boolean | undefined;
 }
 
 type Job =
@@ -85,6 +88,10 @@ function viewerTz(): string | undefined {
 export function ClipBar(p: ClipBarProps) {
   const { client, t, locale } = useSentinelUi();
   const [job, setJobState] = useState<Job>({ s: 'idle' });
+  // the segment's lens slides from one edge to the other and appears and goes where it is: the edge before the
+  // current one (null = none), updated during render when the edge changes
+  const [edges, setEdges] = useState<{ cur: ClipEdge | null; was: ClipEdge | null }>({ cur: p.edge, was: null });
+  if (edges.cur !== p.edge) setEdges({ cur: p.edge, was: edges.cur });
   const jobRef = useRef<Job>(job);
   const setJob = useCallback((j: Job) => {
     jobRef.current = j;
@@ -475,8 +482,17 @@ export function ClipBar(p: ClipBarProps) {
   return (
     <div className="nvr-clipbar" role="group" aria-label={t('nvr.clip.download')}>
       <div className="nvr-clipbar__row">
-        {chip('from')}
-        {chip('to')}
+        {p.immersive ? (
+          <div className="nvr-clipbar__edges" data-edge={p.edge ?? undefined} data-was={edges.was ?? undefined}>
+            {chip('from')}
+            {chip('to')}
+          </div>
+        ) : (
+          <>
+            {chip('from')}
+            {chip('to')}
+          </>
+        )}
         <button
           type="button"
           className="nvr-iconbtn nvr-clipbar__close"

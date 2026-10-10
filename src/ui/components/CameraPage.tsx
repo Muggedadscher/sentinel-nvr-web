@@ -873,6 +873,7 @@ export function CameraPage(p: CameraPageProps) {
               clips={merged.clips}
               onEdge={activateEdge}
               onClose={closeClip}
+              immersive={immersive}
             />
           )}
           {!clip && (

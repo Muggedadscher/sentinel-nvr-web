@@ -1,5 +1,5 @@
 /** Camera tiles ("CAMERAS"): fresh snapshot every 5 s → newest segment thumbnail → placeholder; name + recording dot, offline / recording-stalled badge, meta. */
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Camera, VideoOff, WifiOff } from 'lucide-react';
 import { sentinelRecordingState, type SentinelCamera } from '../../api';
 import { useSentinelUi } from '../context';
@@ -114,11 +114,19 @@ export function CameraTiles({ cameras }: { cameras: SentinelCamera[] }) {
   );
 }
 
-export function CameraGrid({ cameras }: { cameras: SentinelCamera[] }) {
+/** `icon`: a symbol in front of the title (a host's look; without it the markup is that of 0.18.0). */
+export function CameraGrid({ cameras, icon }: { cameras: SentinelCamera[]; icon?: ReactNode }) {
   const { t } = useSentinelUi();
   return (
     <section className="nvr-section">
-      <h2 className="nvr-section__label">{t('nvr.cameras.title')}</h2>
+      <h2 className="nvr-section__label">
+        {icon && (
+          <span className="nvr-section__icon" aria-hidden="true">
+            {icon}
+          </span>
+        )}
+        {t('nvr.cameras.title')}
+      </h2>
       <CameraTiles cameras={cameras} />
     </section>
   );
