@@ -14,8 +14,8 @@ import { resolve } from 'node:path';
 
 // vitest runs from the package root
 const CSS = readFileSync(resolve('src/ui/ui.css'));
-const DEFAULT_BYTES = 45096;
-const DEFAULT_SHA256 = '9d01cdadc5733b2e2dcddb945d5db0274b8fe87ec07909f6cc5bd5f8aeacdf04';
+const DEFAULT_BYTES = 45256;
+const DEFAULT_SHA256 = 'a3b75fd330b83ecd96d9a9eef1ec239ee5c42085f9e1d78407b6400cd668bae6';
 const SCOPE = "[data-nvr-appearance='immersive']";
 /** classes CameraTitle renders only with `live`/`at` */
 const NEW_PROP_CLASS = /^\.nvr-cam__(?:name|badge)(?:--[a-z]+)?(?![\w-])/;

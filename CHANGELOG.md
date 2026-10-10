@@ -6,17 +6,22 @@ are listed in the README compatibility table.
 
 ## 0.19.0 — 2026-10-10
 
-- Immersive camera page, clip mode: the clip bar floats as a card above the bottom edge (styled through the same
-  `--nvr-float-*` hooks as the date chip, with its rim); the edges are a segment (`.nvr-clipbar__edges`, `data-edge` =
-  the edge that follows the playhead line) with the key over the time in each half and the lens under the active edge,
-  the close button is a round 44-px button, length and hints a caption line, the buttons 50-px capsules. On phones the
-  picture stays edge to edge in clip mode (the sound button where it always is; on a short screen the picture yields
-  first, so the clip bar and the timeline keep ~22rem). Reduced motion: the active edge's fill fades over instead of
-  the sliding lens; forced colours: the bar, the segment, its lens and the buttons keep an edge. `ClipBar` takes
-  `immersive` (`CameraPage` passes it); without it its markup is that of 0.18.0.
+- Immersive camera page, clip mode: the clip bar floats as a card above the bottom edge (its surface through the date
+  chip's `--nvr-float-bg`, `-filter`, `-shadow` and `-rim` hooks; its text stays in `--text`/`--text-dim`, so that
+  surface must carry them); the edges are a segment (`.nvr-clipbar__edges`, `data-edge` = the edge that follows the
+  playhead line, `data-was` = the edge before) with the key over the time in each half and the lens under the active
+  edge (it slides from one edge to the other, and appears and goes where it is), the close button is a round 44-px
+  button, length and hints a caption line, the buttons 50-px capsules. A time too wide for its half breaks at its
+  spaces. On phones the picture stays edge to edge in clip mode (the sound button where it always is; on a short
+  screen the picture yields first, down to the default's 28vh, so the clip bar and the timeline keep ~22rem as long
+  as it can). Reduced motion: the active edge's fill fades over instead of the sliding lens; forced colours: the bar,
+  the segment, its lens and the buttons keep an edge. It comes with `<CameraPage appearance="immersive">`; without it
+  the clip bar's markup is that of 0.18.0.
 - Clip bar, both appearances: the close button never wraps into a line of its own. A time too wide for its chip
-  (12-hour clock with "PM", a time zone during the repeated hour) now puts the time under "From"/"To" inside the chip;
-  before, the close button took a row of its own on the desktop column (328 px) in English.
+  (12-hour clock with "PM", a time zone during the repeated hour) now puts the time under "From"/"To" inside the chip,
+  and one still too wide breaks at its spaces; before, the close button took a row of its own on the desktop column
+  (328 px) in English. On phones narrower than about 360 px the English chips take two lines the same way instead of
+  the row wrapping.
 - `EventsStrip` and `CameraGrid` take an optional `icon`: a symbol in front of the section title (`.nvr-section__icon`,
   hidden from screen readers). Without it their markup is that of 0.18.0.
 - The default stylesheet changed on purpose (the section icon, the clip bar's first row): `test/ui/immersive-css.test.ts`

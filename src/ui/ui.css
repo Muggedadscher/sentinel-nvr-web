@@ -1638,8 +1638,8 @@
 .nvr-clipbar__close {
   margin-left: auto;
 }
-/* the first row never wraps: a time too wide for its chip (12-hour clock, a time zone) puts the time under the key
-   instead of pushing the close button into a line of its own (0.19.0) */
+/* the first row never wraps: a time too wide for its chip (12-hour clock, a time zone) puts the time under the key,
+   and one still too wide breaks at its spaces, instead of pushing the close button into a line of its own (0.19.0) */
 .nvr-clipbar__row:first-child {
   flex-wrap: nowrap;
 }
@@ -1649,6 +1649,10 @@
   justify-content: center;
   row-gap: 0;
   min-width: 0;
+}
+.nvr-clipbar__row:first-child > .nvr-clipchip > .nvr-clipchip__v {
+  white-space: normal;
+  text-align: center;
 }
 /* clip mode hides the date chip: the live pill moves down to its place (else it covers the LIVE chip / a marker) */
 .nvr-cam__right--clip .nvr-vtl .livejump {
@@ -2441,24 +2445,34 @@
   border-radius: 24px;
   background: var(--nvr-seg-track, var(--bg-subtle));
 }
+/* the lens under the active edge: it slides from one edge to the other (`data-was` = the edge before) and appears
+   and goes where it is (no edge before: it fades in at its edge; no edge after: it fades out there, then waits under
+   "From") */
 .nvr-cam[data-nvr-appearance='immersive'] .nvr-clipbar__edges::before {
   content: '';
   position: absolute;
   top: 3px;
   bottom: 3px;
   left: 3px;
+  box-sizing: border-box;
   width: calc(50% - 3px);
   border-radius: 21px;
   background: var(--nvr-seg-lens, var(--bg-card));
   box-shadow: var(--nvr-seg-shadow, var(--shadow-card));
   opacity: 0;
   transition:
-    translate var(--nvr-dur, 250ms) var(--nvr-ease, ease-out),
-    opacity 200ms ease;
+    opacity 200ms ease,
+    translate 0s 200ms;
   pointer-events: none;
 }
 .nvr-cam[data-nvr-appearance='immersive'] .nvr-clipbar__edges[data-edge]::before {
   opacity: 1;
+  transition: opacity 200ms ease;
+}
+.nvr-cam[data-nvr-appearance='immersive'] .nvr-clipbar__edges[data-edge][data-was]::before {
+  transition:
+    translate var(--nvr-dur, 250ms) var(--nvr-ease, ease-out),
+    opacity 200ms ease;
 }
 .nvr-cam[data-nvr-appearance='immersive'] .nvr-clipbar__edges[data-edge='to']::before {
   translate: 100% 0;
@@ -2488,10 +2502,11 @@
   font-weight: 400;
   line-height: 16px;
 }
+/* a time too wide for its half breaks at its spaces ("PM", the zone during the repeated hour on a line of its own) */
 .nvr-cam[data-nvr-appearance='immersive'] .nvr-clipbar__edges .nvr-clipchip__v {
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  text-align: center;
 }
 .nvr-cam[data-nvr-appearance='immersive'] .nvr-clipbar__edges .nvr-clipchip--bad,
 .nvr-cam[data-nvr-appearance='immersive'] .nvr-clipbar__edges .nvr-clipchip--bad .nvr-clipchip__k {
@@ -2630,7 +2645,8 @@
   }
   /* the page owns the screen (the host hides its bars): the body is the viewport; on a short screen the picture
      yields first (down to 12rem), so its bar, the tabs, the filters and the timeline keep ~15rem — in clip mode the
-     clip bar and the timeline ~22rem (the picture stays edge to edge on a phone, the sound button where it always is) */
+     clip bar and the timeline ~22rem, the picture yields down to the default's 28vh (it stays edge to edge on a phone,
+     the sound button where it always is) */
   .nvr-cam[data-nvr-appearance='immersive'] .nvr-cam__body {
     gap: 0;
     height: 100dvh;
@@ -2640,7 +2656,7 @@
     --stage-maxh: max(12rem, min(46vh, 100dvh - 15rem));
   }
   .nvr-cam[data-nvr-appearance='immersive'] .nvr-cam__body.nvr-cam__body--clip {
-    --stage-maxh: max(12rem, min(46vh, 100dvh - 22rem));
+    --stage-maxh: max(28vh, min(46vh, 100dvh - 22rem));
   }
   .nvr-cam[data-nvr-appearance='immersive'] .nvr-stage-card {
     border: 0;
