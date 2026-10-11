@@ -4,6 +4,18 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.19.2 — 2026-10-11
+
+- Camera tiles carry their camera's id (`data-nvr-camera`) and hold the picture in one box (`.nvr-camtile__pic`). A
+  tile that mounts again (back on the overview from a camera page) shows the camera's last picture in that box at
+  once (a canvas, `.nvr-camtile__img--last`), until its own snapshot is decoded: no empty tiles while the fresh
+  snapshots load, and a host's transition back from the camera page can land in a picture. The picture is drawn from
+  the image a tile remembered or, while that image loads its next snapshot, from a copy kept of the one before (in
+  WebKit an image has nothing to draw while it loads). A tile that falls back to its placeholder drops the last
+  picture for good. For a host's own camera pictures, `drawLastTileSnapshot(camId, canvas)` draws that picture and
+  `hasLastTileSnapshot(camId)` says whether there is one (a loaded image or its copy, not a URL). The default
+  stylesheet gains the box's rule.
+
 ## 0.19.1 — 2026-10-11
 
 - Immersive camera page below 900 px: the picture's card is `position: sticky` (`top: 0`). It cannot move, it is the
