@@ -4,6 +4,16 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.19.1 — 2026-10-11
+
+- Immersive camera page on phones: the picture starts below the top safe area (the status bar of a home-screen app),
+  and a solid band fixed to the top edge fills that strip (`.nvr-cam__statusbar`, colour `--nvr-statusbar-bg`,
+  default the page's `--bg`). iOS 26 lays a blur over whatever runs under the status bar of a home-screen web app
+  unless a fixed box with a plain background covers the top edge, in which case it takes that box's colour; with the
+  picture under the status bar, the top of the picture was blurred. The top safe area is read through
+  `--nvr-safe-top` (default `env(safe-area-inset-top, 0px)`). Without a safe area (desktop browsers, a Safari tab,
+  landscape) nothing changes. The default page is unchanged.
+
 ## 0.19.0 — 2026-10-10
 
 - Immersive camera page, clip mode: the clip bar floats as a card above the bottom edge (its surface through the date

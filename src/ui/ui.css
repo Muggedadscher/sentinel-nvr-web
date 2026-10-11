@@ -2111,9 +2111,10 @@
    -text-shadow; floating over the timeline (date chip, zoom) --nvr-float-bg / -filter / -rim / -shadow / -fg /
    -accent; segment --nvr-seg-track / -lens / -shadow; motion --nvr-ease / --nvr-dur; LIVE --nvr-live-bg / -fg (badge,
    live jump, the live line's label) and --nvr-live-shadow (badge, live jump); the gradients' dark end --nvr-shade-top
-   (104 px under the header, fading down) and --nvr-shade-bottom (120 px under the controls, full from half way). Meant
-   for dark tokens: the host scopes its theme dark on this page. The header's name and time sit on the top gradient,
-   which is dark in every theme: without --nvr-ctl-fg they are white. */
+   (104 px under the header, fading down) and --nvr-shade-bottom (120 px under the controls, full from half way); the
+   band behind the status bar --nvr-statusbar-bg (phones, 0.19.1; default the page's --bg). Meant for dark tokens: the
+   host scopes its theme dark on this page. The header's name and time sit on the top gradient, which is dark in every
+   theme: without --nvr-ctl-fg they are white. */
 .nvr-cam[data-nvr-appearance='immersive'] {
   /* the package derives these on :root and a custom property is computed where it is declared: under a host that
      scopes dark tokens to this page they would keep the root's (light) values — derive them again here (the overlay
@@ -2128,8 +2129,14 @@
   --nvr-rec-motion: var(--positive);
   --nvr-overlay: color-mix(in srgb, var(--bg) 70%, transparent);
   --nvr-on-overlay: var(--text);
+  /* the top safe area: the status bar of a home-screen app, 0 elsewhere (a variable, so a test can stand in for it) */
+  --nvr-safe-top: env(safe-area-inset-top, 0px);
   position: relative;
   color: var(--text);
+}
+/* the band behind the status bar shows on phones only (below) */
+.nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__statusbar {
+  display: none;
 }
 /* the 1-px rim of a floating capsule (a gradient, masked to the edge) */
 .nvr-cam[data-nvr-appearance='immersive'] :is(.nvr-pill-ctl, .nvr-mute)::before,
@@ -2559,13 +2566,28 @@
 
 /* ---- phones: picture edge to edge, header over it, no cards ---- */
 @media (max-width: 899px) {
+  /* the picture starts below the status bar of a home-screen app (iOS draws it over the page): a solid band fixed to
+     the top edge fills that strip. iOS 26 lays a blur over whatever runs under its status bar unless a fixed box with a
+     plain background covers the top edge — then it takes that box's colour — so with the picture under the status bar
+     its top was blurred; now the band is that box and the picture stays sharp. iOS finds the box by hit-testing the
+     top edge: keep it fixed, opaque, a plain colour (no gradient, no backdrop-filter), above what scrolls under it and
+     hit-testable (no pointer-events: none). 0 high (and no change) without a safe area. */
   .nvr-cam[data-nvr-appearance='immersive'] {
     gap: 0;
+    padding-top: var(--nvr-safe-top);
+  }
+  .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__statusbar {
+    display: block;
+    position: fixed;
+    z-index: 6;
+    inset: 0 0 auto;
+    height: var(--nvr-safe-top);
+    background-color: var(--nvr-statusbar-bg, var(--bg));
   }
   .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head {
     position: absolute;
     z-index: 5;
-    top: calc(8px + env(safe-area-inset-top, 0px));
+    top: calc(8px + var(--nvr-safe-top));
     left: calc(12px + env(safe-area-inset-left, 0px));
     right: calc(12px + env(safe-area-inset-right, 0px));
     display: grid;
@@ -2633,30 +2655,30 @@
     justify-self: end;
     gap: 8px;
   }
-  /* the top gradient carries the header */
+  /* the top gradient carries the header (the picture starts below the status bar) */
   .nvr-cam[data-nvr-appearance='immersive'] .nvr-stage::before {
     content: '';
     position: absolute;
     inset: 0 0 auto;
-    height: calc(104px + env(safe-area-inset-top, 0px));
+    height: 104px;
     z-index: 2;
     pointer-events: none;
     background: linear-gradient(var(--nvr-shade-top, color-mix(in srgb, black 70%, transparent)), transparent);
   }
-  /* the page owns the screen (the host hides its bars): the body is the viewport; on a short screen the picture
-     yields first (down to 12rem), so its bar, the tabs, the filters and the timeline keep ~15rem — in clip mode the
-     clip bar and the timeline ~22rem, the picture yields down to the default's 28vh (it stays edge to edge on a phone,
-     the sound button where it always is) */
+  /* the page owns the screen (the host hides its bars): the body is the viewport below the status bar; on a short
+     screen the picture yields first (down to 12rem), so its bar, the tabs, the filters and the timeline keep ~15rem —
+     in clip mode the clip bar and the timeline ~22rem, the picture yields down to the default's 28vh (it stays edge to
+     edge on a phone, the sound button where it always is) */
   .nvr-cam[data-nvr-appearance='immersive'] .nvr-cam__body {
     gap: 0;
-    height: 100dvh;
+    height: calc(100dvh - var(--nvr-safe-top));
     min-height: 27rem;
   }
   .nvr-cam[data-nvr-appearance='immersive'] .nvr-cam__body:not(.nvr-cam__body--clip) {
-    --stage-maxh: max(12rem, min(46vh, 100dvh - 15rem));
+    --stage-maxh: max(12rem, min(46vh, 100dvh - var(--nvr-safe-top) - 15rem));
   }
   .nvr-cam[data-nvr-appearance='immersive'] .nvr-cam__body.nvr-cam__body--clip {
-    --stage-maxh: max(28vh, min(46vh, 100dvh - 22rem));
+    --stage-maxh: max(28vh, min(46vh, 100dvh - var(--nvr-safe-top) - 22rem));
   }
   .nvr-cam[data-nvr-appearance='immersive'] .nvr-stage-card {
     border: 0;
