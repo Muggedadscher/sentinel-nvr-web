@@ -116,9 +116,7 @@ export interface CameraPageProps {
   /** `'immersive'`: the picture edge to edge with the header over it on phones, controls as floating capsules, the
    *  tabs as a segment (`data-nvr-appearance="immersive"` on the page; meant for dark tokens, the host scopes them).
    *  The host can style the floating parts through `--nvr-ctl-*`, `--nvr-float-*`, `--nvr-seg-*`, `--nvr-live-*`,
-   *  `--nvr-shade-top`/`-bottom`, `--nvr-statusbar-bg` and `--nvr-ease`/`--nvr-dur` (README). On phones the picture
-   *  starts below the top safe area (the status bar of a home-screen app), which a solid band fixed to the top edge
-   *  fills (0.19.1).
+   *  `--nvr-shade-top`/`-bottom` and `--nvr-ease`/`--nvr-dur` (README).
    *  Default `'default'`: the page as before. */
   appearance?: 'default' | 'immersive' | undefined;
   /** the host wraps the date picker in its own modal primitive */
@@ -666,8 +664,6 @@ export function CameraPage(p: CameraPageProps) {
 
   return (
     <div className="nvr-cam" data-nvr-appearance={immersive ? 'immersive' : undefined}>
-      {/* immersive, phones: the band behind the status bar (ui.css; a fixed box at the top edge, see there) */}
-      {immersive && <div className="nvr-cam__statusbar" aria-hidden="true" />}
       {header}
       <div className={'nvr-cam__body' + (clip ? ' nvr-cam__body--clip' : '')} ref={body}>
         <div className="nvr-cam__left">

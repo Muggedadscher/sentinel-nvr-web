@@ -6,13 +6,13 @@ are listed in the README compatibility table.
 
 ## 0.19.1 — 2026-10-11
 
-- Immersive camera page on phones: the picture starts below the top safe area (the status bar of a home-screen app),
-  and a solid band fixed to the top edge fills that strip (`.nvr-cam__statusbar`, colour `--nvr-statusbar-bg`,
-  default the page's `--bg`). iOS 26 lays a blur over whatever runs under the status bar of a home-screen web app
-  unless a fixed box with a plain background covers the top edge, in which case it takes that box's colour; with the
-  picture under the status bar, the top of the picture was blurred. The top safe area is read through
-  `--nvr-safe-top` (default `env(safe-area-inset-top, 0px)`). Without a safe area (desktop browsers, a Safari tab,
-  landscape) nothing changes. The default page is unchanged.
+- Immersive camera page below 900 px: the picture's card is `position: sticky` (`top: 0`). It cannot move, it is the
+  only child of its column, so the layout stays as it is. WebKit on iOS 26 takes a fixed or sticky box that spans the
+  top edge of the viewport (at least 90 % of its width) for the page's top bar: a home-screen web app on an iPhone then
+  shows its status bar on that box's background (here the stage's) instead of laying a soft blur over the top of the
+  page, which on this page was the top of the picture with the header row. WebKit only looks at fixed and sticky boxes
+  there, so a host keeps the middle of the top edge free of its own fixed boxes on this page. The default page is
+  unchanged.
 
 ## 0.19.0 — 2026-10-10
 

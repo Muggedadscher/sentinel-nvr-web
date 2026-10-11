@@ -4,8 +4,8 @@
  * it the page renders exactly the markup of 0.17.1 (fixture) — Sentinel's own UI and hosts that do not opt in look as
  * before. `header` as a function also gets `{ live }`; `CameraTitle` shows "LIVE" or the picture's time when the host
  * passes them, and the row is unchanged when it does not. Clip mode (0.19.0): only the immersive page puts the edges
- * in a segment (`data-edge`, and `data-was` for its lens). 0.19.1: the immersive page starts with the band behind the
- * status bar (`nvr-cam__statusbar`).
+ * in a segment (`data-edge`, and `data-was` for its lens). 0.19.1: on phones the picture card is sticky (ui.css), which
+ * leaves the layout as it is only while the card is its column's only child.
  */
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -158,20 +158,26 @@ describe('CameraPage appearance', () => {
     const { div, root } = await render(page({ appearance: 'immersive' }));
     const cam = div.querySelector('.nvr-cam')!;
     expect(cam.getAttribute('data-nvr-appearance')).toBe('immersive');
-    // the band behind the status bar (0.19.1): the page's first child, hidden from screen readers
-    const band = cam.firstElementChild!;
-    expect(band.className).toBe('nvr-cam__statusbar');
-    expect(band.getAttribute('aria-hidden')).toBe('true');
-    expect(band.childNodes).toHaveLength(0);
     const html = markup(div);
     expect(html).toContain('<div class="nvr-tabs" role="tablist" data-active="tl">');
-    expect(
-      html
-        .replace(' data-nvr-appearance="immersive"', '')
-        .replace(' data-active="tl"', '')
-        .replace('<div class="nvr-cam__statusbar" aria-hidden="true"></div>', ''),
-    ).toBe(FIXTURE());
+    expect(html.replace(' data-nvr-appearance="immersive"', '').replace(' data-active="tl"', '')).toBe(FIXTURE());
     root.unmount();
+  });
+
+  it('the picture card is the only child of its column, also in clip mode (sticky without room to move, 0.19.1)', async () => {
+    const getJson = client.getJson;
+    client.getJson = () => Promise.resolve({ clips: [], events: [], motion: [], features: ['export'] });
+    try {
+      const { div, root } = await render(page({ appearance: 'immersive' }));
+      const only = () => [...div.querySelector('.nvr-cam__left')!.children].map((c) => c.className);
+      expect(only()).toEqual(['nvr-card nvr-stage-card']);
+      await act(async () => (div.querySelector('[aria-label="nvr.clip.download"]') as HTMLButtonElement).click());
+      expect(div.querySelector('.nvr-clipbar')).not.toBeNull();
+      expect(only()).toEqual(['nvr-card nvr-stage-card']);
+      root.unmount();
+    } finally {
+      client.getJson = getJson;
+    }
   });
 
   it('immersive: the tabs carry the chosen tab (data-active, for the sliding lens)', async () => {

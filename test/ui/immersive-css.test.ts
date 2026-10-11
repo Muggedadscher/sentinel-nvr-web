@@ -161,6 +161,39 @@ describe('ui.css: the immersive appearance is an addition', () => {
     expect(check(`${S} [class~='a'] :is(.b, .c) { color: red }`)).toMatchObject({ reaching: [], unscoped: [] });
   });
 
+  it('phones: the picture card is sticky, only there (iOS 26 takes it for the top bar, 0.19.1)', () => {
+    const css = CSS.toString('utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    /** the body of every `@media (<query>) { … }` block */
+    const blocks = (query: string): string[] => {
+      const out: string[] = [];
+      for (let at = css.indexOf(`@media (${query}) {`); at !== -1; at = css.indexOf(`@media (${query}) {`, at + 1)) {
+        let depth = 0;
+        for (let k = css.indexOf('{', at); k < css.length; k++) {
+          if (css[k] === '{') depth++;
+          else if (css[k] === '}' && --depth === 0) {
+            out.push(css.slice(css.indexOf('{', at) + 1, k));
+            break;
+          }
+        }
+      }
+      return out;
+    };
+    const card = new RegExp(`\\.nvr-cam\\[data-nvr-appearance='immersive'\\] \\.nvr-stage-card \\{([^}]*)\\}`, 'g');
+    const bodies = (text: string) => [...text.matchAll(card)].map((m) => m[1]!);
+    const phone = blocks('max-width: 899px').flatMap(bodies);
+    expect(phone).toHaveLength(1);
+    expect(phone[0]).toMatch(/\bposition: sticky;/);
+    expect(phone[0]).toMatch(/\btop: 0;/);
+    // the stage under it has an opaque background in the default stylesheet (the colour iOS gives the status bar)
+    expect(CSS.subarray(0, DEFAULT_BYTES).toString('utf8')).toMatch(
+      /\n\.nvr-stage \{[^}]*\bbackground: color-mix\(in srgb, var\(--bg\) 35%, black\);/,
+    );
+    // nowhere else: the desktop rule and the rules outside @media leave the card in the flow
+    const elsewhere = [...css.matchAll(card)].map((m) => m[1]!).filter((b) => b !== phone[0]);
+    expect(elsewhere.length).toBeGreaterThan(0);
+    for (const b of elsewhere) expect(b).not.toMatch(/\bposition:/);
+  });
+
   it('the badge classes do not occur in the default markup', () => {
     const fixture = readFileSync(resolve('test/ui/fixtures/camerapage-default-0.17.1.html'), 'utf8');
     expect(fixture).not.toMatch(/nvr-cam__(?:name|badge)/);
