@@ -4,7 +4,8 @@
  * it the page renders exactly the markup of 0.17.1 (fixture) — Sentinel's own UI and hosts that do not opt in look as
  * before. `header` as a function also gets `{ live }`; `CameraTitle` shows "LIVE" or the picture's time when the host
  * passes them, and the row is unchanged when it does not. Clip mode (0.19.0): only the immersive page puts the edges
- * in a segment (`data-edge`, and `data-was` for its lens).
+ * in a segment (`data-edge`, and `data-was` for its lens). 0.19.1: on phones the picture card is sticky (ui.css), which
+ * leaves the layout as it is only while the card is its column's only child (also in clip mode and with the PiP note).
  */
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -59,6 +60,9 @@ vi.mock('../../src/player', () => ({
     }
     scrubSettling() {
       return false;
+    }
+    pip() {
+      return Promise.resolve('unsupported');
     }
   },
   rlog: () => {},
@@ -161,6 +165,28 @@ describe('CameraPage appearance', () => {
     expect(html).toContain('<div class="nvr-tabs" role="tablist" data-active="tl">');
     expect(html.replace(' data-nvr-appearance="immersive"', '').replace(' data-active="tl"', '')).toBe(FIXTURE());
     root.unmount();
+  });
+
+  it('the picture card is the only child of its column, in clip mode and with the PiP note too (sticky without room to move, 0.19.1)', async () => {
+    const getJson = client.getJson;
+    client.getJson = () => Promise.resolve({ clips: [], events: [], motion: [], features: ['export'] });
+    try {
+      const { div, root } = await render(page({ appearance: 'immersive' }));
+      const only = () => [...div.querySelector('.nvr-cam__left')!.children].map((c) => c.className);
+      expect(only()).toEqual(['nvr-card nvr-stage-card']);
+      await act(async () => (div.querySelector('[aria-label="nvr.clip.download"]') as HTMLButtonElement).click());
+      expect(div.querySelector('.nvr-clipbar')).not.toBeNull();
+      expect(only()).toEqual(['nvr-card nvr-stage-card']);
+      // the browser refuses picture-in-picture: the note appears inside the card
+      await act(async () => {
+        (div.querySelector('[aria-label="nvr.player.pip"]') as HTMLButtonElement).click();
+      });
+      expect(div.querySelector('.nvr-stage-card > .nvr-pipnote')).not.toBeNull();
+      expect(only()).toEqual(['nvr-card nvr-stage-card']);
+      root.unmount();
+    } finally {
+      client.getJson = getJson;
+    }
   });
 
   it('immersive: the tabs carry the chosen tab (data-active, for the sliding lens)', async () => {

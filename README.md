@@ -39,7 +39,7 @@ on older servers, but only get their full behaviour with the matching plugin ver
 | 0.16.x | any (spans: ≥ 1.3.0) | events as time spans: bar from first sighting to last movement on the timeline, running events pulse, duration/„running“ in the list (`endTs`/`open`); older servers show plain markers. 0.16.5: storage values in the UI language, today refresh during playback — client only. 0.16.7: overlapping timeline markers grouped with a count, a tap zooms in — client only. 0.16.8: the events tab counts the centred day — client only. 0.16.9: "yesterday" in front of the time in the overview events strip — client only. 0.16.10: "recording stalled" on tiles and in the status pill (`stalled` from plugin ≥ 2026-10-05; older servers: no change). 0.16.11: `header`/`externalUrl` may take the playback position — client only. |
 | 0.17.x | plugin with `features: ["export"]` (older plugins: no clip button, everything else as 0.16.x) | clip download on the camera page: "Download clip" in the info bar and per event in the list, range as a band on the timeline, edges set over the playhead line, `api/export` → `api/export-status` → `api/export-file` (save, or share up to 100 MB); `SentinelClient.startExport/exportStatus/exportFileUrl/cancelExport`, `SentinelHttpError.code`. |
 | 0.18.x | any | opt-in immersive camera page: `CameraPage appearance="immersive"` (`data-nvr-appearance` on the page) — picture edge to edge with the header over it on phones, floating controls, tabs as a segment, styled by the host through `--nvr-ctl-*`, `--nvr-float-*`, `--nvr-seg-*`, `--nvr-live-*`, `--nvr-shade-top`/`-bottom`, `--nvr-ease`/`--nvr-dur`; `header(at, { live })`, `CameraTitle` `live`/`at` (LIVE badge or the picture's time). Without the prop the page is unchanged. Client only. |
-| 0.19.x | any (clip download: as 0.17.x) | immersive clip mode (`CameraPage appearance="immersive"`): the clip bar as a floating card with the edges as a segment, the picture edge to edge on phones; the clip bar's close button never wraps (both appearances); optional `icon` in front of the `EventsStrip` / `CameraGrid` titles. Client only. |
+| 0.19.x | any (clip download: as 0.17.x) | immersive clip mode (`CameraPage appearance="immersive"`): the clip bar as a floating card with the edges as a segment, the picture edge to edge on phones; the clip bar's close button never wraps (both appearances); optional `icon` in front of the `EventsStrip` / `CameraGrid` titles. 0.19.1: below 900 px the immersive picture card is sticky (it cannot move), so that, according to WebKit's source, an iOS 26 home-screen app on an iPhone shows the status bar on the stage's background instead of blurring the top of the picture (pictures at least 90 % as wide as the screen). Client only. |
 
 Lab note: Scrypted's WebRTC sink re-encodes (1280 px, 15 fps) for clients that are not Windows/macOS/iOS and report a
 screen below 1920 physical pixels, unless the source declares a width ≤ 1280. Plugin ≥ 1.2.0 declares it for recorded
@@ -65,12 +65,18 @@ The server keeps its own types; `docs/API.md` in the plugin repository is the co
   owns the screen: the host hides its own bars and gives the page the viewport (`.nvr-cam__body` is `100dvh`, at least
   27rem; on a short screen the picture yields first). The picture runs edge to edge and the header row (`CameraTitle`:
   back, name + badge, host actions) lies over it with a gradient — give icon actions the class `nvr-iconbtn` to get
-  the same round button as back. The controls float as capsules, the tabs are a segment with a sliding lens
-  (`.nvr-tabs[data-active]`, only on this page), the timeline reaches the bottom edge (safe areas kept). From 900 px
-  the header stays above the columns, the picture has no card frame. The timeline keeps its geometry. Meant for dark
-  tokens: the host scopes its theme dark on the page (the package re-derives its own `--nvr-*` colours there). Hooks,
-  all optional (fallback = the default look): over the picture `--nvr-ctl-bg`, `-filter`, `-rim` (1-px edge, may be a
-  gradient), `-shadow`, `-fg`, `-text-shadow`; over the timeline (date chip, zoom) `--nvr-float-bg`, `-filter`,
+  the same round button as back. The picture's card is sticky there (0.19.1; it is the only child of its column, so it
+  cannot move): according to WebKit's source, iOS 26 drops the soft blur a home-screen app on an iPhone lays over the
+  top of the page when the page has a top bar, and shows the status bar on its background (here the stage's). WebKit
+  takes the topmost fixed or sticky box at the middle of the top edge and walks up from it to the first one at least
+  90 % as wide as the viewport: keep that point free of the host's own fixed boxes on this page. A picture narrower
+  than 90 % of the viewport (a square or upright camera on a small phone) keeps the blur. The controls float as
+  capsules, the tabs are a segment with a sliding lens (`.nvr-tabs[data-active]`, only on this page), the timeline
+  reaches the bottom edge (safe areas kept). From 900 px the header stays above the columns, the
+  picture has no card frame. The timeline keeps its geometry. Meant for dark tokens: the host scopes its theme dark
+  on the page (the package re-derives its own `--nvr-*` colours there). Hooks, all optional (fallback = the default
+  look): over the picture `--nvr-ctl-bg`, `-filter`, `-rim` (1-px edge, may be a gradient), `-shadow`, `-fg`,
+  `-text-shadow`; over the timeline (date chip, zoom) `--nvr-float-bg`, `-filter`,
   `-rim`, `-shadow`, `-fg`, `-accent` (the chip's text while a recording plays); segment `--nvr-seg-track`, `-lens`,
   `-shadow`; LIVE badge, live jump and the live line's label `--nvr-live-bg`, `-fg` (badge and live jump also
   `--nvr-live-shadow`); the gradients' dark end `--nvr-shade-top` (under the header, default black 70 %) and

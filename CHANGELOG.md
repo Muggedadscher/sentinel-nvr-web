@@ -4,6 +4,17 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.19.1 — 2026-10-11
+
+- Immersive camera page below 900 px: the picture's card is `position: sticky` (`top: 0`). It cannot move, it is the
+  only child of its column, so the layout stays as it is. A home-screen web app on an iPhone (iOS 26) lays a soft blur
+  over the top of the page, on this page over the top of the picture with the header row. According to WebKit's
+  source, iOS drops it when the page has a top bar: WebKit takes the topmost fixed or sticky box at the middle of the
+  top edge and walks up from it to the first one at least 90 % as wide as the viewport, and the status bar then shows
+  on the background found on the way (here the stage's). So a host keeps that point free of its own fixed boxes on
+  this page, and a picture narrower than 90 % of the viewport (a square or upright camera on a small phone) keeps the
+  blur. The default page is unchanged.
+
 ## 0.19.0 — 2026-10-10
 
 - Immersive camera page, clip mode: the clip bar floats as a card above the bottom edge (its surface through the date

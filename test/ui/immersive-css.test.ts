@@ -6,6 +6,9 @@
  * part before the new rules) together with its CHANGELOG entry — 0.19.0 did (the section titles' optional icon, the
  * clip bar's first row that never wraps). The added part may hold only style rules (inside @media/@supports at most),
  * no other at-rules, nesting or sibling combinators.
+ * 0.19.1: on phones the picture's card is sticky (iOS 26 takes it for the top bar). Only that rule positions the card,
+ * the immersive part leaves its column as tall as the card (so it cannot move) and the stage's opaque background as
+ * it is (the colour of the status bar).
  */
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
@@ -23,6 +26,8 @@ const NEW_PROP_CLASS = /^\.nvr-cam__(?:name|badge)(?:--[a-z]+)?(?![\w-])/;
 interface Walk {
   /** selector lists of the style rules (inside @media/@supports too) */
   selectors: string[];
+  /** the style rules: selector list, declarations, the @media/@supports preludes around them */
+  rules: { sel: string; decl: string; within: string[] }[];
   /** every other at-rule, with or without a block (@layer, @keyframes, @property, `@layer a;` …) */
   atRules: string[];
   /** style rules that hold a nested rule (CSS nesting) */
@@ -35,7 +40,7 @@ function walk(css: string): Walk {
   const text = css
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(["'])(?:\\.|(?!\1)[^\\\n])*\1/g, (m) => m.replace(/[{};]/g, '_'));
-  const out: Walk = { selectors: [], atRules: [], nested: [] };
+  const out: Walk = { selectors: [], rules: [], atRules: [], nested: [] };
   let i = 0;
   const nextStop = (): number => {
     const re = /[{};]/g;
@@ -51,7 +56,7 @@ function walk(css: string): Walk {
       } else if (text[i] === '}') depth--;
     }
   };
-  const group = (): void => {
+  const group = (within: string[]): void => {
     while (i < text.length) {
       const k = nextStop();
       if (k === -1) {
@@ -66,17 +71,19 @@ function walk(css: string): Walk {
         if (prelude.startsWith('@')) out.atRules.push(prelude);
         continue;
       }
-      if (/^@(media|supports)\b/.test(prelude)) group();
+      if (/^@(media|supports)\b/.test(prelude)) group([...within, prelude]);
       else if (prelude.startsWith('@')) {
         out.atRules.push(prelude);
         body();
       } else {
         out.selectors.push(prelude);
+        const from = i;
         body(prelude);
+        out.rules.push({ sel: prelude, decl: text.slice(from, i - 1), within });
       }
     }
   };
-  group();
+  group([]);
   return out;
 }
 
@@ -108,6 +115,22 @@ function topLevel(sel: string): string {
     else if (depth === 0) out += c;
   }
   return out;
+}
+
+/** Whether the selector's last compound is the element with this class itself (not a pseudo-element of it). */
+function targets(sel: string, cls: string): boolean {
+  const last =
+    topLevel(sel)
+      .trim()
+      .split(/\s*[\s>+~]\s*/)
+      .pop() ?? '';
+  return new RegExp(`\\.${cls}(?![\\w-])`).test(last) && !/::|:(?:before|after|first-line|first-letter)\b/.test(last);
+}
+
+/** The style rules of a stylesheet (default: all of ui.css) that target the class and set one of the properties. */
+function setting(cls: string, props: RegExp, css = CSS.toString('utf8')) {
+  const prop = new RegExp(`(?:^|;)\\s*(?:${props.source})\\s*:`);
+  return walk(css).rules.filter((r) => split(r.sel).some((sel) => targets(sel, cls)) && prop.test(r.decl));
 }
 
 /** What the scope check needs from an added part of the stylesheet. */
@@ -159,6 +182,49 @@ describe('ui.css: the immersive appearance is an addition', () => {
     expect(check(`@media (hover: hover) { .g { color: red } }`).unscoped).toEqual(['.g']);
     // allowed: attribute operators and :is() lists
     expect(check(`${S} [class~='a'] :is(.b, .c) { color: red }`)).toMatchObject({ reaching: [], unscoped: [] });
+  });
+
+  it('phones: the picture card is sticky, no other rule positions it (iOS 26 takes it for the top bar, 0.19.1)', () => {
+    const pos = setting('nvr-stage-card', /position/);
+    expect(pos.map((r) => [r.within, split(r.sel)])).toEqual([
+      [['@media (max-width: 899px)'], [`.nvr-cam${SCOPE} .nvr-stage-card`]],
+    ]);
+    expect(pos[0]!.decl).toMatch(/\bposition: sticky;/);
+    expect(pos[0]!.decl).toMatch(/\btop: 0;/);
+  });
+
+  it('phones: the card cannot move, keeps its width and lies on the stage, opaque as before', () => {
+    const added = CSS.subarray(DEFAULT_BYTES).toString('utf8');
+    // its column stays as tall as the card: nothing immersive makes it taller or dissolves it
+    const column = /display|flex(?:-grow|-basis)?|(?:min-)?(?:height|block-size)|padding(?:-[a-z-]+)?/;
+    expect(setting('nvr-cam__left', column, added)).toEqual([]);
+    // the card keeps its width and place (WebKit takes it only when it is at least 90 % as wide as the viewport)
+    const size = /(?:min-|max-)?(?:width|inline-size)|margin(?:-[a-z-]+)?|padding(?:-[a-z-]+)?/;
+    expect(setting('nvr-stage-card', size, added)).toEqual([]);
+    // the stage's background in the default stylesheet is opaque (the colour iOS gives the status bar) …
+    expect(CSS.subarray(0, DEFAULT_BYTES).toString('utf8')).toMatch(
+      /\n\.nvr-stage \{[^}]*\bbackground: color-mix\(in srgb, var\(--bg\) 35%, black\);/,
+    );
+    // … and the immersive part leaves it as it is (its gradients are pseudo-elements)
+    expect(setting('nvr-stage', /background(?:-color|-image)?/, added)).toEqual([]);
+  });
+
+  it('the card checks themselves find what they look for', () => {
+    const S = `.nvr-cam${SCOPE}`;
+    const pos = (css: string) => setting('nvr-stage-card', /position/, css).map((r) => r.sel);
+    expect(pos(`.nvr-stage-card { position: relative }`)).toEqual(['.nvr-stage-card']);
+    expect(pos(`@media (x) { ${S} .a > .nvr-stage-card:hover { color: red; position: fixed } }`)).toEqual([
+      `${S} .a > .nvr-stage-card:hover`,
+    ]);
+    expect(pos(`.a, ${S} :is(.b, .c) .nvr-stage-card { position: static }`)).toHaveLength(1);
+    // not the card itself: a pseudo-element, an element inside it, another class, another property
+    expect(pos(`.nvr-stage-card::before { position: absolute } .nvr-stage-card .x { position: absolute }`)).toEqual([]);
+    expect(pos(`.nvr-stage-cards { position: absolute } .nvr-stage-card { --position: 1; inset: 0 }`)).toEqual([]);
+    expect(
+      setting('nvr-cam__left', /padding(?:-[a-z-]+)?/, `${S} .nvr-cam__left { padding-bottom: 1px }`),
+    ).toHaveLength(1);
+    const bg = `${S} .nvr-stage { background-color: red } ${S} .nvr-stage::before { background: red }`;
+    expect(setting('nvr-stage', /background(?:-color|-image)?/, bg)).toHaveLength(1);
   });
 
   it('the badge classes do not occur in the default markup', () => {
