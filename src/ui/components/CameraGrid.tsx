@@ -1,10 +1,13 @@
-/** Camera tiles ("CAMERAS"): fresh snapshot every 5 s → newest segment thumbnail → placeholder; name + recording dot, offline / recording-stalled badge, meta. */
-import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
+/** Camera tiles ("CAMERAS"): fresh snapshot every 5 s → newest segment thumbnail → placeholder; name + recording dot, offline / recording-stalled badge, meta.
+ *  A tile carries its camera's id (`data-nvr-camera`) and holds its picture in one box (`.nvr-camtile__pic`): a tile that
+ *  mounts again shows the camera's last picture there at once, until its own snapshot is on screen — back on the
+ *  overview there are pictures, not empty tiles, and a host's transition back from the camera page lands in one. */
+import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Camera, VideoOff, WifiOff } from 'lucide-react';
 import { sentinelRecordingState, type SentinelCamera } from '../../api';
 import { useSentinelUi } from '../context';
 import { fmtRelative } from '../format';
-import { rememberTileSnapshot } from '../snapshot-cache';
+import { drawLastTileSnapshot, hasLastTileSnapshot, rememberTileSnapshot } from '../snapshot-cache';
 
 const SNAPSHOT_MS = 5000;
 /** Tile snapshot width: a tile is ~300–450 CSS px wide; the 5-MP original (~400 KB every 5 s per camera) only cost the
@@ -18,6 +21,12 @@ const RETRY_EVERY = 6; // ticks (30 s): give a failed snapshot another chance in
 function CameraTile({ cam, tick, n }: { cam: SentinelCamera; tick: number; n: number }) {
   const { client, t, nav } = useSentinelUi();
   const [failed, setFailed] = useState(0); // 0 snapshot · 1 thumbnail · 2 placeholder
+  // the camera's last picture (from any tile, before the page change) under this tile's own until that is decoded
+  const [last, setLast] = useState(() => hasLastTileSnapshot(cam.id));
+  const drawLast = useCallback(
+    (canvas: HTMLCanvasElement | null) => void (canvas && drawLastTileSnapshot(cam.id, canvas)),
+    [cam.id],
+  );
   useEffect(() => {
     setFailed(0);
   }, [client, cam.id]);
@@ -41,6 +50,7 @@ function CameraTile({ cam, tick, n }: { cam: SentinelCamera; tick: number; n: nu
   return (
     <div
       className={`nvr-card nvr-camtile${rec === 'offline' || rec === 'stalled' ? ' nvr-camtile--badged' : ''}`}
+      data-nvr-camera={cam.id}
       role="button"
       tabIndex={0}
       onClick={open}
@@ -53,14 +63,25 @@ function CameraTile({ cam, tick, n }: { cam: SentinelCamera; tick: number; n: nu
       aria-label={cam.name}
     >
       {src ? (
-        <img
-          className="nvr-camtile__img"
-          src={src}
-          alt=""
-          crossOrigin="anonymous"
-          onLoad={(e) => rememberTileSnapshot(cam.id, e.currentTarget)}
-          onError={() => setFailed((f) => Math.min(2, f + 1))}
-        />
+        <span className="nvr-camtile__pic">
+          {last && <canvas className="nvr-camtile__img" ref={drawLast} aria-hidden="true" />}
+          <img
+            className="nvr-camtile__img"
+            src={src}
+            alt=""
+            crossOrigin="anonymous"
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              rememberTileSnapshot(cam.id, img);
+              if (!last) return;
+              // the last picture goes once this one is decoded (it lies on top, nothing in between shows)
+              const drop = () => setLast(false);
+              if (typeof img.decode === 'function') img.decode().then(drop, drop);
+              else drop();
+            }}
+            onError={() => setFailed((f) => Math.min(2, f + 1))}
+          />
+        </span>
       ) : (
         <div className="nvr-camtile__placeholder" aria-hidden="true">
           <Camera size={32} strokeWidth={1.5} />

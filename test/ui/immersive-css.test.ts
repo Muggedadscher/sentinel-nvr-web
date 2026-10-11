@@ -9,6 +9,7 @@
  * 0.19.1: on phones the picture's card is sticky (iOS 26 takes it for the top bar). Only that rule positions the card,
  * the immersive part leaves its column as tall as the card (so it cannot move) and the stage's opaque background as
  * it is (the colour of the status bar).
+ * 0.19.2 changed the default rules on purpose: the camera tile's picture box (`.nvr-camtile__pic`).
  */
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
@@ -17,8 +18,8 @@ import { resolve } from 'node:path';
 
 // vitest runs from the package root
 const CSS = readFileSync(resolve('src/ui/ui.css'));
-const DEFAULT_BYTES = 45256;
-const DEFAULT_SHA256 = 'a3b75fd330b83ecd96d9a9eef1ec239ee5c42085f9e1d78407b6400cd668bae6';
+const DEFAULT_BYTES = 45420;
+const DEFAULT_SHA256 = '809233a8cf60214d698a9d1464794b612e91c0fe99dd9268a5503d7a035edf1b';
 const SCOPE = "[data-nvr-appearance='immersive']";
 /** classes CameraTitle renders only with `live`/`at` */
 const NEW_PROP_CLASS = /^\.nvr-cam__(?:name|badge)(?:--[a-z]+)?(?![\w-])/;
