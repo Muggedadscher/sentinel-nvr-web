@@ -193,11 +193,14 @@ describe('ui.css: the immersive appearance is an addition', () => {
     expect(pos[0]!.decl).toMatch(/\btop: 0;/);
   });
 
-  it('phones: the card cannot move and lies on the stage, opaque as before', () => {
+  it('phones: the card cannot move, keeps its width and lies on the stage, opaque as before', () => {
     const added = CSS.subarray(DEFAULT_BYTES).toString('utf8');
     // its column stays as tall as the card: nothing immersive makes it taller or dissolves it
     const column = /display|flex(?:-grow|-basis)?|(?:min-)?(?:height|block-size)|padding(?:-[a-z-]+)?/;
     expect(setting('nvr-cam__left', column, added)).toEqual([]);
+    // the card keeps its width and place (WebKit takes it only when it is at least 90 % as wide as the viewport)
+    const size = /(?:min-|max-)?(?:width|inline-size)|margin(?:-[a-z-]+)?|padding(?:-[a-z-]+)?/;
+    expect(setting('nvr-stage-card', size, added)).toEqual([]);
     // the stage's background in the default stylesheet is opaque (the colour iOS gives the status bar) …
     expect(CSS.subarray(0, DEFAULT_BYTES).toString('utf8')).toMatch(
       /\n\.nvr-stage \{[^}]*\bbackground: color-mix\(in srgb, var\(--bg\) 35%, black\);/,

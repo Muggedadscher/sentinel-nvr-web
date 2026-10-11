@@ -7,13 +7,13 @@ are listed in the README compatibility table.
 ## 0.19.1 — 2026-10-11
 
 - Immersive camera page below 900 px: the picture's card is `position: sticky` (`top: 0`). It cannot move, it is the
-  only child of its column, so the layout stays as it is. WebKit on iOS 26 takes a fixed or sticky box that spans the
-  top edge of the viewport (at least 90 % of its width) for the page's top bar: a home-screen web app on an iPhone then
-  shows its status bar on the background it finds there (here the stage's) instead of laying a soft blur over the top
-  of the page, which on this page was the top of the picture with the header row. WebKit takes the topmost fixed or
-  sticky box at the middle of the top edge and only walks up from it, so a host keeps that point free of its own fixed
-  boxes on this page. A picture narrower than 90 % of the viewport (a square or upright camera on a small phone) keeps
-  the blur. The default page is unchanged.
+  only child of its column, so the layout stays as it is. A home-screen web app on an iPhone (iOS 26) lays a soft blur
+  over the top of the page, on this page over the top of the picture with the header row. According to WebKit's
+  source, iOS drops it when the page has a top bar: WebKit takes the topmost fixed or sticky box at the middle of the
+  top edge and walks up from it to the first one at least 90 % as wide as the viewport, and the status bar then shows
+  on the background found on the way (here the stage's). So a host keeps that point free of its own fixed boxes on
+  this page, and a picture narrower than 90 % of the viewport (a square or upright camera on a small phone) keeps the
+  blur. The default page is unchanged.
 
 ## 0.19.0 — 2026-10-10
 
