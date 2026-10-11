@@ -8,10 +8,13 @@ are listed in the README compatibility table.
 
 - Camera tiles carry their camera's id (`data-nvr-camera`) and hold the picture in one box (`.nvr-camtile__pic`). A
   tile that mounts again (back on the overview from a camera page) shows the camera's last picture in that box at
-  once, drawn from the image a tile remembered, until its own snapshot is decoded: no empty tiles while the fresh
-  snapshots load, and a host's transition back from the camera page can land in a picture. For a host's own camera
-  pictures, `drawLastTileSnapshot(camId, canvas)` draws that picture and `hasLastTileSnapshot(camId)` says whether
-  there is one (a loaded image, not a URL). The default stylesheet gains the box's rule.
+  once (a canvas, `.nvr-camtile__img--last`), until its own snapshot is decoded: no empty tiles while the fresh
+  snapshots load, and a host's transition back from the camera page can land in a picture. The picture is drawn from
+  the image a tile remembered or, while that image loads its next snapshot, from a copy kept of the one before (in
+  WebKit an image has nothing to draw while it loads). A tile that falls back to its placeholder drops the last
+  picture for good. For a host's own camera pictures, `drawLastTileSnapshot(camId, canvas)` draws that picture and
+  `hasLastTileSnapshot(camId)` says whether there is one (a loaded image or its copy, not a URL). The default
+  stylesheet gains the box's rule.
 
 ## 0.19.1 — 2026-10-11
 

@@ -1,7 +1,8 @@
 /** Camera tiles ("CAMERAS"): fresh snapshot every 5 s → newest segment thumbnail → placeholder; name + recording dot, offline / recording-stalled badge, meta.
  *  A tile carries its camera's id (`data-nvr-camera`) and holds its picture in one box (`.nvr-camtile__pic`): a tile that
- *  mounts again shows the camera's last picture there at once, until its own snapshot is on screen — back on the
- *  overview there are pictures, not empty tiles, and a host's transition back from the camera page lands in one. */
+ *  mounts again shows the camera's last picture there at once (a canvas, `.nvr-camtile__img--last`), until its own
+ *  snapshot is decoded — back on the overview there are pictures, not empty tiles, and a host's transition back from the
+ *  camera page lands in one. */
 import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Camera, VideoOff, WifiOff } from 'lucide-react';
 import { sentinelRecordingState, type SentinelCamera } from '../../api';
@@ -64,7 +65,7 @@ function CameraTile({ cam, tick, n }: { cam: SentinelCamera; tick: number; n: nu
     >
       {src ? (
         <span className="nvr-camtile__pic">
-          {last && <canvas className="nvr-camtile__img" ref={drawLast} aria-hidden="true" />}
+          {last && <canvas className="nvr-camtile__img nvr-camtile__img--last" ref={drawLast} aria-hidden="true" />}
           <img
             className="nvr-camtile__img"
             src={src}
@@ -79,7 +80,11 @@ function CameraTile({ cam, tick, n }: { cam: SentinelCamera; tick: number; n: nu
               if (typeof img.decode === 'function') img.decode().then(drop, drop);
               else drop();
             }}
-            onError={() => setFailed((f) => Math.min(2, f + 1))}
+            onError={() => {
+              // the placeholder comes next: the last picture must not come back with a later retry
+              if (failed > 0 || !cam.latestThumbId) setLast(false);
+              setFailed((f) => Math.min(2, f + 1));
+            }}
           />
         </span>
       ) : (
