@@ -2660,10 +2660,12 @@
   }
   /* the picture's card is sticky. It cannot move (it is its column's only child, the column is as tall as the card),
      so the layout stays as it is. WebKit (iOS 26) takes a fixed or sticky box at the top edge of the viewport for the
-     page's top bar: a home-screen app then shows its status bar on that box's background (here the stage's) instead
-     of laying its soft blur over what starts below the status bar, the top of the picture with the header row.
-     WebKit looks only at fixed and sticky boxes there, the first one under the middle of the top edge that is about
-     as wide as the viewport: on this page the host keeps that point free of its own fixed boxes. */
+     page's top bar: a home-screen app then shows its status bar on the background it finds there (here the stage's)
+     instead of laying its soft blur over what starts below the status bar, the top of the picture with the header
+     row. WebKit hit-tests only fixed and sticky boxes (and what is inside them) at the middle of the top edge, takes
+     the topmost one and walks up from it to the first fixed or sticky box at least 90 % as wide as the viewport; it
+     never looks further down. So on this page the host keeps that point free of its own fixed boxes, and a picture
+     narrower than that (a square or upright camera on a small phone) keeps the blur. */
   .nvr-cam[data-nvr-appearance='immersive'] .nvr-stage-card {
     position: sticky;
     top: 0;
