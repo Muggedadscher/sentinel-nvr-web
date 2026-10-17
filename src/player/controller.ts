@@ -759,8 +759,11 @@ export class PlayerController {
       this.freezeT = window.setTimeout(() => this.freezeHide(), STILL_CAP_MS);
     }
   }
-  /** Event click: the stored frame is the poster until the seek lands. */
-  posterEvent(ts: number): void {
+  /** Event click: a poster until the seek lands. With `start` (the playback start; server feature `frame`) the
+   *  picture the playback starts with (api/frame: the keyframe the relay starts on), else the stored detection frame —
+   *  that one lies up to ~16 s after the start (2 s before the first sighting, then the keyframe before), and the picture
+   *  jumped back when the video took over. */
+  posterEvent(ts: number, start?: number): void {
     const cam = this.camId;
     this.posterFor = ts;
     const img = new Image();
@@ -775,7 +778,10 @@ export class PlayerController {
       }
       // else: the target picture is already on screen — don't cover it
     };
-    img.src = this.api.url(`api/evframe?camera=${encodeURIComponent(cam)}&ts=${ts}`);
+    img.src =
+      start !== undefined
+        ? this.api.url(`api/frame?camera=${encodeURIComponent(cam)}&ts=${Math.round(start)}&w=1280`)
+        : this.api.url(`api/evframe?camera=${encodeURIComponent(cam)}&ts=${ts}`);
   }
   /** Camera opened: a picture in front of the grey stage until live plays. `tile` = what the overview tile showed: its
    *  loaded <img> is drawn at once (already decoded, no request); a URL or a broken/unfinished image falls back to a
