@@ -9,7 +9,7 @@ are listed in the README compatibility table.
 - Event click: the still picture until the video runs is the picture the playback starts with, so the video no longer
   jumps back when it takes over. Playback starts before the event (2 s before the first sighting, then from the
   keyframe before), up to ~16 s earlier than the stored detection frame that was shown so far. Needs a plugin with
-  `features: ["frame"]` (`api/frame`); with an older plugin the detection frame stays. `PlayerController.posterEvent`
+  `features: ["frame"]` (`api/frame`); with an older plugin, or when `api/frame` fails, the detection frame stays. `PlayerController.posterEvent`
   takes the playback start as an optional second argument. An event link from the overview shows its still once the
   first day of the camera has loaded (its answer carries `features`).
 
