@@ -256,6 +256,8 @@ export function CameraPage(p: CameraPageProps) {
   useEffect(() => {
     ctl.current?.setClips(merged.clips, merged.codecs, merged.rangeStart, merged.rangeEnd);
   }, [merged]);
+  /** the server decodes the picture a playback starts with (api/frame) — known once a day of this camera is loaded */
+  const frameServer = useCallback(() => Object.values(daysRef.current).some((d) => sentinelHasFeature(d, 'frame')), []);
 
   const fetchDay = useCallback(
     async (ds: number): Promise<SentinelClipsResponse> => {
@@ -351,11 +353,7 @@ export function CameraPage(p: CameraPageProps) {
     setClipEdge(null);
     setLoadError(false);
     loading.current.clear();
-    // a stored event frame exists only for an event (posterTs = `ev` of the link); a time-only link (`at` from "Open in
-    // Sentinel", "Open in Safari", a reload) asked api/evframe for `at` and got a 404
-    if (startAt) {
-      if (posterTs) c.posterEvent(posterTs);
-    } else {
+    if (!startAt) {
       c.posterFromSnapshot(lastTileSnapshot(camId));
       // live needs no clips: start it now instead of after the day loads (two api/clips answers, several hundred KB on a
       // phone — the grey stage waited for them). Only the MSE-live fallback reads the codec from the clips: a fallback
@@ -364,8 +362,18 @@ export function CameraPage(p: CameraPageProps) {
     }
     const t0 = todayStart();
     const target = startAt ? dayOf(startAt) : t0;
+    const first = ensureDay(target);
+    // a poster only for an event link (posterTs = `ev` of the link; a time-only link — `at` from "Open in Sentinel",
+    // "Open in Safari", a reload — has no stored event frame). It waits for this day: only its answer says whether the
+    // server has api/frame (the playback's first picture); the session starts after the days anyway
+    if (startAt && posterTs)
+      first
+        .then(() => {
+          if (c.camId === camId && ctl.current === c) c.posterEvent(posterTs, frameServer() ? startAt : undefined);
+        })
+        .catch(() => {});
     Promise.all([
-      ensureDay(target),
+      first,
       ensureDay(addDays(target, -1)),
       target !== t0 ? ensureDay(t0) : Promise.resolve(),
       target === t0 ? Promise.resolve() : ensureDay(addDays(target, 1)),
@@ -396,7 +404,7 @@ export function CameraPage(p: CameraPageProps) {
     deepRef.current = key;
     const c = ctl.current;
     c.freezeCurrent();
-    if (posterTs) c.posterEvent(posterTs);
+    if (posterTs) c.posterEvent(posterTs, frameServer() ? startAt : undefined);
     goToDay(dayOf(startAt), startAt).catch(() => setLoadError(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startAt, posterTs]);
@@ -438,14 +446,18 @@ export function CameraPage(p: CameraPageProps) {
     setJump({ ts: Date.now(), n: Date.now() });
   }, []);
   // click → the current picture freezes at once → the event frame replaces it when loaded → the video at the target lifts it
-  const playEvent = useCallback((ev: SentinelEvent) => {
-    const c = ctl.current;
-    if (!c) return;
-    setTab('tl');
-    c.freezeCurrent();
-    c.posterEvent(ev.timestamp);
-    c.playAt(sentinelEventPlayTs(ev), {});
-  }, []);
+  const playEvent = useCallback(
+    (ev: SentinelEvent) => {
+      const c = ctl.current;
+      if (!c) return;
+      setTab('tl');
+      c.freezeCurrent();
+      const start = sentinelEventPlayTs(ev);
+      c.posterEvent(ev.timestamp, frameServer() ? start : undefined);
+      c.playAt(start, {});
+    },
+    [frameServer],
+  );
   // tap on a group of timeline markers: the timeline zoomed in and put the group on the playhead line — play from there,
   // a jump like an event click (still picture until the new picture), but no event poster; seconds before now = live
   const seekTo = useCallback(
@@ -522,10 +534,11 @@ export function CameraPage(p: CameraPageProps) {
       const c = ctl.current;
       if (!c) return;
       c.freezeCurrent();
-      c.posterEvent(ev.timestamp);
-      c.playAt(Math.max(r.from, oldestRec ?? -Infinity), {});
+      const start = Math.max(r.from, oldestRec ?? -Infinity);
+      c.posterEvent(ev.timestamp, frameServer() ? start : undefined);
+      c.playAt(start, {});
     },
-    [oldestRec],
+    [oldestRec, frameServer],
   );
   const closeClip = useCallback(() => {
     setClip(null);

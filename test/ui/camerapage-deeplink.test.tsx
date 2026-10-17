@@ -124,7 +124,7 @@ describe('CameraPage deep link', () => {
       codecs: 'avc1.42e01f',
     });
     await new Promise((r) => setTimeout(r, 30));
-    expect(posterEvent).toHaveBeenCalledWith(ev);
+    expect(posterEvent).toHaveBeenCalledWith(ev, undefined); // no `frame` feature: the stored event frame
     expect(playAt).toHaveBeenCalledWith(ev - 3000, {});
     // the clips handed over right BEFORE playAt must include today's clip (a later setClips from the render effect doesn't help:
     // nothing restarts playback, the label would stay "no recording")
@@ -247,7 +247,68 @@ describe('CameraPage deep link', () => {
     await act(async () => {
       root.render(page(at + 120000 - 3000, at + 120000));
     });
-    expect(posterEvent).toHaveBeenCalledWith(at + 120000);
+    expect(posterEvent).toHaveBeenCalledWith(at + 120000, undefined);
+    root.unmount();
+  });
+
+  it('a server with api/frame (feature "frame"): the poster is the playback start, on opening and on a second jump', async () => {
+    posterEvent.mockClear();
+    playAt.mockClear();
+    const today = new Date().setHours(0, 0, 0, 0);
+    const ev = today + 5 * 3600e3;
+    const client = {
+      corsMedia: true,
+      url: (p: string) => p,
+      getJson: () =>
+        Promise.resolve({
+          clips: [{ id: 'c', startTime: ev - 30000, duration: 3600e3 }],
+          events: [],
+          motion: [],
+          features: ['export', 'frame'],
+        }),
+      eventThumbUrl: () => '',
+      snapshotUrl: () => '',
+      segmentThumbUrl: () => '',
+    } as any;
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    const root = createRoot(div);
+    const page = (startAt: number, posterTs?: number) => (
+      <SentinelUiProvider
+        value={{
+          client,
+          t: (k: string) => k,
+          locale: 'de-DE',
+          nav: {
+            openCamera: () => {
+              /* */
+            },
+          },
+        }}
+      >
+        <CameraPage
+          camId="33"
+          name="Cam"
+          startAt={startAt}
+          posterTs={posterTs}
+          storagePrefix="t-"
+          brand="test"
+          renderDatePicker={() => null}
+        />
+      </SentinelUiProvider>
+    );
+    await act(async () => {
+      root.render(page(ev - 3000, ev));
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+    expect(posterEvent).toHaveBeenCalledWith(ev, ev - 3000);
+    expect(playAt).toHaveBeenCalledWith(ev - 3000, {});
+    await act(async () => {
+      root.render(page(ev + 60000 - 3000, ev + 60000));
+    });
+    expect(posterEvent).toHaveBeenLastCalledWith(ev + 60000, ev + 60000 - 3000);
     root.unmount();
   });
 });
