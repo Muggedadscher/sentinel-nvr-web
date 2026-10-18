@@ -125,11 +125,11 @@ export class PlayerController {
   private recoveries = 0;
   private posterUntilSeek = false;
   private seekTarget = 0;
-  // seek → visible swap (see SWAP_MS); posterFor = event the pending poster belongs to; scrubOffT = delayed profile switch
+  // seek → visible swap (see SWAP_MS); posterFor = URL of the pending event poster; scrubOffT = delayed profile switch
   private swapPending = false;
   private swapFrames = -1;
   private swapT = 0;
-  private posterFor = 0;
+  private posterFor = '';
   private scrubOffT = 0;
   // marked seek: width the new position arrives with (0 = timer path), send time (telemetry); presented width / frames at session start
   private swapW = 0;
@@ -759,23 +759,36 @@ export class PlayerController {
       this.freezeT = window.setTimeout(() => this.freezeHide(), STILL_CAP_MS);
     }
   }
-  /** Event click: the stored frame is the poster until the seek lands. */
-  posterEvent(ts: number): void {
+  /** Event click: a poster until the seek lands. With `start` (the playback start; server feature `frame`) the
+   *  picture the playback starts with (api/frame: the keyframe the relay starts on), else the stored detection frame —
+   *  that one lies up to ~16 s after the start (2 s before the first sighting, then the keyframe before), and the picture
+   *  jumped back when the video took over. */
+  posterEvent(ts: number, start?: number): void {
     const cam = this.camId;
-    this.posterFor = ts;
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      if (this.camId !== cam || this.posterFor !== ts || this.destroyed) return;
-      const firstFramePending = !!this.rw?.active && this.presentedFrames() <= this.sessFrames0;
-      if (this.swapPending)
-        this.freezeFromImage(img, true, true, 'event'); // a jump is under way → until its picture
-      else if (firstFramePending || !this.rw?.active) {
-        if (this.freezeFromImage(img, true, false, 'event')) this.openMark('poster'); // new session → until its first frame
-      }
-      // else: the target picture is already on screen — don't cover it
+    const evframe = this.api.url(`api/evframe?camera=${encodeURIComponent(cam)}&ts=${ts}`);
+    const load = (url: string, fallback?: string) => {
+      this.posterFor = url; // the same event can be asked with two starts (event click, clip from the event)
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        if (this.camId !== cam || this.posterFor !== url || this.destroyed) return;
+        const firstFramePending = !!this.rw?.active && this.presentedFrames() <= this.sessFrames0;
+        if (this.swapPending)
+          this.freezeFromImage(img, true, true, 'event'); // a jump is under way → until its picture
+        else if (firstFramePending || !this.rw?.active) {
+          if (this.freezeFromImage(img, true, false, 'event')) this.openMark('poster'); // new session → until its first frame
+        }
+        // else: the target picture is already on screen — don't cover it
+      };
+      // api/frame failed (no recording decodable there, a timeout): the stored detection frame is better than none
+      if (fallback)
+        img.onerror = () => {
+          if (this.camId === cam && this.posterFor === url && !this.destroyed) load(fallback);
+        };
+      img.src = url;
     };
-    img.src = this.api.url(`api/evframe?camera=${encodeURIComponent(cam)}&ts=${ts}`);
+    if (start === undefined) load(evframe);
+    else load(this.api.url(`api/frame?camera=${encodeURIComponent(cam)}&ts=${Math.round(start)}&w=1280`), evframe);
   }
   /** Camera opened: a picture in front of the grey stage until live plays. `tile` = what the overview tile showed: its
    *  loaded <img> is drawn at once (already decoded, no request); a URL or a broken/unfinished image falls back to a

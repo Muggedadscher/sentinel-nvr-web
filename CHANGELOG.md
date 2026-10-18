@@ -4,6 +4,15 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.20.0 — 2026-10-18
+
+- Event click: the still picture until the video runs is the picture the playback starts with, so the video no longer
+  jumps back when it takes over. Playback starts before the event (2 s before the first sighting, then from the
+  keyframe before), up to ~16 s earlier than the stored detection frame that was shown so far. Needs a plugin with
+  `features: ["frame"]` (`api/frame`); with an older plugin, or when `api/frame` fails, the detection frame stays. `PlayerController.posterEvent`
+  takes the playback start as an optional second argument. An event link from the overview shows its still once the
+  first day of the camera has loaded (its answer carries `features`).
+
 ## 0.19.2 — 2026-10-11
 
 - Camera tiles carry their camera's id (`data-nvr-camera`) and hold the picture in one box (`.nvr-camtile__pic`). A
