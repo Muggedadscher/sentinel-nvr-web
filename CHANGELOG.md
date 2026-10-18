@@ -4,7 +4,7 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
-## Unreleased
+## 0.20.0 — 2026-10-18
 
 - Event click: the still picture until the video runs is the picture the playback starts with, so the video no longer
   jumps back when it takes over. Playback starts before the event (2 s before the first sighting, then from the
