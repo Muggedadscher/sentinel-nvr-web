@@ -1979,6 +1979,7 @@ export class PlayerController {
       } catch {
         /* ignore */
       }
+      this.drain(); // chunks a timeupdate fetched before sourceopen
       this.feed();
     });
     try {

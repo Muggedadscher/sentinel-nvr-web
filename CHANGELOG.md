@@ -7,8 +7,8 @@ are listed in the README compatibility table.
 ## 0.20.1 — 2026-10-19
 
 - A jump (click, ±15 s, event, deep link) into one of the short gaps between two recordings (the recorder leaves
-  30–1350 ms between many segments, ~500 per day) plays the next recording instead of showing "no recording" — the
-  same choice the server makes. `clipAt(clips, ts)` and `GAP_SNAP_MS` (2 s) in `@sentinel-nvr/web/player`;
+  30–1350 ms between many segments, ~500 per day) plays the next recording instead of showing "no recording", as the
+  server already does. `clipAt(clips, ts)` and `GAP_SNAP_MS` (2 s) in `@sentinel-nvr/web/player`;
   `PlayerController.clipIndexFor` uses it.
 - Recorded MSE fallback: the next segment is fetched only after every chunk of the previous one is appended. On a fast
   network a timeupdate could start it earlier; its timestamp offset then landed inside the previous segment, and the
