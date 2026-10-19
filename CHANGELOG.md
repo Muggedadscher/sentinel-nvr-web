@@ -4,6 +4,13 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.20.2 — 2026-10-19
+
+- Fast scrubbing, above all backwards: the time shown on the picture and the playhead no longer run 60–100 s past the
+  picture and snap back with the next position answer. Between two answers they move at the speed of the picture on
+  screen (`relay-pos` `v`) instead of the server's current rate, which is up to 0.8 s ahead of the picture. Plugins
+  without `v` keep the former behaviour.
+
 ## 0.20.1 — 2026-10-19
 
 - A jump (click, ±15 s, event, deep link) into one of the short gaps between two recordings (the recorder leaves

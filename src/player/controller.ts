@@ -29,7 +29,7 @@ import {
   STILL_CAP_MS,
   SWAP_MS,
 } from './stills';
-import { DEAD_POLLS, relayFailure, relayPosVerdict } from './relaystate';
+import { DEAD_POLLS, relayFailure, relayPlayhead, relayPosVerdict } from './relaystate';
 
 /** `label` is an i18n key suffix: nvr.player.<label> */
 export type PlayerLabel =
@@ -109,6 +109,9 @@ export class PlayerController {
   private rwBase: number | null = null;
   private rwPosTs: number | null = null;
   private rwPosAt = 0;
+  /** speed of the picture over the next poll interval from relay-pos `v` (null = server without it, or re-anchored
+   *  locally since) — the playhead interpolates with it; the server's `r` runs up to 0.8 s ahead of the picture */
+  private rwPosV: number | null = null;
   private rwRate = 1;
   private rwSrate = 1;
   private rwScrub = false;
@@ -521,14 +524,14 @@ export class PlayerController {
   currentTs(): number | null {
     if (this.rw?.active) {
       if (this.rwPosTs != null) {
-        const v = this.rwPosTs + (Date.now() - this.rwPosAt) * (this.rwRate || 1);
-        // while the server steers onto a target its rate changes every 100 ms — never extrapolate past the target
-        if ((this.rwScrub || this.scrubMoves > 0) && this.rwLastTarget) {
-          const lo = Math.min(this.rwPosTs, this.rwLastTarget),
-            hi = Math.max(this.rwPosTs, this.rwLastTarget);
-          return Math.min(hi, Math.max(lo, v));
-        }
-        return v;
+        return relayPlayhead(
+          this.rwPosTs,
+          this.rwPosAt,
+          Date.now(),
+          this.rwPosV,
+          this.rwRate,
+          (this.rwScrub || this.scrubMoves > 0) && this.rwLastTarget ? this.rwLastTarget : null,
+        );
       }
       if (this.rwBase != null && this.v.currentTime > 0)
         return this.rwStartMs + (this.v.currentTime - this.rwBase) * 1000 * (this.rwRate || 1);
@@ -1253,6 +1256,7 @@ export class PlayerController {
     this.rw = undefined;
     this.rwBase = null;
     this.rwPosTs = null;
+    this.rwPosV = null;
     this.rwPoll = null;
     this.rwScrub = false;
     this.rwSeekBusy = false;
@@ -1422,6 +1426,7 @@ export class PlayerController {
     this.wdGrace = Date.now() + 5000;
     this.rwPosTs = ts;
     this.rwPosAt = Date.now();
+    this.rwPosV = null;
     this.setLabel(this.rwScrub ? 'scrub' : 'loading'); // scrubbing seeks constantly — no "loading" flicker there
     this.rwSeekBusy = true;
     this.seekTarget = ts;
@@ -1479,6 +1484,7 @@ export class PlayerController {
     if (c != null) {
       this.rwPosTs = c;
       this.rwPosAt = Date.now();
+      this.rwPosV = null;
     }
     if (!this.rwScrub) this.rwRate = r;
     this.cmdSeq++;
@@ -1545,6 +1551,7 @@ export class PlayerController {
       if (c != null) {
         this.rwPosTs = c;
         this.rwPosAt = Date.now();
+        this.rwPosV = null;
       }
       if (this.label === 'scrub') this.setLabel('playing');
     }
@@ -1654,6 +1661,7 @@ export class PlayerController {
             this.wdDead = 0;
             this.rwPosTs = d.t;
             this.rwPosAt = Date.now();
+            this.rwPosV = typeof d.v === 'number' && isFinite(d.v) ? d.v : null;
             const P = this.rwPoll;
             this.rwPoll = {
               t: d.t,
