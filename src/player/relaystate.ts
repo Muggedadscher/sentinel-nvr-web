@@ -25,6 +25,9 @@ export function relayPosVerdict(
   return 'ignore';
 }
 
+/** relay-pos `v` is the picture's mean speed over this long after the answer (the server's poll interval). */
+export const VIS_RATE_MS = 600;
+
 /** The playhead between two relay-pos answers: the last answer's picture position, moved on at the picture's own speed
  *  (`v`, null = server before 19.10.2026: the feeder rate). The feeder rate runs up to 0.8 s ahead of the picture — at a
  *  fast reverse scrub the playhead ran at the servo's new rate, overshot by 60–100 s and snapped back with the next poll.
@@ -37,7 +40,12 @@ export function relayPlayhead(
   rate: number,
   target: number | null,
 ): number {
-  const x = pos + (now - at) * (v ?? (rate || 1));
+  const dt = now - at;
+  // v covers VIS_RATE_MS; a late answer (poll in flight up to 3 s) goes on at the rate, not at a fling's last speed
+  const x =
+    v == null
+      ? pos + dt * (rate || 1)
+      : pos + Math.min(dt, VIS_RATE_MS) * v + Math.max(0, dt - VIS_RATE_MS) * (rate || 1);
   if (target == null) return x;
   return Math.min(Math.max(pos, target), Math.max(Math.min(pos, target), x));
 }

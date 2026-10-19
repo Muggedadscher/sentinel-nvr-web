@@ -138,6 +138,11 @@ describe('playhead between relay-pos answers', () => {
     expect(relayPlayhead(pos, NOW, NOW + 600, -2000, 1, null)).toBe(pos - 1_200_000);
   });
 
+  it('v covers only the next 600 ms; a late answer goes on at the rate', () => {
+    // a fling gave up: the last answer still carries −3000×, the session already plays at 1× again
+    expect(relayPlayhead(pos, NOW, NOW + 2600, -3000, 1, null)).toBe(pos - 600 * 3000 + 2000);
+  });
+
   it('servers without v: the feeder rate as before (0 counts as 1×)', () => {
     expect(relayPlayhead(pos, NOW, NOW + 600, null, -3000, null)).toBe(pos - 1_800_000);
     expect(relayPlayhead(pos, NOW, NOW + 600, null, 0, null)).toBe(pos + 600);
