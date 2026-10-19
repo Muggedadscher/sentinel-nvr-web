@@ -16,3 +16,23 @@ export function carryClipIndex(prev: readonly { id: string }[], next: readonly {
   if (before >= 0) return before + 1;
   return idx;
 }
+
+/** Gaps up to this long between two recordings count as no gap: a jump into one plays the next recording. */
+export const GAP_SNAP_MS = 2000;
+
+/**
+ * The clip a jump to `ts` plays: the one that covers it, else the next one when it starts at most `GAP_SNAP_MS` later.
+ * Consecutive segments are not seamless: the recorder leaves 30–1350 ms between many of them (496 gaps in one lab day),
+ * and a click, ±15 s or an event landing in one showed "no recording" instead of playing on. The server's feeder
+ * (`clipIndexAt`) also starts at the next segment. -1 = nothing recorded there.
+ */
+export function clipAt(clips: readonly { startTime: number; duration?: number }[], ts: number): number {
+  let next = -1;
+  for (let i = 0; i < clips.length; i++) {
+    const c = clips[i]!;
+    if (ts >= c.startTime && ts < c.startTime + (c.duration || 60000)) return i;
+    if (c.startTime > ts && c.startTime - ts <= GAP_SNAP_MS && (next < 0 || c.startTime < clips[next]!.startTime))
+      next = i;
+  }
+  return next;
+}

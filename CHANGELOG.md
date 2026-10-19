@@ -4,6 +4,16 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.20.1 — 2026-10-19
+
+- A jump (click, ±15 s, event, deep link) into one of the short gaps between two recordings (the recorder leaves
+  30–1350 ms between many segments, ~500 per day) plays the next recording instead of showing "no recording", as the
+  server already does. `clipAt(clips, ts)` and `GAP_SNAP_MS` (2 s) in `@sentinel-nvr/web/player`;
+  `PlayerController.clipIndexFor` uses it.
+- Recorded MSE fallback: the next segment is fetched only after every chunk of the previous one is appended. On a fast
+  network a timeupdate could start it earlier; its timestamp offset then landed inside the previous segment, and the
+  picture stopped with a decode error (about 1 in 10 starts in the lab).
+
 ## 0.20.0 — 2026-10-18
 
 - Event click: the still picture until the video runs is the picture the playback starts with, so the video no longer
