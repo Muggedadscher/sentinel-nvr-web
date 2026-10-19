@@ -1,5 +1,5 @@
 // DOM-free decisions of the PlayerController's relay session (unit-testable without a browser): which relay-pos answers
-// count, and when a failing relay is retried or handed over to MSE.
+// count, where the playhead is between them, and when a failing relay is retried or handed over to MSE.
 
 /** A relay-pos answer within PRE_SWAP_MS after a seek that is further than PRE_SWAP_DIST_MS from the seek target still
  *  shows the old position (the new one has not crossed the pipeline yet) — ignored, else the playhead jumps back. */
@@ -23,6 +23,23 @@ export function relayPosVerdict(
   if (d && d.t > 0) return 'position';
   if (d && d.t <= 0) return 'dead';
   return 'ignore';
+}
+
+/** The playhead between two relay-pos answers: the last answer's picture position, moved on at the picture's own speed
+ *  (`v`, null = server before 19.10.2026: the feeder rate). The feeder rate runs up to 0.8 s ahead of the picture — at a
+ *  fast reverse scrub the playhead ran at the servo's new rate, overshot by 60–100 s and snapped back with the next poll.
+ *  `target` (while the server steers onto a scrub target): never past it, never back behind the answer. */
+export function relayPlayhead(
+  pos: number,
+  at: number,
+  now: number,
+  v: number | null,
+  rate: number,
+  target: number | null,
+): number {
+  const x = pos + (now - at) * (v ?? (rate || 1));
+  if (target == null) return x;
+  return Math.min(Math.max(pos, target), Math.max(Math.min(pos, target), x));
 }
 
 /** `t ≤ 0` this many polls in a row = the session is gone → recover. */

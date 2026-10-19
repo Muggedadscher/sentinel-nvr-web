@@ -15,6 +15,7 @@ import {
   PRE_SWAP_MS,
   RELAY_RETRIES,
   relayFailure,
+  relayPlayhead,
   relayPosVerdict,
 } from '../../src/player/relaystate';
 
@@ -124,5 +125,28 @@ describe('relay recovery', () => {
     fallback();
     fallback();
     expect(log).toEqual(['retry', 'retry', 'mse']);
+  });
+});
+
+describe('playhead between relay-pos answers', () => {
+  const pos = NOW - 3_600_000;
+
+  it("moves at the picture's speed, not at the servo's rate that runs ahead of it", () => {
+    // fast reverse scrub: the servo is at −3000× already, the picture on screen still runs at −40×
+    expect(relayPlayhead(pos, NOW, NOW + 600, -40, -3000, null)).toBe(pos - 24_000);
+    // the servo brakes to 1× while the picture still runs backwards fast: no standstill, no jump with the next answer
+    expect(relayPlayhead(pos, NOW, NOW + 600, -2000, 1, null)).toBe(pos - 1_200_000);
+  });
+
+  it('servers without v: the feeder rate as before (0 counts as 1×)', () => {
+    expect(relayPlayhead(pos, NOW, NOW + 600, null, -3000, null)).toBe(pos - 1_800_000);
+    expect(relayPlayhead(pos, NOW, NOW + 600, null, 0, null)).toBe(pos + 600);
+  });
+
+  it('while steering onto a scrub target: never past the target, never behind the answer', () => {
+    const target = pos - 60_000;
+    expect(relayPlayhead(pos, NOW, NOW + 600, -3000, -3000, target)).toBe(target);
+    expect(relayPlayhead(pos, NOW, NOW + 600, -40, -3000, target)).toBe(pos - 24_000);
+    expect(relayPlayhead(pos, NOW, NOW + 600, 40, -3000, target)).toBe(pos); // picture still forwards: hold the answer
   });
 });
