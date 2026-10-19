@@ -17,7 +17,7 @@ import { timeoutSignal, type SentinelClip as Clip, type SentinelClient } from '.
 import { rlog, setRlogClient } from './rlog';
 import { WebRtcSession, mobileClient } from './webrtc';
 import { skipTarget } from './skip';
-import { carryClipIndex } from './clips';
+import { carryClipIndex, clipAt } from './clips';
 import { settleStart, settleStep, SETTLE_CAP_MS, type SettleTrack } from './settle';
 import {
   avoidWidth,
@@ -508,11 +508,7 @@ export class PlayerController {
     });
   }
   clipIndexFor(ts: number): number {
-    for (let i = 0; i < this.clips.length; i++) {
-      const c = this.clips[i]!;
-      if (ts >= c.startTime && ts < c.startTime + (c.duration || 60000)) return i;
-    }
-    return -1;
+    return clipAt(this.clips, ts);
   }
   private nearNow(ts: number): boolean {
     return Date.now() - ts < 8000;
@@ -2025,7 +2021,9 @@ export class PlayerController {
   }
   private feed(): void {
     const M = this.M;
-    if (!M.active || M.feeding) return;
+    // the previous segment's chunks still queued: the next one waits for updateend. Its timestampOffset would land
+    // before them (InvalidStateError mid media segment, the abort() fallback then broke the parser: decode error)
+    if (!M.active || M.feeding || M.q.length) return;
     if (M.mmsGo === false) return;
     if (M.nextIdx < 0 || M.nextIdx >= this.clips.length) return;
     if (M.end - this.v.currentTime > 90) return;
