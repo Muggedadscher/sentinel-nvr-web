@@ -41,7 +41,8 @@ export interface StyleFields {
 
 /** What the host adds to the shared rules. */
 export interface AppearanceHost {
-  /** Surfaces the host floats over the page from `<body>` (windows, panels): dark while the camera page is shown. */
+  /** Surfaces the host floats over the page from `<body>` (windows, panels): dark while the camera page is shown.
+   *  One selector per entry (no comma lists: each entry gets the Glas prefix in front). */
   floating?: readonly string[];
   /** Klassisch: the host's own browser colour (e.g. from `--bg`); without it the page's original value comes back. */
   classicThemeColor?: () => void;
