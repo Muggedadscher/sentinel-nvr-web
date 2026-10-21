@@ -44,6 +44,7 @@
   "nvr.cameras.title": "Telecamere",
   "nvr.cameras.none": "Nessuna telecamera con l’estensione Sentinel NVR attiva.",
   "nvr.cameras.offline": "Offline",
+  "nvr.cameras.live": "Live",
   "nvr.cameras.stalled": "Registrazione bloccata",
   "nvr.cameras.stalledHint": "Non arrivano nuove registrazioni, Sentinel riavvia la registrazione",
   "nvr.cameras.eventsToday.one": "{count} oggi",

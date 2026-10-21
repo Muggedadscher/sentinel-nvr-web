@@ -44,6 +44,7 @@
   "nvr.cameras.title": "Kameror",
   "nvr.cameras.none": "Inga kameror med Sentinel NVR-tillägget aktiverat.",
   "nvr.cameras.offline": "Offline",
+  "nvr.cameras.live": "Live",
   "nvr.cameras.stalled": "Inspelningen har stannat",
   "nvr.cameras.stalledHint": "Inga nya inspelningar kommer in, Sentinel startar om inspelningen",
   "nvr.cameras.eventsToday.one": "{count} idag",
