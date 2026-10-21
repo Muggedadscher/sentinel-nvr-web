@@ -32,6 +32,11 @@
       "import": "./dist/ui/index.js",
       "default": "./dist/ui/index.js"
     },
+    "./glas": {
+      "types": "./dist/glas/index.d.ts",
+      "import": "./dist/glas/index.js",
+      "default": "./dist/glas/index.js"
+    },
     "./ui/ui.css": "./dist/ui/ui.css",
     "./ui/locales/*": "./dist/ui/locales/*"
   },
