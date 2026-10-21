@@ -38,13 +38,14 @@
       "default": "./dist/glas/index.js"
     },
     "./ui/ui.css": "./dist/ui/ui.css",
+    "./ui/glas.css": "./dist/ui/glas.css",
     "./ui/locales/*": "./dist/ui/locales/*"
   },
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsup && mkdir -p dist/ui && cp src/ui/ui.css dist/ui/ui.css && rm -rf dist/ui/locales && cp -r src/ui/locales dist/ui/locales",
+    "build": "tsup && mkdir -p dist/ui && cp src/ui/ui.css dist/ui/ui.css && cp src/ui/glas.css dist/ui/glas.css && rm -rf dist/ui/locales && cp -r src/ui/locales dist/ui/locales",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:tz": "TZ=UTC vitest run && TZ=Europe/Berlin vitest run && TZ=America/New_York vitest run",
