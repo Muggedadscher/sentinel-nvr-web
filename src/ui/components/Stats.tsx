@@ -249,7 +249,8 @@ function GlassHero({ cameras, stats }: { cameras: SentinelCamera[]; stats: Senti
             </dt>
             <dd className="nvr-tafel__value">
               {f.value}
-              {f.unit && <span className="nvr-tafel__unit">{` ${f.unit}`}</span>}
+              {/* a no-break space: the unit never wraps away from its value */}
+              {f.unit && <span className="nvr-tafel__unit">{`\u00a0${f.unit}`}</span>}
             </dd>
           </div>
         ))}
