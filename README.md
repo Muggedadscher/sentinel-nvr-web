@@ -16,6 +16,7 @@ One npm package, **`@sentinel-nvr/web`**, with subpath entry points (one version
 | `@sentinel-nvr/web/api` | **available** | DOM-free data model + types mirroring the plugin's `docs/API.md`, URL/setup parsing, event classification, storage forecast, timeline clip-run merge, locale formatters, and a `fetch`/WebSocket `SentinelClient`. No framework deps. |
 | `@sentinel-nvr/web/player` | **available** | `PlayerController`, WebRTC signaling, the no-reneg recorded-playback relay client, watchdog and the live/recorded fallback chain. |
 | `@sentinel-nvr/web/ui` | **available** | React components — the whole **camera page** (`CameraPage`: stage, control pill, info bar, tabs, class filters, vertical timeline, events list, date chip; `CameraTitle` header row), class badges, event strip, camera tiles, date picker, stat cards — the i18n dictionaries (`nvr.*`, 7 locales) and the theme system (4 identities × light/dark/auto + accent hue). Styles in `@sentinel-nvr/web/ui/ui.css` (HAPulse tokens). |
+| `@sentinel-nvr/web/glas` | **available** (0.21.0) | The style "Glas" without React: its values (`glas-data`, a verbatim copy of HAPulse's `glasTokens.ts`) and `applyAppearance`/`watchAppearance`, which write them on `<html>` next to the classic theme. Its stylesheet for the package's parts is `@sentinel-nvr/web/ui/glas.css` (load after `ui.css`). |
 
 The earlier `@sentinel-nvr/api@0.1.0` is deprecated in favour of `@sentinel-nvr/web/api`.
 
@@ -41,6 +42,7 @@ on older servers, but only get their full behaviour with the matching plugin ver
 | 0.18.x | any | opt-in immersive camera page: `CameraPage appearance="immersive"` (`data-nvr-appearance` on the page) — picture edge to edge with the header over it on phones, floating controls, tabs as a segment, styled by the host through `--nvr-ctl-*`, `--nvr-float-*`, `--nvr-seg-*`, `--nvr-live-*`, `--nvr-shade-top`/`-bottom`, `--nvr-ease`/`--nvr-dur`; `header(at, { live })`, `CameraTitle` `live`/`at` (LIVE badge or the picture's time). Without the prop the page is unchanged. Client only. |
 | 0.19.x | any (clip download: as 0.17.x) | immersive clip mode (`CameraPage appearance="immersive"`): the clip bar as a floating card with the edges as a segment, the picture edge to edge on phones; the clip bar's close button never wraps (both appearances); optional `icon` in front of the `EventsStrip` / `CameraGrid` titles. 0.19.1: below 900 px the immersive picture card is sticky (it cannot move), so that, according to WebKit's source, an iOS 26 home-screen app on an iPhone shows the status bar on the stage's background instead of blurring the top of the picture (pictures at least 90 % as wide as the screen). 0.19.2: camera tiles carry `data-nvr-camera` and hold the picture in one box (`.nvr-camtile__pic`); a tile that mounts again shows the camera's last picture (`.nvr-camtile__img--last`, also while the remembered image loads its next snapshot) until its own snapshot is decoded (`drawLastTileSnapshot` / `hasLastTileSnapshot` for a host's own pictures). Client only. |
 | 0.20.x | any (start picture: plugin with `features: ["frame"]`, older plugins keep the detection frame) | event click: the still picture until the video runs is the first picture of the playback (`api/frame`), so the video no longer jumps back when it takes over; `PlayerController.posterEvent(ts, start?)`. 0.20.1: a jump into a gap of up to 2 s between two recordings plays the next one instead of "no recording" (`clipAt`, `GAP_SNAP_MS`); MSE fallback: the next segment is fetched only after the previous one is appended (sporadic decode error) — client only. 0.20.2: while scrubbing the playhead moves at the speed of the picture (`relay-pos` `v`, plugin from 19.10.2026; older plugins: the former rate interpolation). |
+| 0.21.x | any (client only) | the style "Glas": entry `@sentinel-nvr/web/glas`, `ui/glas.css`, the Glas overview parts (`GlassCameras`, `GlassEvents`, `GlassNvr`, `GlassSections`), `Hero appearance="glass"`, the style rows in `AppearanceSection`. Without them every part renders as in 0.20.x. |
 
 Lab note: Scrypted's WebRTC sink re-encodes (1280 px, 15 fps) for clients that are not Windows/macOS/iOS and report a
 screen below 1920 physical pixels, unless the source declares a width ≤ 1280. Plugin ≥ 1.2.0 declares it for recorded
@@ -89,6 +91,25 @@ The server keeps its own types; `docs/API.md` in the plugin repository is the co
   surface hooks (`--nvr-float-bg`, `-filter`, `-shadow`, `-rim`; its text stays in `--text`/`--text-dim`, so that
   surface must carry them), its edges are a segment with the `--nvr-seg-*` hooks (`.nvr-clipbar__edges[data-edge]`,
   `data-was` = the edge before).
+
+- **Glas** (0.21.0, opt-in; HAPulse leads the look, the package holds what both apps show): `applyAppearance({ theme,
+  mode, accentHue, uiStyle, glassStrength, reduceTransparency })` from `@sentinel-nvr/web/glas` applies the classic theme
+  and, for `uiStyle: 'glas'`, the Glas values and `data-style="glas"` on `<html>` (`data-glass` = the strength, opaque
+  under more contrast or reduced transparency; a `<style id="glas-dark-scope">` for the dark subtree). Back to
+  Klassisch nothing of Glas stays. `watchAppearance(get)` re-applies on the system's light/dark, contrast and
+  transparency changes. `setAppearanceHost({ floating, classicThemeColor })` names the host's floating surfaces over the
+  camera page and who sets the browser colour in Klassisch. Every rule of `ui/glas.css` sits under
+  `:root[data-style='glas']`; without the attribute the file does nothing. Host contract (as HAPulse's base): the root
+  values (`--g-font`, `--font-*`, `--radius-card`, tabular figures), the class `nvr-overview` on the overview's content,
+  `--nvr-gl-bleed` (default 16 px, how far the strips reach past the content on a phone), `data-glas-scheme="dark"`
+  on the part that shows the camera page. Parts: `GlassNvr` (cameras and events as strips, the snapshots refresh every
+  `refreshMs`, a failed one shows the last thumbnail until a background probe loads, every 30 s), `GlassSections` (the
+  same with section titles), `GlassCameras`, `GlassEvents`; a tile is the `button[data-nvr-camera]` with its picture
+  box `.nvr-camtile__pic` as first child (a host's transition between tile and camera page finds it there); opening
+  goes through `nav.openCamera(id)` (tile) or `nav.openCamera(id, at, ev)` (event). `Hero appearance="glass"` is the
+  status board (`.nvr-tafel`). `AppearanceSection` shows the style rows when the host passes `onUiStyle` (and in Glas
+  `onGlassStrength`, `onReduceTransparency`); in Glas a hint replaces the theme cards. Without these props every part
+  renders the markup of 0.20.x (test `classic-markup`).
 
 ## Develop
 
