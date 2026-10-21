@@ -26,6 +26,7 @@
 :root[data-style='glas'] .nvr-chart__bar,
 :root[data-style='glas'] .nvr-meter__rec,
 :root[data-style='glas'] .nvr-legend__sw--rec,
+:root[data-style='glas'] .nvr-vtl .vclip,
 :root[data-style='glas'] .nvr-dt__d--sel,
 :root[data-style='glas'] .nvr-mute[aria-pressed='true'],
 :root[data-style='glas'] .nvr-clipbar__prog > i {
@@ -961,12 +962,27 @@
 :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] .nvr-stage-title small {
   color: var(--g-label-2);
 }
+/* the timeline keeps the package's geometry and its colours for states (recording band, motion, classes, live; K101);
+   the playhead is `label` (§7.33) with its time as a capsule in the same colour */
+:root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vcenter {
+  background: var(--g-label);
+  box-shadow: none;
+}
+:root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vcenter-t {
+  border-color: transparent;
+  background: var(--g-label);
+  color: var(--g-bg);
+  font: 600 13px / 18px var(--g-font);
+}
 /* Focus over the picture (Etappe 7, K109): inside the control, in its own ink, so the ring lies on the control's glass
    (white on clear glass, dark on the pressed sound circle) — the accent ring around it lay on the picture (1.2:1 over
    a bright image). The timeline's events take the playhead's colour (the accent beside the blue band: 2.3:1). */
 :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] :is(.nvr-pb, .nvr-mute):focus-visible {
   outline: 2px solid currentColor;
   outline-offset: -2px;
+}
+:root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vev:focus-visible {
+  outline-color: var(--g-label);
 }
 @media (max-width: 899px) {
   :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-iconbtn:focus-visible {
@@ -1031,6 +1047,18 @@
   }
 }
 @media (forced-colors: active) {
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vcenter {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vcenter-t {
+    forced-color-adjust: none;
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
   :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] {
     --nvr-ctl-bg: Canvas;
     --nvr-ctl-filter: none;
