@@ -1,0 +1,1250 @@
+/* @sentinel-nvr/web — the style "Glas" for the package's parts (from 0.21.0). Every rule sits under
+   :root[data-style='glas'] (set by the glas entry's applyAppearance), values only through variables (no hex, the values
+   come from glas-data.ts), no @layer, !important only for the 200-ms fades under reduced motion, a tint on :hover only
+   under @media (hover: hover). Load it after ui.css.
+
+   Moved here from HAPulse's styles/glas (base, accent, material, lists, nvr, pages, tafel; HAPulse a4e3d3c), which
+   imports this file at the place of its nvr.css: HAPulse leads the look, both apps show the same parts. HAPulse's own
+   names became the package's (.g-nvr → .nvr-gl, .g-tafel → .nvr-tafel, .g-glass → .nvr-glass, the overview's
+   .nvr-layout → .nvr-overview, a host class); contexts that covered every place HAPulse shows a part were dropped
+   (none of the rules lost against another one by that, checked rule by rule).
+
+   Host contract: the root values (--g-font, --font-*, --radius-card, tabular figures) as HAPulse's base.css sets them;
+   `.nvr-overview` on the overview's content; `--nvr-gl-bleed` (default 16 px), how far the strips reach past the
+   content on a phone; `data-glas-scheme="dark"` on the part that shows the camera page. */
+
+/* ---- from HAPulse styles/glas/base.css ---- */
+
+/* Cards are borderless in Glas; --border itself stays visible for controls and tracks (plan K14). Borders that
+   show a state (alarm triggered, motion detected, the chosen colour world) stay as in Klassisch. The Sentinel
+   package's cards (.nvr-card, same role) follow, colour only. */
+:root[data-style='glas'] .nvr-card {
+  border-color: transparent;
+}
+/* ---- from HAPulse styles/glas/accent.css ---- */
+:root[data-style='glas'] .nvr-btn--primary,
+:root[data-style='glas'] .nvr-chart__bar,
+:root[data-style='glas'] .nvr-meter__rec,
+:root[data-style='glas'] .nvr-legend__sw--rec,
+:root[data-style='glas'] .nvr-vtl .vclip,
+:root[data-style='glas'] .nvr-dt__d--sel,
+:root[data-style='glas'] .nvr-mute[aria-pressed='true'],
+:root[data-style='glas'] .nvr-clipbar__prog > i {
+  --accent: var(--g-prominent);
+  --on-accent: var(--g-on-prominent);
+}
+/* Focus rings keep the ink on the orange areas above (global :focus-visible and the switch tracks draw them with
+   var(--accent)). Where the ring is a box-shadow around the area, the area turns ink while focused. Since stage 5 the
+   sliders and the play buttons of the media cards no longer use the accent (controls.css, K93), the pool's bars,
+   timeline, on/off and rings have their own colours and focus rings (pool.css, K99), and the library's play button
+   and the group menu's check have their own look (music.css). */
+:root[data-style='glas'] :is(.nvr-btn--primary, .nvr-dt__d--sel, .nvr-mute):focus-visible {
+  outline-color: var(--g-focus);
+}
+/* ---- from HAPulse styles/glas/material.css ---- */
+:root[data-style='glas'] :where(.nvr-glass) {
+  --g-surface-tint: 0;
+  --g-t: max(var(--g-surface-tint), var(--g-glass-tint));
+  --g-glass-fill: linear-gradient(
+    180deg,
+    rgb(var(--g-glass-rgb) / calc(var(--g-glass-a0) + 0.4 * var(--g-t))),
+    rgb(var(--g-glass-rgb) / calc(var(--g-glass-a1) + 0.4 * var(--g-t)))
+  );
+  --g-glass-filter: blur(calc(6px + 10px * var(--g-t))) saturate(var(--g-glass-sat)) brightness(var(--g-glass-bright));
+  --g-surface-fill: var(--g-glass-fill);
+  --g-surface-filter: var(--g-glass-filter);
+  --g-surface-shadow: var(--g-glass-shadow);
+  --g-surface-rim: var(--g-glass-rim);
+  --g-surface-solid: var(--g-card-solid);
+  /* what the surface shows — a state rule that has to restore it (hover of an upstream button) uses this */
+  --g-surface-bg: var(--g-surface-fill);
+  position: relative;
+  isolation: isolate;
+  background: var(--g-surface-bg);
+  -webkit-backdrop-filter: var(--g-surface-filter);
+  backdrop-filter: var(--g-surface-filter);
+  box-shadow: var(--g-surface-shadow);
+}
+/* Specular rim, 1 px, masked to the edge. */
+:root[data-style='glas'] :where(.nvr-glass)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: var(--g-surface-rim);
+  -webkit-mask:
+    linear-gradient(black 0 0) content-box,
+    linear-gradient(black 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+/* Sheen from the touch point while pressed (--gx/--gy in px, written by GlasRuntime on pointerdown). Only controls
+   light up (below); panels, menus and toasts keep it at 0. */
+:root[data-style='glas'] :where(.nvr-glass)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(120px circle at var(--gx, 50%) var(--gy, 50%), var(--g-glow), transparent 60%);
+  transition: opacity 400ms ease-out;
+}
+/* clear: only over a camera image or video — white glyphs (§3.2); also the name on the Sentinel camera tiles (nvr.css,
+   K105), whose markup comes from the package. */
+:root[data-style='glas'] .nvr-glass--clear {
+  --g-glass-fill: var(--g-glass-clear-fill);
+  --g-glass-filter: var(--g-glass-clear-filter);
+  --g-surface-rim: var(--g-glass-clear-rim);
+  box-shadow: var(--g-glass-clear-shadow);
+  color: var(--g-on-media);
+  text-shadow: var(--g-glass-clear-text-shadow);
+}
+/* text on clear glass (the camera tiles' names, the NVR card's pill): the clear fill dims more, so the white text keeps
+   4.5:1 over a white picture together with the tile's top shade (GLAS-DESIGN §2.5 rule 5; Etappe 7, K109) */
+:root[data-style='glas'] .nvr-gl__pill {
+  --g-glass-fill: var(--g-glass-clear-text-fill);
+}
+/* opaque ("Deckend", "Transparenz reduzieren", more contrast): solid fill, no filter, no rim (§3.4). */
+:root[data-style='glas'][data-glass='opaque'] :where(.nvr-glass) {
+  --g-surface-bg: var(--g-surface-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--g-glass-opaque-shadow);
+}
+:root[data-style='glas'][data-glass='opaque'] .nvr-glass--clear {
+  --g-surface-bg: var(--g-glass-opaque-clear-fill);
+  box-shadow: var(--g-glass-opaque-clear-shadow);
+}
+:root[data-style='glas'][data-glass='opaque'] :where(.nvr-glass)::before {
+  display: none;
+}
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  :root[data-style='glas'] :where(.nvr-glass) {
+    --g-surface-bg: var(--g-surface-solid);
+    box-shadow: var(--g-glass-opaque-shadow);
+  }
+
+  :root[data-style='glas'] .nvr-glass--clear {
+    --g-surface-bg: var(--g-glass-opaque-clear-fill);
+    box-shadow: var(--g-glass-opaque-clear-shadow);
+  }
+
+  :root[data-style='glas'] :where(.nvr-glass)::before {
+    display: none;
+  }
+}
+@media (forced-colors: active) {
+  :root[data-style='glas'] :where(.nvr-glass) {
+    --g-surface-bg: Canvas;
+    color: CanvasText;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: 1px solid CanvasText;
+  }
+
+  :root[data-style='glas'] :where(.nvr-glass)::before,
+  :root[data-style='glas'] :where(.nvr-glass)::after {
+    display: none;
+  }
+}
+/* ---- from HAPulse styles/glas/lists.css ---- */
+/* ---- Fields (K94, GLAS-DESIGN §7.30; also the switch points of the pool's schedule editor, the Music Assistant
+   connection below the queue and Sentinel's connection, plan PLAN-ETAPPE-6.md K105): `fill`, radius 10, 36 visible in
+   a hit area of 44, text 17 (below 16 px iOS zooms into the field), placeholder `label2`, the focus ring inside the
+   field. A field on its own draws its 36 inside a transparent border of 4 above and below (corners 10 / 14, which
+   leaves 10 at the visible edge). In a search the bar is 36 and its input reaches 4 above and below it; the magnifier
+   is `label2`. ---- */
+:root[data-style='glas'] .nvr-input {
+  height: 44px;
+  min-height: 44px;
+  padding-block: 0;
+  padding-right: 12px;
+  border: 0;
+  border-block: 4px solid transparent;
+  border-radius: 10px / 14px;
+  background: var(--g-fill);
+  background-clip: padding-box;
+  box-shadow: none;
+  color: var(--g-label);
+  font-size: 17px;
+  line-height: 22px;
+}
+:root[data-style='glas'] .nvr-input {
+  padding-left: 12px;
+}
+:root[data-style='glas'] .nvr-input::placeholder {
+  color: var(--g-label-2);
+}
+:root[data-style='glas'] .nvr-input:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--g-focus);
+}
+:root[data-style='glas'] .nvr-select__native {
+  max-width: 200px;
+  min-height: 44px;
+  padding: 0 34px 0 14px;
+  border: 0;
+  border-block: 4px solid transparent;
+  border-radius: 18px / 22px;
+  background: var(--g-fill);
+  background-clip: padding-box;
+  color: var(--g-label);
+  font: 400 15px / 20px var(--g-font);
+}
+@media (hover: hover) {
+  :root[data-style='glas'] .nvr-select__native:hover {
+    background-image: linear-gradient(var(--g-hover), var(--g-hover));
+  }
+}
+/* the ring inside the visible capsule like the fields' (the transparent border above and below is hit area) */
+:root[data-style='glas'] .nvr-select__native:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--g-focus);
+}
+:root[data-style='glas'] .nvr-select__chevron {
+  right: 14px;
+  width: 14px;
+  height: 14px;
+  color: var(--g-label-2);
+}
+@media (forced-colors: active) {
+  :root[data-style='glas'] .nvr-input {
+    height: 36px;
+    min-height: 36px;
+    margin-block: 4px;
+    border: 1px solid CanvasText;
+    border-radius: 10px;
+  }
+
+  :root[data-style='glas'] .nvr-select__native {
+    min-height: 36px;
+    margin-block: 4px;
+    border: 1px solid ButtonText;
+    border-radius: 18px;
+  }
+
+  /* forced colours drop the inset ring */
+  :root[data-style='glas'] .nvr-input:focus,
+  :root[data-style='glas'] .nvr-select__native:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+/* ---- from HAPulse styles/glas/nvr.css ---- */
+@keyframes g-nvr-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+:root[data-style='glas'] .nvr-gl {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+/* ---- Cameras ---- */
+:root[data-style='glas'] .nvr-gl__cams {
+  display: grid;
+  grid-auto-columns: 100%;
+  grid-auto-flow: column;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+:root[data-style='glas'] .nvr-gl__cams::-webkit-scrollbar {
+  display: none;
+}
+/* several cameras: the next one peeks in from the edge */
+:root[data-style='glas'] .nvr-gl__cams[data-several] {
+  grid-auto-columns: calc(100% - 20px);
+  margin: 0 calc(-1 * var(--nvr-gl-bleed, 16px));
+  padding: 0 var(--nvr-gl-bleed, 16px);
+  scroll-padding-inline: var(--nvr-gl-bleed, 16px);
+}
+:root[data-style='glas'] .nvr-gl__cam-item {
+  display: flex;
+  min-width: 0;
+  scroll-snap-align: start;
+}
+:root[data-style='glas'] :is(.nvr-gl__cam, .nvr-gl__wait) {
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 220px;
+  padding: 0;
+  border: 0;
+  border-radius: 26px;
+  overflow: hidden;
+  background: var(--g-media-bg);
+  color: var(--g-on-media);
+  text-align: left;
+}
+:root[data-style='glas'] .nvr-gl__cam {
+  cursor: pointer;
+  transition: scale var(--g-d-smooth) var(--g-spring-smooth);
+  -webkit-tap-highlight-color: transparent;
+}
+:root[data-style='glas'] .nvr-gl__cam:active {
+  scale: 0.98;
+  transition-duration: 120ms;
+}
+/* the strips clip anything outside their items: the ring goes inside — on the tile as its last layer, an outline
+   would lie under the picture. On a picture the ring has the focus colour at the edge, the card's colour inside it and,
+   in light mode, a band in the card's counter-tone (`--g-focus-pair`, Etappe 7, K109): two of the tones are ≥ 9:1
+   apart, so one of them stands out against any picture (WCAG technique C40; the focus colour alone: 1.8:1 over a dark
+   one, focus and white together not over a mid-grey sky). */
+:root[data-style='glas'] .nvr-gl__ev:focus-visible {
+  outline: 2px solid var(--g-focus);
+  outline-offset: -2px;
+}
+:root[data-style='glas'] .nvr-gl__cam:focus-visible {
+  outline: none;
+}
+:root[data-style='glas'] .nvr-gl__cam:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--g-focus);
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 2px var(--g-card),
+    inset 0 0 0 4px var(--g-focus-pair);
+  pointer-events: none;
+}
+/* the events are a strip of pictures: the ring lies on the event's picture, in the same two tones */
+:root[data-style='glas'] .nvr-gl__ev {
+  position: relative;
+}
+:root[data-style='glas'] .nvr-gl__ev:focus-visible {
+  outline: none;
+}
+:root[data-style='glas'] .nvr-gl__ev:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 112px;
+  border: 2px solid var(--g-focus);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 0 0 2px var(--g-card),
+    inset 0 0 0 4px var(--g-focus-pair);
+  pointer-events: none;
+}
+/* no answer yet: a calm placeholder, not a black block */
+:root[data-style='glas'] .nvr-gl__wait {
+  background: var(--g-fill);
+}
+:root[data-style='glas'] .nvr-gl__cam .nvr-camtile__placeholder {
+  color: color-mix(in srgb, var(--g-on-media) 55%, transparent);
+}
+:root[data-style='glas'] .nvr-gl__shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(color-mix(in srgb, var(--g-media-bg) 35%, transparent), transparent) top / 100% 76px no-repeat,
+    linear-gradient(transparent, color-mix(in srgb, var(--g-media-bg) 60%, transparent)) bottom / 100% 90px no-repeat;
+  pointer-events: none;
+}
+/* the clear capsule (material.css .g-glass--clear: fill, rim, white text with shadow) */
+:root[data-style='glas'] .nvr-gl__pill {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 24px);
+  height: 32px;
+  padding: 0 14px 0 12px;
+  border-radius: 16px;
+  font: 600 15px / 20px var(--g-font);
+}
+:root[data-style='glas'] .nvr-gl__pill-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-style='glas'] .nvr-gl__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--g-live-dot);
+  animation: g-nvr-pulse 2s ease-in-out infinite;
+}
+/* recording on but nothing arrives: the dot stands still, grey when offline, yellow while it hangs */
+:root[data-style='glas'] .nvr-gl__cam:not([data-state='ok']) .nvr-gl__dot {
+  background: color-mix(in srgb, var(--g-on-media) 55%, transparent);
+  animation: none;
+}
+:root[data-style='glas'] .nvr-gl__cam[data-state='stalled'] .nvr-gl__dot {
+  background: var(--g-yellow);
+}
+:root[data-style='glas'] .nvr-gl__caption {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  color: var(--g-on-media);
+  text-shadow: var(--g-glass-clear-text-shadow);
+}
+:root[data-style='glas'] .nvr-gl__title {
+  display: none;
+}
+:root[data-style='glas'] .nvr-gl__today {
+  max-width: 100%;
+  overflow: hidden;
+  font: 600 15px / 20px var(--g-font);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-style='glas'] .nvr-gl__empty {
+  margin: 0;
+  color: var(--g-label-2);
+  font: 400 15px / 20px var(--g-font);
+}
+/* ---- Latest events ---- */
+:root[data-style='glas'] .nvr-gl__events {
+  display: flex;
+  gap: 10px;
+  margin: 0 calc(-1 * var(--nvr-gl-bleed, 16px));
+  padding: 0 var(--nvr-gl-bleed, 16px);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  list-style: none;
+  scroll-padding-inline: var(--nvr-gl-bleed, 16px);
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+:root[data-style='glas'] .nvr-gl__events::-webkit-scrollbar {
+  display: none;
+}
+:root[data-style='glas'] .nvr-gl__ev-item {
+  flex: none;
+  display: flex;
+  scroll-snap-align: start;
+}
+:root[data-style='glas'] .nvr-gl__ev {
+  display: block;
+  width: 150px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--g-label);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    scale var(--g-d-smooth) var(--g-spring-smooth);
+  -webkit-tap-highlight-color: transparent;
+}
+:root[data-style='glas'] .nvr-gl__ev:active {
+  scale: 0.97;
+  transition-duration: 120ms;
+}
+:root[data-style='glas'] .nvr-gl__ev-img {
+  display: block;
+  width: 150px;
+  height: 112px;
+  border-radius: 16px;
+  background: var(--g-fill);
+  object-fit: cover;
+}
+:root[data-style='glas'] .nvr-gl__ev-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 6px 4px 0;
+}
+:root[data-style='glas'] .nvr-gl__ev-time {
+  font: 600 15px / 20px var(--g-font);
+  font-variant-numeric: tabular-nums;
+}
+:root[data-style='glas'] .nvr-gl__ev-sub {
+  overflow: hidden;
+  color: var(--g-label-2);
+  font: 400 13px / 18px var(--g-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-style='glas'] .nvr-gl__ev-ago {
+  display: none;
+}
+@media (min-width: 900px) {
+  :root[data-style='glas'] .nvr-gl__cams {
+    grid-auto-columns: min(100%, 360px);
+  }
+
+  :root[data-style='glas'] .nvr-gl__cams[data-several] {
+    grid-auto-columns: min(calc(100% - 20px), 360px);
+  }
+}
+/* ---- The strips' buttons (nvr/NvrStrip.tsx): only from 900 px with a pointer that can hover, shown while it is over
+   the strip; a glass circle 36 at each end that can scroll, centred on the pictures ---- */
+:root[data-style='glas'] .nvr-gl__strip {
+  position: relative;
+  min-width: 0;
+}
+:root[data-style='glas'] .nvr-gl__strip--cams {
+  --nvr-gl-paddle-y: 50%;
+}
+:root[data-style='glas'] .nvr-gl__strip--events {
+  --nvr-gl-paddle-y: 56px;
+}
+:root[data-style='glas'] .nvr-gl__paddle {
+  display: none;
+}
+@media (min-width: 900px) and (hover: hover) {
+  :root[data-style='glas'] .nvr-gl__paddle {
+    position: absolute;
+    top: var(--nvr-gl-paddle-y);
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    color: var(--g-label);
+    cursor: pointer;
+    opacity: 0;
+    translate: 0 -50%;
+    transition:
+      opacity 0.2s ease,
+      scale var(--g-d-smooth) var(--g-spring-smooth);
+  }
+
+  :root[data-style='glas'] .nvr-gl__paddle[data-dir='prev'] {
+    left: 8px;
+  }
+
+  :root[data-style='glas'] .nvr-gl__paddle[data-dir='next'] {
+    right: 8px;
+  }
+
+  :root[data-style='glas'] .nvr-gl__strip:hover > .nvr-gl__paddle {
+    opacity: 1;
+  }
+
+  :root[data-style='glas'] .nvr-gl__paddle:active {
+    scale: 0.92;
+    transition-duration: 120ms;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-style='glas'] .nvr-gl__dot {
+    animation: none;
+  }
+
+  :root[data-style='glas'] :is(.nvr-gl__cam, .nvr-gl__ev, .nvr-gl__paddle):active {
+    scale: none;
+  }
+}
+@media (forced-colors: active) {
+  :root[data-style='glas'] :is(.nvr-gl__cam, .nvr-gl__paddle) {
+    border: 1px solid ButtonText;
+  }
+}
+/* a line of text instead of the content (no cameras, Sentinel not reachable): 15/20 `label2` */
+:root[data-style='glas'] .nvr-overview .nvr-muted {
+  gap: 6px;
+  color: var(--g-label-2);
+  font: 400 15px / 20px var(--g-font);
+}
+/* ---- Section titles ("Ereignisse", "Kameras"): like the card titles, a row of 44 with the symbol bare 18 in `label2`
+   (on the overview, plan docs/glas/PLAN-ETAPPE-7.md N2) and the title 20/25 600, no capitals ---- */
+:root[data-style='glas'] .nvr-overview .nvr-section {
+  gap: 6px;
+}
+:root[data-style='glas'] .nvr-overview .nvr-section > .nvr-section__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--g-label);
+  font: 600 20px / 25px var(--g-font);
+  letter-spacing: normal;
+  text-transform: none;
+}
+:root[data-style='glas'] .nvr-overview .nvr-section__icon {
+  margin-right: 0;
+  color: var(--g-label-2);
+}
+@media (min-width: 900px) {
+  :root[data-style='glas'] .nvr-overview .nvr-section > .nvr-section__label {
+    padding-left: 4px;
+  }
+}
+/* ---- The overview's cameras and events (`.g-nvr-page`, NvrOverviewPage): the NVR card's tiles and events (top of
+   this file), the cameras first, all of them, then all recent events. The tiles 16:10 with the capsule, in a column
+   below 900 px (two once 300 wide fit; a single camera takes the whole width), in two columns from 900 px; the events
+   the card's strip below them, to the screen edge on the phone. ---- */
+:root[data-style='glas'] .nvr-overview .nvr-gl-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+:root[data-style='glas'] .nvr-overview .nvr-gl-page > .nvr-section {
+  min-width: 0;
+}
+:root[data-style='glas'] .nvr-overview .nvr-gl-page :is(.nvr-gl__cams, .nvr-gl__cams[data-several]) {
+  grid-auto-columns: auto;
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  scroll-snap-type: none;
+}
+:root[data-style='glas'] .nvr-overview .nvr-gl-page .nvr-gl__cam {
+  height: auto;
+  aspect-ratio: 16 / 10;
+}
+/* before today the day in front of the time (also on the NVR card) */
+:root[data-style='glas'] .nvr-gl__ev-day {
+  color: var(--g-label-2);
+  font-weight: 400;
+}
+@media (min-width: 900px) {
+  :root[data-style='glas'] .nvr-overview .nvr-gl-page {
+    --nvr-gl-bleed: 0px;
+    gap: 26px;
+  }
+
+  :root[data-style='glas'] .nvr-overview .nvr-gl-page .nvr-gl__cams[data-several] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* ---- Card titles (chart, storage): the symbol bare 18 in `label2`, the title 20/25 600 in one line like the card
+   titles of the other pages; the line below the title ("Heute, alle Kameras", "Aufnahme-Datenträger") is left out,
+   the chart's axis and the card's rows say it (plan docs/glas/PLAN-ETAPPE-7.md N2) ---- */
+:root[data-style='glas'] .nvr-overview .nvr-ctitle {
+  gap: 8px;
+}
+:root[data-style='glas'] .nvr-overview .nvr-ctitle__chip {
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: none;
+  color: var(--g-label-2);
+}
+:root[data-style='glas'] .nvr-overview .nvr-ctitle__chip > svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+}
+:root[data-style='glas'] .nvr-overview .nvr-ctitle__title {
+  overflow: hidden;
+  color: var(--g-label);
+  font: 600 20px / 25px var(--g-font);
+  letter-spacing: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-style='glas'] .nvr-overview .nvr-ctitle__sub {
+  display: none;
+}
+/* the chart and the storage: the title row above the surface (K89, as pages.css does for the other pages) */
+:root[data-style='glas'] .nvr-overview .nvr-card.nvr-statcard {
+  --g-card-head: 44px;
+  --g-card-gap: 6px;
+  position: relative;
+  isolation: isolate;
+  gap: 12px;
+  padding: 0 16px 16px;
+  background: none;
+  box-shadow: none;
+}
+:root[data-style='glas'] .nvr-overview .nvr-card.nvr-statcard::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--g-card-head) + var(--g-card-gap)) 0 0;
+  z-index: -1;
+  border-radius: var(--radius-card);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+  pointer-events: none;
+}
+:root[data-style='glas'] .nvr-overview .nvr-card.nvr-statcard > .nvr-ctitle {
+  min-height: var(--g-card-head);
+  margin: 0 -16px calc(var(--g-card-gap) + 4px);
+}
+@media (min-width: 900px) {
+  :root[data-style='glas'] .nvr-overview .nvr-card.nvr-statcard > .nvr-ctitle {
+    padding-left: 4px;
+  }
+}
+/* Events per hour like the energy chart's day (§7.9): bars up to 14 wide, 3 apart, rounded on top, on a base line;
+   the current hour a `fill` column; the axis 12/16 `label2`. The bars' orange comes from accent.css. */
+:root[data-style='glas'] .nvr-overview .nvr-chart {
+  gap: 3px;
+  border-bottom: 1px solid var(--g-sep-strong);
+}
+:root[data-style='glas'] .nvr-overview .nvr-chart__col {
+  justify-content: center;
+  border-radius: 4px 4px 0 0;
+}
+:root[data-style='glas'] .nvr-overview .nvr-chart__col--now {
+  background: var(--g-fill);
+}
+:root[data-style='glas'] .nvr-overview .nvr-chart__bar {
+  max-width: 14px;
+  border-radius: 4px 4px 0 0;
+}
+:root[data-style='glas'] .nvr-overview .nvr-chart__axis {
+  color: var(--g-label-2);
+  font: 400 12px / 16px var(--g-font);
+  font-variant-numeric: tabular-nums;
+}
+/* Storage: the meter a capsule 10 in `fill`, the legend's swatches dots 8 with 13/18 `label2`, the values 15/20 (the
+   key `label2`, the value 600 `label`), the note a quiet line under a hairline like a list's footnote (plan E7 N2) */
+:root[data-style='glas'] .nvr-overview .nvr-meter {
+  height: 10px;
+  border: 0;
+  background: var(--g-fill);
+}
+:root[data-style='glas'] .nvr-overview .nvr-legend {
+  gap: 6px 14px;
+  color: var(--g-label-2);
+  font: 400 13px / 18px var(--g-font);
+}
+:root[data-style='glas'] .nvr-overview .nvr-legend > span {
+  gap: 6px;
+}
+:root[data-style='glas'] .nvr-overview .nvr-legend__sw {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+:root[data-style='glas'] .nvr-overview .nvr-kv {
+  gap: 8px;
+}
+:root[data-style='glas'] .nvr-overview .nvr-kv li {
+  font: 400 15px / 20px var(--g-font);
+}
+:root[data-style='glas'] .nvr-overview .nvr-kv li > span {
+  color: var(--g-label-2);
+}
+:root[data-style='glas'] .nvr-overview .nvr-kv li > b {
+  color: var(--g-label);
+  font-weight: 600;
+}
+:root[data-style='glas'] .nvr-overview .nvr-kv em {
+  color: var(--g-label-2);
+  font-weight: 400;
+}
+:root[data-style='glas'] .nvr-overview .nvr-note {
+  padding: 12px 0 0;
+  border-top: 1px solid var(--g-sep);
+  border-radius: 0;
+  background: none;
+  color: var(--g-label-2);
+  font: 400 13px / 18px var(--g-font);
+}
+/* the target out of reach: a dot 8 in `warnInk` before it (as the hero's retention chip), the text `label` */
+:root[data-style='glas'] .nvr-overview .nvr-note--warn {
+  background: none;
+  color: var(--g-label);
+}
+:root[data-style='glas'] .nvr-overview .nvr-note--warn::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--g-warn-ink);
+  vertical-align: 1px;
+}
+/* ---- Date and time (the camera page's window, J6): the month 17/22 600 between the arrows as accent chevrons in
+   circles 44, the weekdays 13/18 600 `label2`, the days circles of 44 with 20/25 — the chosen one prominent, today in
+   the accent ink, days before the retention `label3`; the time a field of K94 on its own row, below it "Heute" grey
+   and "Anzeigen" prominent as the foot's capsules 50 (§7.29) ---- */
+:root[data-style='glas'] .nvr-dt__head {
+  margin-bottom: 4px;
+}
+:root[data-style='glas'] .nvr-dt__nav {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: none;
+  color: var(--g-accent-ink);
+}
+:root[data-style='glas'] .nvr-dt__nav > svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.25;
+}
+:root[data-style='glas'] .nvr-dt__month {
+  color: var(--g-label);
+  font: 600 17px / 22px var(--g-font);
+}
+:root[data-style='glas'] .nvr-dt__grid {
+  gap: 2px 0;
+}
+:root[data-style='glas'] .nvr-dt__wd {
+  padding: 6px 0;
+  color: var(--g-label-2);
+  font: 600 13px / 18px var(--g-font);
+  letter-spacing: normal;
+}
+:root[data-style='glas'] .nvr-dt__d {
+  justify-self: center;
+  width: 100%;
+  max-width: 44px;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  color: var(--g-label);
+  font: 400 20px / 25px var(--g-font);
+  font-variant-numeric: tabular-nums;
+}
+:root[data-style='glas'] .nvr-dt__d--today {
+  box-shadow: none;
+  color: var(--g-accent-ink);
+  font-weight: 600;
+}
+:root[data-style='glas'] .nvr-dt__d--off {
+  color: var(--g-label-3);
+}
+/* the chosen day keeps its fill under the pointer too (the package's hover tint would replace it) */
+:root[data-style='glas'] .nvr-dt__d.nvr-dt__d--sel {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+:root[data-style='glas'] :is(.nvr-dt__nav, .nvr-dt__d):focus-visible {
+  outline: 2px solid var(--g-focus);
+  outline-offset: 2px;
+}
+:root[data-style='glas'] .nvr-dt__foot {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+:root[data-style='glas'] .nvr-dt__foot > .nvr-dt__time {
+  flex: 1 1 100%;
+  order: -1;
+}
+:root[data-style='glas'] .nvr-dt__foot > .nvr-btn {
+  flex: 1 1 0;
+  min-width: max-content;
+  min-height: 50px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 25px;
+  font: 600 17px / 22px var(--g-font);
+}
+:root[data-style='glas'] .nvr-dt__foot > .nvr-btn--ghost {
+  background: var(--g-fill);
+  color: var(--g-label);
+}
+:root[data-style='glas'] .nvr-dt__foot > .nvr-btn:focus-visible {
+  outline: 2px solid var(--g-focus);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  :root[data-style='glas'] .nvr-dt__nav:hover {
+    background: var(--g-hover);
+  }
+
+  :root[data-style='glas'] .nvr-dt__d:hover:not(:disabled, .nvr-dt__d--sel) {
+    background: var(--g-hover);
+  }
+
+  :root[data-style='glas'] .nvr-dt__foot > .nvr-btn--ghost:hover {
+    background: var(--g-fill-2);
+  }
+}
+@media (hover: none) {
+  :root[data-style='glas'] .nvr-dt__d:hover:not(:disabled, .nvr-dt__d--sel) {
+    background: none;
+  }
+}
+@media (forced-colors: active) {
+  :root[data-style='glas'] .nvr-dt__foot > .nvr-btn {
+    border: 1px solid ButtonText;
+  }
+
+  /* the chosen day: its fill turns into the page colour, a ring keeps it */
+  :root[data-style='glas'] .nvr-dt__d.nvr-dt__d--sel {
+    border: 2px solid Highlight;
+  }
+
+  :root[data-style='glas'] .nvr-overview .nvr-meter {
+    border: 1px solid CanvasText;
+  }
+
+  /* every state of the dots (their state rules above are more specific than the plain dot) and the warning dot of
+     the storage note */
+  :root[data-style='glas'] .nvr-overview .nvr-note--warn::before,
+  :root[data-style='glas'] .nvr-gl__dot,
+  :root[data-style='glas'] .nvr-gl__cam:not([data-state='ok']) .nvr-gl__dot,
+  :root[data-style='glas'] .nvr-gl__cam[data-state='stalled'] .nvr-gl__dot {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+}
+/* ---- Camera page (stage 6; plan docs/glas/PLAN-ETAPPE-6.md K101–K103, GLAS-DESIGN §7.33) ----
+   The package's immersive appearance (CameraPage appearance="immersive", @sentinel-nvr/web 0.18) takes its looks
+   from hooks; here they get the Glas values. The page lies in the dark subtree (AppLayout: data-glas-scheme="dark"
+   while it is shown), so every --g-* below is the dark one. Over the picture clear glass (§3.2), over the timeline
+   regular glass with the date chip's minimum tint (the recipe of material.css), the segment as §7.27, LIVE red with
+   its shadow, the gradients of §3.6, the lens with the snappy spring. */
+:root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] {
+  --g-nvr-t: max(var(--g-tint-date-chip), var(--g-glass-tint));
+  --nvr-ctl-bg: var(--g-glass-clear-fill);
+  --nvr-ctl-filter: var(--g-glass-clear-filter);
+  --nvr-ctl-rim: var(--g-glass-clear-rim);
+  --nvr-ctl-shadow: var(--g-glass-clear-shadow);
+  --nvr-ctl-fg: var(--g-on-media);
+  --nvr-ctl-text-shadow: var(--g-glass-clear-text-shadow);
+  --nvr-float-bg: linear-gradient(
+    180deg,
+    rgb(var(--g-glass-rgb) / calc(var(--g-glass-a0) + 0.4 * var(--g-nvr-t))),
+    rgb(var(--g-glass-rgb) / calc(var(--g-glass-a1) + 0.4 * var(--g-nvr-t)))
+  );
+  --nvr-float-filter: blur(calc(6px + 10px * var(--g-nvr-t))) saturate(var(--g-glass-sat))
+    brightness(var(--g-glass-bright));
+  --nvr-float-rim: var(--g-glass-rim);
+  --nvr-float-shadow: var(--g-glass-shadow);
+  --nvr-float-fg: var(--g-label);
+  --nvr-float-accent: var(--g-accent-ink);
+  --nvr-seg-track: var(--g-fill);
+  --nvr-seg-lens: var(--g-seg);
+  --nvr-seg-shadow: var(--g-seg-shadow);
+  --nvr-live-bg: var(--g-live);
+  --nvr-live-fg: var(--g-on-media);
+  --nvr-live-shadow: var(--g-shadow-live);
+  --nvr-shade-top: color-mix(in srgb, var(--g-media-bg) 70%, transparent);
+  --nvr-shade-bottom: color-mix(in srgb, var(--g-media-bg) 35%, transparent);
+  --nvr-ease: var(--g-spring-snappy);
+  --nvr-dur: var(--g-d-snappy);
+  font-family: var(--g-font);
+  font-variant-numeric: tabular-nums;
+}
+/* opaque ("Deckend", "Transparenz reduzieren", more contrast) and without backdrop-filter: solid, no rim (§3.4) */
+:root[data-style='glas'][data-glass='opaque'] .nvr-cam[data-nvr-appearance='immersive'] {
+  --nvr-ctl-bg: var(--g-glass-opaque-clear-fill);
+  --nvr-ctl-filter: none;
+  --nvr-ctl-rim: transparent;
+  --nvr-ctl-shadow: var(--g-glass-opaque-clear-shadow);
+  --nvr-float-bg: var(--g-card-solid);
+  --nvr-float-filter: none;
+  --nvr-float-rim: transparent;
+  --nvr-float-shadow: var(--g-glass-opaque-shadow);
+}
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] {
+    --nvr-ctl-bg: var(--g-glass-opaque-clear-fill);
+    --nvr-ctl-rim: transparent;
+    --nvr-ctl-shadow: var(--g-glass-opaque-clear-shadow);
+    --nvr-float-bg: var(--g-card-solid);
+    --nvr-float-rim: transparent;
+    --nvr-float-shadow: var(--g-glass-opaque-shadow);
+  }
+}
+/* the secondary texts of the page (state, ticks, times) in Glas grey */
+:root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] .nvr-stage-title small {
+  color: var(--g-label-2);
+}
+/* the timeline keeps the package's geometry and its colours for states (recording band, motion, classes, live; K101);
+   the playhead is `label` (§7.33) with its time as a capsule in the same colour */
+:root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vcenter {
+  background: var(--g-label);
+  box-shadow: none;
+}
+:root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vcenter-t {
+  border-color: transparent;
+  background: var(--g-label);
+  color: var(--g-bg);
+  font: 600 13px / 18px var(--g-font);
+}
+/* Focus over the picture (Etappe 7, K109): inside the control, in its own ink, so the ring lies on the control's glass
+   (white on clear glass, dark on the pressed sound circle) — the accent ring around it lay on the picture (1.2:1 over
+   a bright image). The timeline's events take the playhead's colour (the accent beside the blue band: 2.3:1). */
+:root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] :is(.nvr-pb, .nvr-mute):focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+:root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vev:focus-visible {
+  outline-color: var(--g-label);
+}
+@media (max-width: 899px) {
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-iconbtn:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: -2px;
+  }
+}
+@media (hover: none) {
+  :root[data-style='glas']
+    .nvr-cam[data-nvr-appearance='immersive']
+    :is(.nvr-pb, .nvr-datechip > button):hover:not(:disabled) {
+    background: transparent;
+  }
+}
+@media (min-width: 900px) {
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head {
+    min-height: 44px;
+  }
+
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-iconbtn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    border-radius: 50%;
+    background: var(--g-fill);
+    color: var(--g-label);
+  }
+
+  @media (hover: hover) {
+    :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-iconbtn:hover {
+      background: var(--g-fill-2);
+      color: var(--g-label);
+    }
+  }
+
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-iconbtn:focus-visible {
+    outline: 2px solid var(--g-focus);
+    outline-offset: 2px;
+  }
+
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-cam__title {
+    gap: 12px;
+  }
+
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-cam__name {
+    gap: 10px;
+  }
+
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-cam__h1 {
+    font: 700 34px / 41px var(--g-font);
+    letter-spacing: 0.37px;
+    color: var(--g-label);
+  }
+
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] > .nvr-cam__head .nvr-cam__badge--time {
+    color: var(--g-label-2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] .nvr-tabs button {
+    transition-duration: 200ms !important;
+  }
+}
+@media (forced-colors: active) {
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vcenter {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] .nvr-vtl .vcenter-t {
+    forced-color-adjust: none;
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  :root[data-style='glas'] .nvr-cam[data-nvr-appearance='immersive'] {
+    --nvr-ctl-bg: Canvas;
+    --nvr-ctl-filter: none;
+    --nvr-ctl-rim: transparent;
+    --nvr-ctl-shadow: none;
+    --nvr-ctl-fg: CanvasText;
+    --nvr-ctl-text-shadow: none;
+    --nvr-float-bg: Canvas;
+    --nvr-float-filter: none;
+    --nvr-float-rim: transparent;
+    --nvr-float-shadow: none;
+    --nvr-float-fg: CanvasText;
+    --nvr-float-accent: CanvasText;
+    --nvr-live-bg: Highlight;
+    --nvr-live-fg: HighlightText;
+    --nvr-live-shadow: none;
+  }
+}
+/* ---- from HAPulse styles/glas/pages.css ---- */
+/* ---- A card that is its own surface (title in the surface, a head tafel, the alarm panel, the music page's cards) does not
+   tint under the pointer: it is content, not a control (GLAS-DESIGN §6.3: rows, links and tiles answer the pointer).
+   The classic `.card:hover` would paint `cardHover` on it. A card with its title above the surface has no background
+   of its own (above). ---- */
+:root[data-style='glas'] .nvr-tafel:where(.nvr-card):hover {
+  background-color: var(--bg-card);
+}
+/* ---- from HAPulse styles/glas/tafel.css ---- */
+:root[data-style='glas'] .nvr-card.nvr-tafel {
+  display: flex;
+  flex-direction: column;
+  /* the classic heroes' min-height and space-between (their CSS keeps applying to the class) would spread the parts */
+  justify-content: flex-start;
+  min-height: 0;
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-card);
+  background-image: none;
+  /* the grid's lone last cell (below) asks the card's width */
+  container: nvr-tafel / inline-size;
+}
+/* the classic heroes paint their wash or glow from these; the tafel has none */
+:root[data-style='glas'] .nvr-card.nvr-tafel::before,
+:root[data-style='glas'] .nvr-card.nvr-tafel::after {
+  content: none;
+}
+/* ---- Head ---- */
+:root[data-style='glas'] .nvr-tafel__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+:root[data-style='glas'] .nvr-tafel__badge {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--g-fill);
+  color: var(--g-label-2);
+}
+:root[data-style='glas'] .nvr-tafel__badge > svg {
+  width: 28px;
+  height: 28px;
+}
+:root[data-style='glas'] .nvr-tafel__badge[data-tone='ok'] {
+  background: var(--g-green-soft);
+  color: var(--g-green-ink);
+}
+:root[data-style='glas'] .nvr-tafel__badge[data-tone='warn'] {
+  background: var(--g-warn-soft);
+  color: var(--g-warn-ink);
+}
+:root[data-style='glas'] .nvr-tafel__badge[data-tone='danger'] {
+  background: var(--g-red-soft);
+  color: var(--g-red-ink);
+}
+:root[data-style='glas'] .nvr-tafel__head-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+:root[data-style='glas'] .nvr-tafel__kicker {
+  margin: 0;
+  overflow: hidden;
+  color: var(--g-label-2);
+  font: 400 13px / 18px var(--g-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-style='glas'] .nvr-tafel__title {
+  margin: 0;
+  color: var(--g-label);
+  font: 700 22px / 28px var(--g-font);
+  overflow-wrap: anywhere;
+}
+:root[data-style='glas'] .nvr-tafel__title[data-tone='ok'] {
+  color: var(--g-green-ink);
+}
+:root[data-style='glas'] .nvr-tafel__title[data-tone='warn'] {
+  color: var(--g-warn-ink);
+}
+:root[data-style='glas'] .nvr-tafel__title[data-tone='danger'] {
+  color: var(--g-red-ink);
+}
+:root[data-style='glas'] .nvr-tafel__title[data-tone='danger'] .nvr-tafel__part:not(:only-child) {
+  /* one of several problems never breaks inside (NVR: "1 Kamera offline · 1 Aufnahme hängt") */
+  white-space: nowrap;
+}
+/* ---- Grid: hairlines between the cells only. Each cell draws one up and one left of itself; the grid clips those
+   that fall outside it (first row, first column). Columns: as many as fit at --g-tafel-min, at most --g-tafel-max. ---- */
+:root[data-style='glas'] .nvr-tafel__grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(max(var(--nvr-tafel-min, 130px), 100% / var(--nvr-tafel-max, 4) - 1px), 1fr)
+  );
+  margin: 0 0 -6px -12px;
+  overflow: hidden;
+}
+@container nvr-tafel (280px <= width < 410px) {
+  :root[data-style='glas'] .nvr-tafel__grid[data-min='130'] > .nvr-tafel__cell:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+@container nvr-tafel (300px <= width < 440px) {
+  :root[data-style='glas'] .nvr-tafel__grid[data-min='140'] > .nvr-tafel__cell:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+:root[data-style='glas'] .nvr-tafel__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 8px 10px 12px;
+  box-shadow: -0.5px -0.5px 0 0 var(--g-sep);
+}
+:root[data-style='glas'] .nvr-tafel__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--g-label-2);
+  font: 600 13px / 18px var(--g-font);
+}
+:root[data-style='glas'] .nvr-tafel__label > svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+:root[data-style='glas'] .nvr-tafel__label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-style='glas'] .nvr-tafel__value {
+  margin: 0;
+  overflow: hidden;
+  color: var(--g-label);
+  font: 600 28px / 34px var(--g-font);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-style='glas'] .nvr-tafel__unit {
+  color: var(--g-label-2);
+  font-size: 17px;
+  font-weight: 600;
+}
+:root[data-style='glas'] .nvr-tafel__cell[data-tone='warn'] :is(.nvr-tafel__label > svg, .nvr-tafel__value) {
+  color: var(--g-warn-ink);
+}
+:root[data-style='glas'] .nvr-tafel__cell[data-tone='danger'] :is(.nvr-tafel__label > svg, .nvr-tafel__value) {
+  color: var(--g-red-ink);
+}
+@media (forced-colors: active) {
+  :root[data-style='glas']
+    .nvr-tafel__cell:is([data-tone='warn'], [data-tone='danger'])
+    :is(.nvr-tafel__label > svg, .nvr-tafel__value) {
+    forced-color-adjust: none;
+    color: Highlight;
+  }
+
+  :root[data-style='glas'] .nvr-tafel__badge {
+    border: 1px solid CanvasText;
+  }
+}

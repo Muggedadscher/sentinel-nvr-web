@@ -5,6 +5,7 @@ export * from './format';
 export * from './components/ClassBadge';
 export * from './components/EventsStrip';
 export * from './components/CameraGrid';
+export * from './components/Glass';
 export { drawLastTileSnapshot, hasLastTileSnapshot, rememberTileSnapshot, type TileSnapshot } from './snapshot-cache';
 export { isIosHomeScreenApp, outsideAppHref } from './outside';
 export * from './components/EventList';

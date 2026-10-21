@@ -28,6 +28,7 @@ The server contract is the plugin's `docs/API.md`. The package keeps its own typ
 | `@sentinel-nvr/web/api` | `src/api/` | DOM-free, no framework: data model + types (`model.ts`), `SentinelClient` (`client.ts`, fetch/WebSocket), Intl formatters (`format.ts`, no dictionary words). |
 | `@sentinel-nvr/web/player` | `src/player/` | Framework-free. `PlayerController` (`controller.ts`) owns the `<video>`, the freeze canvas and the MJPEG `<img>` and reports state; pure decisions are split into small tested modules (`stills.ts`, `relaystate.ts`, `settle.ts`, `skip.ts`, `clips.ts`). `rlog.ts` = client telemetry to the plugin. |
 | `@sentinel-nvr/web/ui` | `src/ui/` | React components (`components/`, the whole `CameraPage`), i18n (`i18n.ts`, `locales/*.json`), themes (`theme.ts`, `themes-data.ts`), styles `ui.css`. DOM-free page logic in `camera-logic.ts`, `timeline-groups.ts`, `clip-logic.ts` (clip download). |
+| `@sentinel-nvr/web/glas` | `src/glas/` | No React. The style "Glas": `glas-data.ts` is a verbatim copy of HAPulse `packages/core/src/glasTokens.ts` (only its `ThemeTokens` import differs; keep it verbatim, HAPulse's parity test compares), `appearance.ts` = `applyAppearance`/`watchAppearance` (port of HAPulse `theme/glasAppearance.ts`). |
 
 Tests mirror this in `test/api/` and `test/ui/` (vitest; jsdom where a test needs the DOM).
 
@@ -65,6 +66,20 @@ commits go into `.git-blame-ignore-revs`.
   plugin announces a capability in `features` (e.g. `"export"` for the clip download, checked in `src/api/model.ts`),
   the client offers it only then. Note the needed plugin version or feature in the README's server-compatibility table.
 - Telemetry (`rlog`) also logs success paths: phones have no console, and silence was ambiguous more than once.
+
+## Style "Glas" (0.21.0)
+
+- HAPulse leads the look; the Glas rules for the package's parts live in `src/ui/glas.css` (moved from HAPulse's
+  `styles/glas`, HAPulse imports this file) and the Glas overview parts in `src/ui/components/Glass.tsx`.
+- Every rule of `glas.css` sits under `:root[data-style='glas']`, no hex, no `@layer`, `!important` only under reduced
+  motion, a tint on `:hover` only under `@media (hover: hover)`, keyframes `g-*`, only the package's classes (and the
+  host's `nvr-overview`). `test/ui/glas-css.test.ts` guards this; `ui.css` styles no Glas-only class.
+- Klassisch must not change: new looks come as opt-in props (`appearance="glass"`, the style props of
+  `AppearanceSection`). `test/ui/classic-markup.test.tsx` compares the markup without them with
+  `test/ui/fixtures/classic-0.20.2.json`; a release that changes Klassisch on purpose regenerates it
+  (`CLASSIC_FIXTURE=<file>`, see the test) and says so in the CHANGELOG.
+- A tile in Glas keeps `button[data-nvr-camera]` with `.nvr-camtile__pic` as its first child: HAPulse's transition
+  between tile and camera page looks for it.
 
 ## Changes and releases
 

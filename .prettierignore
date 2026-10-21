@@ -4,3 +4,4 @@ package-lock.json
 *.md
 .changeset/
 test/ui/fixtures/
+src/glas/glas-data.ts

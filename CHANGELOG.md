@@ -4,6 +4,18 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.21.0 — 2026-10-21
+
+- The style "Glas" for the package's parts, moved from HAPulse so that the Sentinel app can show it too and both stay
+  the same (HAPulse leads the look). New entry `@sentinel-nvr/web/glas` (no React): the Glas values and
+  `applyAppearance`/`watchAppearance`. New stylesheet `@sentinel-nvr/web/ui/glas.css`, every rule under
+  `:root[data-style='glas']`. New components for the overview in Glas: `GlassNvr`, `GlassSections`, `GlassCameras`,
+  `GlassEvents` (camera and event strips with arrow buttons where they can scroll); `Hero appearance="glass"` renders the
+  status board. `AppearanceSection` takes the style (Klassisch | Glas), the glass strength and "reduce transparency".
+  New texts `nvr.cameras.live` and `nvr.settings.style*`, `nvr.settings.glassStrength*`,
+  `nvr.settings.reduceTransparency*`, `nvr.settings.theme.glasHint` in all 7 languages. The stat cards carry the class
+  `nvr-statcard`. Without the new props nothing changes (the markup is checked against 0.20.2).
+
 ## 0.20.2 — 2026-10-19
 
 - Fast scrubbing, above all backwards: the time shown on the picture and the playhead no longer run 60–100 s past the
