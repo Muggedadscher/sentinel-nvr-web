@@ -81,7 +81,7 @@ export function Hero({
 }: {
   cameras: SentinelCamera[];
   stats: SentinelStats;
-  appearance?: 'glass';
+  appearance?: 'glass' | undefined;
 }) {
   if (appearance === 'glass') return <GlassHero cameras={cameras} stats={stats} />;
   return <ClassicHero cameras={cameras} stats={stats} />;

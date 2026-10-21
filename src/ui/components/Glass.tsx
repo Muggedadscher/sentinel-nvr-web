@@ -176,9 +176,9 @@ function GlassStrip<T extends HTMLElement>({
 export interface GlassCamerasProps {
   cameras: SentinelCamera[];
   /** No answer from the NVR yet: an empty tile instead of "no cameras". */
-  loading?: boolean;
+  loading?: boolean | undefined;
   /** How often the snapshots refresh (ms, while the page is visible); default 5 s. */
-  refreshMs?: number;
+  refreshMs?: number | undefined;
 }
 
 /** The cameras: per camera its snapshot tile, opening the camera page. */
@@ -319,9 +319,9 @@ export interface GlassNvrProps {
   cameras: SentinelCamera[];
   events: SentinelRecentEvent[];
   /** No answer from the NVR yet: an empty tile instead of "no cameras". */
-  loading?: boolean;
+  loading?: boolean | undefined;
   /** How often the snapshots refresh (ms, while the page is visible); default 5 s. */
-  refreshMs?: number;
+  refreshMs?: number | undefined;
 }
 
 /** Cameras and events as one body (a host's NVR card). */
