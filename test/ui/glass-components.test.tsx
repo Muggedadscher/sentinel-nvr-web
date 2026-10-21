@@ -14,6 +14,7 @@ import type { SentinelCamera, SentinelRecentEvent, SentinelStats } from '../../s
 import { SentinelUiProvider } from '../../src/ui/context';
 import { GlassNvr, GlassSections } from '../../src/ui/components/Glass';
 import { Hero, HistogramCard } from '../../src/ui/components/Stats';
+import { AppearanceSection, type AppearanceProps } from '../../src/ui/components/Appearance';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -189,6 +190,71 @@ describe('Hero', () => {
   it('the stat cards carry nvr-statcard (no rule in Klassisch)', () => {
     const { div, done } = render(<HistogramCard histogram={new Array(24).fill(0)} />);
     expect(div.querySelector('.nvr-card.nvr-statcard')).not.toBeNull();
+    done();
+  });
+});
+
+describe('AppearanceSection: the style', () => {
+  const base: AppearanceProps = {
+    theme: 'aurora',
+    mode: 'light',
+    language: 'auto',
+    languages: [],
+    onTheme: () => {},
+    onMode: () => {},
+    onAccent: () => {},
+    onLanguage: () => {},
+  };
+  const labels = (div: HTMLElement) => [...div.querySelectorAll('.nvr-set__label')].map((l) => l.textContent);
+
+  it('Klassisch: the style row above the rest, the theme cards stay', () => {
+    const onUiStyle = vi.fn();
+    const { div, done } = render(<AppearanceSection {...base} uiStyle="classic" onUiStyle={onUiStyle} />);
+    expect(labels(div)[0]).toBe('nvr.settings.style');
+    expect(labels(div)).not.toContain('nvr.settings.glassStrength');
+    expect(div.querySelector('.nvr-swatches')).not.toBeNull();
+    const glas = [...div.querySelectorAll<HTMLButtonElement>('.nvr-seg__btn')].find(
+      (b) => b.textContent === 'nvr.settings.style.glas',
+    )!;
+    act(() => glas.click());
+    expect(onUiStyle).toHaveBeenCalledWith('glas');
+    done();
+  });
+
+  it('Glas: strength and reduce transparency, a hint instead of the theme cards, the accent stays', () => {
+    const onGlassStrength = vi.fn();
+    const onReduceTransparency = vi.fn();
+    const { div, done } = render(
+      <AppearanceSection
+        {...base}
+        uiStyle="glas"
+        onUiStyle={() => {}}
+        glassStrength="tinted"
+        onGlassStrength={onGlassStrength}
+        reduceTransparency={false}
+        onReduceTransparency={onReduceTransparency}
+      />,
+    );
+    expect(labels(div).slice(0, 3)).toEqual([
+      'nvr.settings.style',
+      'nvr.settings.glassStrength',
+      'nvr.settings.reduceTransparency',
+    ]);
+    expect(div.querySelector('.nvr-swatches')).toBeNull();
+    expect(div.textContent).toContain('nvr.settings.theme.glasHint');
+    expect(div.querySelector('.nvr-accent__slider')).not.toBeNull();
+    const active = [...div.querySelectorAll('.nvr-seg__btn--active')].map((b) => b.textContent);
+    expect(active).toContain('nvr.settings.glassStrength.tinted');
+    act(() =>
+      [...div.querySelectorAll<HTMLButtonElement>('.nvr-seg__btn')]
+        .find((b) => b.textContent === 'nvr.settings.glassStrength.opaque')!
+        .click(),
+    );
+    expect(onGlassStrength).toHaveBeenCalledWith('opaque');
+    const sw = div.querySelector<HTMLButtonElement>('[role="switch"]')!;
+    expect(sw.getAttribute('aria-checked')).toBe('false');
+    act(() => sw.click());
+    expect(onReduceTransparency).toHaveBeenCalledWith(true);
     done();
   });
 });

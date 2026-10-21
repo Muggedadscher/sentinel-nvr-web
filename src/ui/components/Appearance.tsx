@@ -3,9 +3,14 @@
  * © 2026 Julian — see NOTICE.md): light/dark/auto segmented control, language
  * select, theme preview cards, accent-hue rainbow slider. Controlled component —
  * the host owns the persisted choice (HAPulse: settingsStore; Sentinel: localStorage).
+ *
+ * The style (0.21.0): with `onUiStyle` a row Klassisch | Glas, and in Glas the glass strength and "reduce
+ * transparency" (texts as HAPulse's StyleSettings). In Glas a hint takes the place of the theme cards: Glas has one
+ * neutral palette, the theme stays saved for Klassisch. Without `onUiStyle` the section is the one of 0.20.
  */
 import { useState, type ReactNode } from 'react';
-import { ChevronDown, Languages, Palette, Sun } from 'lucide-react';
+import { Blend, ChevronDown, Contrast, Languages, Layers, Palette, Sun } from 'lucide-react';
+import type { GlasStrength, UiStyle } from '../../glas/glas-data';
 import { useSentinelUi } from '../context';
 import {
   THEMES,
@@ -29,7 +34,18 @@ export interface AppearanceProps {
   onMode: (mode: ThemeMode) => void;
   onAccent: (hue: number | undefined) => void;
   onLanguage: (id: string) => void;
+  /** the style; the row appears only with `onUiStyle` */
+  uiStyle?: UiStyle | undefined;
+  onUiStyle?: ((style: UiStyle) => void) | undefined;
+  /** Glas only: the stored strength (contrast or reduced transparency make it opaque, the row shows the choice) */
+  glassStrength?: GlasStrength | undefined;
+  onGlassStrength?: ((strength: GlasStrength) => void) | undefined;
+  reduceTransparency?: boolean | undefined;
+  onReduceTransparency?: ((on: boolean) => void) | undefined;
 }
+
+const STYLES: readonly UiStyle[] = ['classic', 'glas'];
+const STRENGTHS: readonly GlasStrength[] = ['clear', 'tinted', 'opaque'];
 
 /** Hue (0–360) of a `#rrggbb` colour — the slider's rest position for a theme's own accent. */
 export function hexHue(hex: string): number {
@@ -139,10 +155,70 @@ export function AppearanceSection(p: AppearanceProps) {
       {icon}
     </span>
   );
+  const seg = <T extends string>(label: string, values: readonly T[], value: T, key: string, on: (v: T) => void) => (
+    <div className="nvr-seg" role="group" aria-label={label}>
+      {values.map((v) => (
+        <button
+          key={v}
+          type="button"
+          className={'nvr-seg__btn' + (value === v ? ' nvr-seg__btn--active' : '')}
+          onClick={() => on(v)}
+          aria-pressed={value === v}
+        >
+          {t(`${key}.${v}`)}
+        </button>
+      ))}
+    </div>
+  );
+  const glas = !!p.onUiStyle && p.uiStyle === 'glas';
   return (
     <section className="nvr-set__section">
       <div className="nvr-section__label">{t('nvr.settings.appearance')}</div>
       <div className="nvr-card nvr-set-card">
+        {p.onUiStyle && (
+          <div className="nvr-set__row nvr-set__row--inline">
+            <span className="nvr-set__label">
+              {chip('var(--accent-soft)', 'var(--accent)', <Layers size={14} strokeWidth={1.75} />)}
+              {t('nvr.settings.style')}
+            </span>
+            {seg(t('nvr.settings.style.groupAria'), STYLES, p.uiStyle ?? 'classic', 'nvr.settings.style', p.onUiStyle)}
+            <p className="nvr-set__hint">{t('nvr.settings.style.hint')}</p>
+          </div>
+        )}
+        {glas && p.onGlassStrength && (
+          <div className="nvr-set__row nvr-set__row--inline">
+            <span className="nvr-set__label">
+              {chip('var(--info-soft)', 'var(--info)', <Blend size={14} strokeWidth={1.75} />)}
+              {t('nvr.settings.glassStrength')}
+            </span>
+            {seg(
+              t('nvr.settings.glassStrength.groupAria'),
+              STRENGTHS,
+              p.glassStrength ?? 'clear',
+              'nvr.settings.glassStrength',
+              p.onGlassStrength,
+            )}
+          </div>
+        )}
+        {glas && p.onReduceTransparency && (
+          <div className="nvr-set__row nvr-set__row--inline">
+            <span className="nvr-set__label">
+              {chip('var(--info-soft)', 'var(--info)', <Contrast size={14} strokeWidth={1.75} />)}
+              {t('nvr.settings.reduceTransparency')}
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={!!p.reduceTransparency}
+              aria-label={t('nvr.settings.reduceTransparency')}
+              className={'nvr-switch' + (p.reduceTransparency ? ' nvr-switch--on' : '')}
+              onClick={() => p.onReduceTransparency?.(!p.reduceTransparency)}
+            >
+              <span className="nvr-switch__thumb" />
+            </button>
+            <p className="nvr-set__hint">{t('nvr.settings.reduceTransparency.hint')}</p>
+          </div>
+        )}
         <div className="nvr-set__row nvr-set__row--inline">
           <span className="nvr-set__label">
             {chip('var(--warning-soft)', 'var(--warning)', <Sun size={14} strokeWidth={1.75} />)}
@@ -184,27 +260,37 @@ export function AppearanceSection(p: AppearanceProps) {
             <ChevronDown size={14} strokeWidth={2} className="nvr-select__chevron" aria-hidden="true" />
           </div>
         </div>
-        <div className="nvr-set__row">
-          <div className="nvr-set__label">
-            {chip('var(--accent-soft)', 'var(--accent)', <Palette size={14} strokeWidth={1.75} />)}
-            {t('nvr.settings.theme')}
+        {glas ? (
+          <div className="nvr-set__row nvr-set__row--inline">
+            <span className="nvr-set__label">
+              {chip('var(--accent-soft)', 'var(--accent)', <Palette size={14} strokeWidth={1.75} />)}
+              {t('nvr.settings.theme')}
+            </span>
+            <p className="nvr-set__hint">{t('nvr.settings.theme.glasHint')}</p>
           </div>
-          <div className="nvr-swatches">
-            {THEME_NAMES.map((n) => (
-              <ThemeSwatch
-                key={n}
-                name={n}
-                active={p.theme === n}
-                previewMode={resolved}
-                ariaLabel={t('nvr.settings.theme.selectAria', { name: THEME_LABELS[n] })}
-                onClick={() => {
-                  p.onTheme(n);
-                  if (p.accentHue === undefined) setLocalHue(defaultHue(n));
-                }}
-              />
-            ))}
+        ) : (
+          <div className="nvr-set__row">
+            <div className="nvr-set__label">
+              {chip('var(--accent-soft)', 'var(--accent)', <Palette size={14} strokeWidth={1.75} />)}
+              {t('nvr.settings.theme')}
+            </div>
+            <div className="nvr-swatches">
+              {THEME_NAMES.map((n) => (
+                <ThemeSwatch
+                  key={n}
+                  name={n}
+                  active={p.theme === n}
+                  previewMode={resolved}
+                  ariaLabel={t('nvr.settings.theme.selectAria', { name: THEME_LABELS[n] })}
+                  onClick={() => {
+                    p.onTheme(n);
+                    if (p.accentHue === undefined) setLocalHue(defaultHue(n));
+                  }}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
         <div className="nvr-set__row">
           <div className="nvr-accent">
             <div className="nvr-accent__label">
