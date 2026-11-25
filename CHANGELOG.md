@@ -4,7 +4,7 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
-## Unreleased
+## 0.22.0 — 2026-11-25
 
 - Glas: the settings section (`AppearanceSection` with `uiStyle="glas"`) looks like HAPulse's settings in Glas. The
   rows are one iOS list (group title "Darstellung" without capitals, symbols monochrome grey, labels 17 px, separators
