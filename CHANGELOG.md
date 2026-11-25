@@ -14,7 +14,9 @@ are listed in the README compatibility table.
   choose. After a switch of the style the new style's control keeps the focus. In Glas the accent slider rests on the
   Glas default accent (iOS orange), as in HAPulse. Before, the section showed the classic controls on the Glas page.
 - The "automatic" language choice reads "Auto" in every language, as in HAPulse (`nvr.settings.language.auto`; was
-  e.g. "Automatisch"). Klassisch otherwise unchanged (markup checked against 0.20.2).
+  e.g. "Automatisch"); HAPulse's copy of the `nvr.*` texts follows with the bump (`nvrLocales.test.ts`). Klassisch
+  otherwise unchanged (markup checked against 0.20.2). Probes that click the light/dark buttons find them in Glas as
+  `.nvr-gl-seg__opt` (`role="radio"`), no longer `.nvr-seg__btn`.
 
 ## 0.21.0 — 2026-10-21
 
