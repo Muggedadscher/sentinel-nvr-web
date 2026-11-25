@@ -39,21 +39,23 @@ function render(node: ReactNode) {
   const div = document.createElement('div');
   document.body.appendChild(div);
   const root = createRoot(div);
-  act(() =>
-    root.render(
-      <SentinelUiProvider
-        value={{
-          client,
-          t: (k: string, v?: Record<string, unknown>) => (v ? `${k}:${JSON.stringify(v)}` : k),
-          locale: 'de-DE',
-          nav: { openCamera },
-        }}
-      >
-        {node}
-      </SentinelUiProvider>,
-    ),
-  );
-  return { div, openCamera, done: () => act(() => root.unmount()) };
+  const show = (n: ReactNode) =>
+    act(() =>
+      root.render(
+        <SentinelUiProvider
+          value={{
+            client,
+            t: (k: string, v?: Record<string, unknown>) => (v ? `${k}:${JSON.stringify(v)}` : k),
+            locale: 'de-DE',
+            nav: { openCamera },
+          }}
+        >
+          {n}
+        </SentinelUiProvider>,
+      ),
+    );
+  show(node);
+  return { div, openCamera, rerender: show, done: () => act(() => root.unmount()) };
 }
 
 afterEach(() => {
@@ -243,10 +245,13 @@ describe('AppearanceSection: the style', () => {
     expect(div.querySelector('.nvr-swatches')).toBeNull();
     expect(div.textContent).toContain('nvr.settings.theme.glasHint');
     expect(div.querySelector('.nvr-accent__slider')).not.toBeNull();
-    const active = [...div.querySelectorAll('.nvr-seg__btn--active')].map((b) => b.textContent);
-    expect(active).toContain('nvr.settings.glassStrength.tinted');
+    // Glas: every choice is the Glas segment (radios), no classic buttons
+    expect(div.querySelector('.nvr-seg')).toBeNull();
+    expect(div.querySelectorAll('.nvr-gl-seg--settings[role="radiogroup"]')).toHaveLength(3);
+    const active = [...div.querySelectorAll('.nvr-gl-seg__opt[aria-checked="true"]')].map((b) => b.textContent);
+    expect(active).toEqual(['nvr.settings.style.glas', 'nvr.settings.glassStrength.tinted', 'nvr.settings.mode.light']);
     act(() =>
-      [...div.querySelectorAll<HTMLButtonElement>('.nvr-seg__btn')]
+      [...div.querySelectorAll<HTMLButtonElement>('.nvr-gl-seg__opt')]
         .find((b) => b.textContent === 'nvr.settings.glassStrength.opaque')!
         .click(),
     );
@@ -255,6 +260,39 @@ describe('AppearanceSection: the style', () => {
     expect(sw.getAttribute('aria-checked')).toBe('false');
     act(() => sw.click());
     expect(onReduceTransparency).toHaveBeenCalledWith(true);
+    done();
+  });
+
+  it('Glas: the segments write only on Space/Enter or a click (manual activation), one tab stop each', () => {
+    const onMode = vi.fn();
+    const { div, done } = render(
+      <AppearanceSection {...base} mode="dark" onMode={onMode} uiStyle="glas" onUiStyle={() => {}} />,
+    );
+    const group = div.querySelector<HTMLElement>('[role="radiogroup"][aria-label="nvr.settings.mode"]')!;
+    const opts = [...group.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
+    expect(opts.map((o) => o.tabIndex)).toEqual([-1, 0, -1]);
+    act(() => group.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+    expect(onMode).not.toHaveBeenCalled();
+    expect(opts.map((o) => o.tabIndex)).toEqual([-1, -1, 0]);
+    expect(document.activeElement).toBe(opts[2]);
+    act(() => opts[2]!.click());
+    expect(onMode).toHaveBeenCalledWith('auto');
+    done();
+  });
+
+  it('a switch of the style hands the focus to the new style’s control of the same choice', () => {
+    let style: 'classic' | 'glas' = 'classic';
+    const { div, done, rerender } = render(
+      <AppearanceSection {...base} uiStyle={style} onUiStyle={(v) => (style = v)} />,
+    );
+    const toGlas = div.querySelector<HTMLButtonElement>('.nvr-seg__btn[data-value="glas"]')!;
+    toGlas.focus();
+    act(() => toGlas.click());
+    expect(style).toBe('glas');
+    // the clicked button leaves the DOM with the rerender
+    rerender(<AppearanceSection {...base} uiStyle={style} onUiStyle={(v) => (style = v)} />);
+    expect(document.activeElement?.getAttribute('data-value')).toBe('glas');
+    expect(document.activeElement?.getAttribute('role')).toBe('radio');
     done();
   });
 });

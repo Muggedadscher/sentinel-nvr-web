@@ -108,8 +108,9 @@ The server keeps its own types; `docs/API.md` in the plugin repository is the co
   box `.nvr-camtile__pic` as first child (a host's transition between tile and camera page finds it there); opening
   goes through `nav.openCamera(id)` (tile) or `nav.openCamera(id, at, ev)` (event). `Hero appearance="glass"` is the
   status board (`.nvr-tafel`). `AppearanceSection` shows the style rows when the host passes `onUiStyle` (and in Glas
-  `onGlassStrength`, `onReduceTransparency`); in Glas a hint replaces the theme cards. Without these props every part
-  renders the markup of 0.20.x (test `classic-markup`).
+  `onGlassStrength`, `onReduceTransparency`); in Glas a hint replaces the theme cards, the choices are the Glas segment
+  (`role="radiogroup"`, `.nvr-gl-seg`, choose with Space/Enter or a click) and `ui/glas.css` draws the rows as HAPulse's
+  settings list (unreleased). Without these props every part renders the markup of 0.20.x (test `classic-markup`).
 
 ## Develop
 

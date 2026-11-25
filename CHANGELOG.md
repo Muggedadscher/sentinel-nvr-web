@@ -4,6 +4,18 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## Unreleased
+
+- Glas: the settings section (`AppearanceSection` with `uiStyle="glas"`) looks like HAPulse's settings in Glas. The
+  rows are one iOS list (group title "Darstellung" without capitals, symbols monochrome grey, labels 17 px, separators
+  from the text start, explanations under the label), the language is a plain value with its chevron, the switch and
+  the accent slider are HAPulse's. Style, glass strength and light/dark are HAPulse's Glas segment: a lens that slides
+  to the choice, `role="radiogroup"`, on phones in the row's whole width; arrows move the focus, Space/Enter or a click
+  choose. After a switch of the style the new style's control keeps the focus. In Glas the accent slider rests on the
+  Glas default accent (iOS orange), as in HAPulse. Before, the section showed the classic controls on the Glas page.
+- The "automatic" language choice reads "Auto" in every language, as in HAPulse (`nvr.settings.language.auto`; was
+  e.g. "Automatisch"). Klassisch otherwise unchanged (markup checked against 0.20.2).
+
 ## 0.21.0 — 2026-10-21
 
 - The style "Glas" for the package's parts, moved from HAPulse so that the Sentinel app can show it too and both stay

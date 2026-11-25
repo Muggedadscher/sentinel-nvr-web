@@ -123,7 +123,7 @@
   "nvr.settings.mode.dark": "Scuro",
   "nvr.settings.mode.auto": "Auto",
   "nvr.settings.language": "Lingua",
-  "nvr.settings.language.auto": "Automatico",
+  "nvr.settings.language.auto": "Auto",
   "nvr.settings.theme": "Tema",
   "nvr.settings.theme.selectAria": "Seleziona il tema {name}",
   "nvr.settings.accent": "Colore accento",
