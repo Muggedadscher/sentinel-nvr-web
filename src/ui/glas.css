@@ -1248,3 +1248,382 @@
     border: 1px solid CanvasText;
   }
 }
+/* ---- from HAPulse styles/glas/settings.css, pages.css and controls.css (0.22.0): the settings ("Darstellung") ----
+   One iOS settings list, as HAPulse's settings page: the group title 15/20 600 in `label2` above its list, rows 52
+   (inline: 44 inside 4 above and below), the symbol monochrome `label2` in a column of 28 (its colours come inline;
+   the tokens are set on the chip itself), the label 17/22, separators 0.5 px from the text start (56), none above the
+   first row. Explanations start under the label text (desktop) or at the row's inset (phones). The choices are the Glas
+   segment (GlassSegment, `nvr-gl-seg--settings`), the switch, the language as an iOS pop-up row and the accent slider
+   look like HAPulse's controls. Selectors map HAPulse's classes: .settings-card__row → .nvr-set__row,
+   .settings-card__row-label → .nvr-set__label, .settings-card__icon-chip → .nvr-set__chip, .managed-row-hint →
+   .nvr-set__hint, .admin-toggle → .nvr-switch, .settings-select → .nvr-select, .accent-row → .nvr-accent,
+   .accent-slider → .nvr-accent__slider, .g-seg → .nvr-gl-seg. */
+:root[data-style='glas'] .nvr-set__section {
+  --g-row-indent: 40px;
+  gap: 8px;
+}
+@media (max-width: 480px) {
+  :root[data-style='glas'] .nvr-set__section {
+    --g-row-indent: 0px;
+  }
+}
+:root[data-style='glas'] .nvr-set__section > .nvr-section__label {
+  padding: 0 16px;
+  color: var(--g-label-2);
+  font: 600 15px / 20px var(--g-font);
+  letter-spacing: normal;
+  text-transform: none;
+}
+:root[data-style='glas'] .nvr-set-card {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+/* rows */
+:root[data-style='glas'] .nvr-set-card .nvr-set__row {
+  position: relative;
+  gap: 8px;
+  min-height: 52px;
+  padding: 12px 16px;
+  border: 0;
+}
+:root[data-style='glas'] .nvr-set-card .nvr-set__row--inline {
+  gap: 0 12px;
+  padding: 4px 16px;
+}
+:root[data-style='glas'] .nvr-set-card .nvr-set__row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 56px;
+  height: 0.5px;
+  background: var(--g-sep);
+  pointer-events: none;
+}
+:root[data-style='glas'] .nvr-set-card > .nvr-set__row:first-child::before {
+  content: none;
+}
+/* label and symbol */
+:root[data-style='glas'] .nvr-set-card .nvr-set__label {
+  gap: 12px;
+  color: var(--g-label);
+  font: 400 17px / 22px var(--g-font);
+}
+:root[data-style='glas'] .nvr-set-card .nvr-set__row--inline > .nvr-set__label {
+  flex: 0 1 auto;
+  min-height: 44px;
+}
+/* beside a switch the label wraps, the switch stays at the row's end */
+:root[data-style='glas'] .nvr-set-card .nvr-set__row--inline:has(> .nvr-switch) > .nvr-set__label {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+:root[data-style='glas'] .nvr-set-card .nvr-set__chip {
+  --accent-soft: transparent;
+  --accent: var(--g-label-2);
+  --info-soft: transparent;
+  --info: var(--g-label-2);
+  --warning-soft: transparent;
+  --warning: var(--g-label-2);
+  --bg-subtle: transparent;
+  --text-dim: var(--g-label-2);
+  width: 28px;
+  height: 28px;
+  border-radius: 0;
+}
+:root[data-style='glas'] .nvr-set-card .nvr-set__chip > svg {
+  width: 22px;
+  height: 22px;
+}
+/* explanations */
+:root[data-style='glas'] .nvr-set-card .nvr-set__hint {
+  margin: -6px 0 8px;
+  padding-left: var(--g-row-indent);
+  color: var(--g-label-2);
+  font: 400 13px / 18px var(--g-font);
+}
+@media (max-width: 480px) {
+  :root[data-style='glas'] .nvr-set-card .nvr-set__hint {
+    margin-top: 0;
+  }
+}
+/* language: the value with its chevron at the row's end, like an iOS pop-up row */
+:root[data-style='glas'] .nvr-set-card .nvr-select {
+  margin-left: auto;
+}
+:root[data-style='glas'] .nvr-set-card .nvr-select__native {
+  min-height: 44px;
+  margin-block: 0;
+  padding: 0 24px 0 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--g-label-2);
+  font: 400 17px / 22px var(--g-font);
+  text-align: right;
+  text-align-last: right;
+}
+@media (hover: hover) {
+  :root[data-style='glas'] .nvr-set-card .nvr-select__native:hover {
+    background-image: none;
+  }
+}
+:root[data-style='glas'] .nvr-set-card .nvr-select__native:focus-visible {
+  outline: 2px solid var(--g-focus);
+  outline-offset: 0;
+  box-shadow: none;
+}
+:root[data-style='glas'] .nvr-set-card .nvr-select__chevron {
+  right: 2px;
+  color: var(--g-label-3);
+}
+/* accent: the label line is always 44 high (inside the row's inset), so "Zurücksetzen" appearing on the first drag
+   does not move the slider under the finger; the slider under the label text */
+:root[data-style='glas'] .nvr-set-card .nvr-accent {
+  gap: 8px;
+}
+:root[data-style='glas'] .nvr-set-card .nvr-accent__label {
+  min-height: 44px;
+  margin: -8px 0;
+}
+:root[data-style='glas'] .nvr-set-card .nvr-accent__label > .nvr-set__label {
+  gap: 8px;
+}
+:root[data-style='glas'] .nvr-set-card .nvr-accent__label .nvr-set__chip {
+  margin-right: 4px;
+}
+:root[data-style='glas'] .nvr-set-card .nvr-accent__dot {
+  width: 16px;
+  height: 16px;
+  margin-left: 8px;
+  border: 0;
+}
+:root[data-style='glas'] .nvr-set-card .nvr-accent__reset {
+  display: inline-block;
+  min-height: 44px;
+  padding: 12px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--g-accent-ink);
+  font: 400 17px / 20px var(--g-font);
+}
+:root[data-style='glas'] .nvr-set-card .nvr-accent__reset:hover {
+  background: transparent;
+  color: var(--g-accent-ink);
+}
+@media (hover: hover) {
+  :root[data-style='glas'] .nvr-set-card .nvr-accent__reset:hover {
+    opacity: 0.7;
+  }
+}
+:root[data-style='glas'] .nvr-set-card .nvr-accent__reset:focus-visible {
+  outline: 2px solid var(--g-focus);
+  outline-offset: -2px;
+  border-radius: 10px;
+}
+:root[data-style='glas'] .nvr-set-card .nvr-accent__slider {
+  align-self: stretch;
+  width: auto;
+  height: 28px;
+  margin-left: var(--g-row-indent);
+  border: 0;
+  border-radius: 14px;
+  transition: transform 200ms var(--g-spring-snappy);
+}
+:root[data-style='glas'] .nvr-set-card .nvr-accent__slider::-webkit-slider-thumb {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: var(--g-knob);
+  box-shadow: var(--g-shadow-knob);
+}
+:root[data-style='glas'] .nvr-set-card .nvr-accent__slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: var(--g-knob);
+  box-shadow: var(--g-shadow-knob);
+}
+:root[data-style='glas'] .nvr-set-card .nvr-accent__slider:active {
+  transform: scale(1.04);
+}
+:root[data-style='glas'] .nvr-set-card .nvr-accent__slider:focus-visible {
+  outline: 2px solid var(--g-focus);
+  outline-offset: 2px;
+}
+/* switch (GLAS-DESIGN §7.28): 51 × 31 capsule, knob 27 white with its shadow, on = iOS green and the knob 20 to the
+   right; hit area 64 × 44 around the capsule without moving anything */
+:root[data-style='glas'] .nvr-switch {
+  width: 51px;
+  height: 31px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--g-switch-off);
+  box-shadow: none;
+  transition: background-color 250ms ease;
+}
+:root[data-style='glas'] .nvr-switch--on {
+  background: var(--g-switch-on);
+}
+:root[data-style='glas'] .nvr-switch__thumb {
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: var(--g-knob);
+  box-shadow: var(--g-shadow-knob);
+  transition: transform var(--g-d-snappy) var(--g-spring-snappy);
+}
+:root[data-style='glas'] .nvr-switch--on .nvr-switch__thumb {
+  background: var(--g-knob);
+  transform: translateX(20px);
+}
+:root[data-style='glas'] .nvr-switch::before {
+  content: '';
+  position: absolute;
+  inset: -6.5px;
+}
+:root[data-style='glas'] .nvr-switch:focus-visible {
+  outline: 2px solid var(--g-focus);
+  outline-offset: 2px;
+}
+/* segmented control (GLAS-DESIGN §7.27, GlassSegment): track `fill`, lens `seg` + `segShadow` that slides with the
+   snappy spring, equally wide options with text only. The size per use comes from a modifier class that sets the
+   variables: --nvr-gl-seg-h (hit area), --nvr-gl-seg-inset (space above and below the visible track),
+   --nvr-gl-seg-pad (space between track and lens). The component sets --nvr-gl-seg-n (options) and --nvr-gl-seg-i
+   (chosen one). */
+:root[data-style='glas'] .nvr-gl-seg {
+  --nvr-gl-seg-h: 36px;
+  --nvr-gl-seg-inset: 0px;
+  --nvr-gl-seg-pad: 2px;
+  position: relative;
+  display: flex;
+  height: var(--nvr-gl-seg-h);
+}
+:root[data-style='glas'] .nvr-gl-seg__track {
+  position: absolute;
+  inset: var(--nvr-gl-seg-inset) 0;
+  border-radius: 999px;
+  background: var(--g-fill);
+}
+:root[data-style='glas'] .nvr-gl-seg__lens {
+  position: absolute;
+  top: calc(var(--nvr-gl-seg-inset) + var(--nvr-gl-seg-pad));
+  left: var(--nvr-gl-seg-pad);
+  width: calc((100% - 2 * var(--nvr-gl-seg-pad)) / var(--nvr-gl-seg-n));
+  height: calc(var(--nvr-gl-seg-h) - 2 * (var(--nvr-gl-seg-inset) + var(--nvr-gl-seg-pad)));
+  border-radius: 999px;
+  background: var(--g-seg);
+  box-shadow: var(--g-seg-shadow);
+  transform: translateX(calc(var(--nvr-gl-seg-i) * 100%));
+  transition: transform var(--g-d-snappy) var(--g-spring-snappy);
+  pointer-events: none;
+}
+:root[data-style='glas'] .nvr-gl-seg[data-none] .nvr-gl-seg__lens {
+  display: none;
+}
+:root[data-style='glas'] .nvr-gl-seg__opt {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--nvr-gl-seg-h);
+  padding: 0 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--g-label);
+  font: 600 13px / 18px var(--g-font);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+:root[data-style='glas'] .nvr-gl-seg__opt:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* a label that does not fit (GlassSegment measures it): the whole segment 13/18 with 2 px padding; what still does not
+   fit ends in "…" */
+:root[data-style='glas'] .nvr-gl-seg[data-tight] .nvr-gl-seg__opt {
+  padding: 0 2px;
+  font-size: 13px;
+  line-height: 18px;
+}
+/* the settings' choices (style, strength, light/dark): hit area 44, visible track 32, lens 28, at the row's end; the
+   options equally wide as the longest label (at least 72). A transparent border of 2 on each side gives the measuring
+   its slack. Phones: the segment takes its own line in the row's whole width. */
+:root[data-style='glas'] .nvr-gl-seg--settings {
+  --nvr-gl-seg-h: 44px;
+  --nvr-gl-seg-inset: 6px;
+  --nvr-gl-seg-pad: 2px;
+  display: inline-grid;
+  flex: none;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  margin-left: auto;
+}
+:root[data-style='glas'] .nvr-gl-seg--settings .nvr-gl-seg__opt {
+  min-width: 72px;
+  padding: 0 10px;
+  border-inline: 2px solid transparent;
+}
+@media (max-width: 480px) {
+  :root[data-style='glas'] .nvr-gl-seg--settings {
+    flex: 1 1 100%;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+
+  :root[data-style='glas'] .nvr-gl-seg--settings .nvr-gl-seg__opt {
+    min-width: 0;
+    padding: 0 2px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-style='glas'] .nvr-set-card .nvr-accent__slider:active {
+    transform: none;
+  }
+}
+@media (forced-colors: active) {
+  :root[data-style='glas'] .nvr-set-card .nvr-set__row::before {
+    forced-color-adjust: none;
+    background: GrayText;
+  }
+
+  :root[data-style='glas'] .nvr-switch {
+    forced-color-adjust: none;
+    border: 1px solid ButtonText;
+    background: Canvas;
+  }
+
+  :root[data-style='glas'] .nvr-switch__thumb {
+    top: 1px;
+    left: 1px;
+    background: ButtonText;
+    box-shadow: none;
+  }
+
+  :root[data-style='glas'] .nvr-switch--on {
+    background: Highlight;
+  }
+
+  :root[data-style='glas'] .nvr-switch--on .nvr-switch__thumb {
+    background: HighlightText;
+  }
+
+  :root[data-style='glas'] .nvr-gl-seg__track {
+    border: 1px solid CanvasText;
+  }
+
+  :root[data-style='glas'] .nvr-gl-seg__lens {
+    border: 2px solid Highlight;
+  }
+
+  :root[data-style='glas'] .nvr-set-card .nvr-accent__slider {
+    forced-color-adjust: none;
+    border: 1px solid CanvasText;
+  }
+}

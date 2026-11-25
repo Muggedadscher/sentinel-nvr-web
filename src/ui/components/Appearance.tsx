@@ -7,11 +7,17 @@
  * The style (0.21.0): with `onUiStyle` a row Klassisch | Glas, and in Glas the glass strength and "reduce
  * transparency" (texts as HAPulse's StyleSettings). In Glas a hint takes the place of the theme cards: Glas has one
  * neutral palette, the theme stays saved for Klassisch. Without `onUiStyle` the section is the one of 0.20.
+ *
+ * In Glas (0.22.0) the choices (style, strength, light/dark) are HAPulse's Glas segment (`GlassSegment`, manual
+ * activation: they write) and glas.css gives the rows HAPulse's settings list (styles/glas/settings.css). A switch of the
+ * style replaces the control under the focus, so the control of the new style takes it over (the same choice), as in
+ * HAPulse's StyleSettings.
  */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Blend, ChevronDown, Contrast, Languages, Layers, Palette, Sun } from 'lucide-react';
-import type { GlasStrength, UiStyle } from '../../glas/glas-data';
+import { glasAccent, type GlasStrength, type UiStyle } from '../../glas/glas-data';
 import { useSentinelUi } from '../context';
+import { GlassSegment } from './GlassSegment';
 import {
   THEMES,
   THEME_LABELS,
@@ -143,45 +149,77 @@ export function ThemeSwatch({
 export function AppearanceSection(p: AppearanceProps) {
   const { t } = useSentinelUi();
   const resolved = resolveMode(p.mode);
-  const defaultHue = (name: ThemeName) => hexHue(THEMES[name][resolved].accent);
+  const glas = !!p.onUiStyle && p.uiStyle === 'glas';
+  // Glas has one neutral palette with the iOS orange as its default accent (HAPulse's getDefaultHue)
+  const ownAccent = (name: ThemeName) =>
+    glas ? glasAccent(undefined, resolved).accent : THEMES[name][resolved].accent;
+  const defaultHue = (name: ThemeName) => hexHue(ownAccent(name));
   const [localHue, setLocalHue] = useState<number>(p.accentHue ?? defaultHue(p.theme));
+  // the default hue depends on the style: follow a style switch while no hue is chosen
+  const [hueForGlas, setHueForGlas] = useState(glas);
+  if (hueForGlas !== glas) {
+    setHueForGlas(glas);
+    if (p.accentHue === undefined) setLocalHue(defaultHue(p.theme));
+  }
   const previewColor =
-    p.accentHue !== undefined
-      ? `hsl(${p.accentHue}, 78%, ${resolved === 'dark' ? 60 : 50}%)`
-      : THEMES[p.theme][resolved].accent;
+    p.accentHue !== undefined ? `hsl(${p.accentHue}, 78%, ${resolved === 'dark' ? 60 : 50}%)` : ownAccent(p.theme);
   const modes: ThemeMode[] = ['light', 'dark', 'auto'];
   const chip = (bg: string, fg: string, icon: ReactNode) => (
     <span className="nvr-set__chip" style={{ background: bg, color: fg }}>
       {icon}
     </span>
   );
-  const seg = <T extends string>(label: string, values: readonly T[], value: T, key: string, on: (v: T) => void) => (
-    <div className="nvr-seg" role="group" aria-label={label}>
-      {values.map((v) => (
-        <button
-          key={v}
-          type="button"
-          className={'nvr-seg__btn' + (value === v ? ' nvr-seg__btn--active' : '')}
-          onClick={() => on(v)}
-          aria-pressed={value === v}
-        >
-          {t(`${key}.${v}`)}
-        </button>
-      ))}
-    </div>
-  );
-  const glas = !!p.onUiStyle && p.uiStyle === 'glas';
+  const seg = <T extends string>(label: string, values: readonly T[], value: T, key: string, on: (v: T) => void) =>
+    glas ? (
+      <GlassSegment
+        className="nvr-gl-seg--settings"
+        label={label}
+        value={value}
+        onChange={on}
+        activation="manual"
+        options={values.map((v) => ({ value: v, label: t(`${key}.${v}`) }))}
+      />
+    ) : (
+      <div className="nvr-seg" role="group" aria-label={label}>
+        {values.map((v) => (
+          <button
+            key={v}
+            type="button"
+            className={'nvr-seg__btn' + (value === v ? ' nvr-seg__btn--active' : '')}
+            onClick={() => on(v)}
+            aria-pressed={value === v}
+            data-value={key === 'nvr.settings.style' ? v : undefined}
+          >
+            {t(`${key}.${v}`)}
+          </button>
+        ))}
+      </div>
+    );
+  // the style's control is replaced on a switch: the new style's control of the same choice takes the focus — only
+  // while nothing else has it
+  const styleRow = useRef<HTMLDivElement>(null);
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    if (document.activeElement && document.activeElement !== document.body) return;
+    styleRow.current?.querySelector<HTMLElement>(`[data-value="${p.uiStyle ?? 'classic'}"]`)?.focus();
+  }, [p.uiStyle]);
+  const chooseStyle = (v: UiStyle) => {
+    if (v !== (p.uiStyle ?? 'classic')) refocus.current = true;
+    p.onUiStyle?.(v);
+  };
   return (
     <section className="nvr-set__section">
       <div className="nvr-section__label">{t('nvr.settings.appearance')}</div>
       <div className="nvr-card nvr-set-card">
         {p.onUiStyle && (
-          <div className="nvr-set__row nvr-set__row--inline">
+          <div ref={styleRow} className="nvr-set__row nvr-set__row--inline">
             <span className="nvr-set__label">
               {chip('var(--accent-soft)', 'var(--accent)', <Layers size={14} strokeWidth={1.75} />)}
               {t('nvr.settings.style')}
             </span>
-            {seg(t('nvr.settings.style.groupAria'), STYLES, p.uiStyle ?? 'classic', 'nvr.settings.style', p.onUiStyle)}
+            {seg(t('nvr.settings.style.groupAria'), STYLES, p.uiStyle ?? 'classic', 'nvr.settings.style', chooseStyle)}
             <p className="nvr-set__hint">{t('nvr.settings.style.hint')}</p>
           </div>
         )}
@@ -224,19 +262,23 @@ export function AppearanceSection(p: AppearanceProps) {
             {chip('var(--warning-soft)', 'var(--warning)', <Sun size={14} strokeWidth={1.75} />)}
             {t('nvr.settings.mode')}
           </span>
-          <div className="nvr-seg" role="group" aria-label={t('nvr.settings.mode')}>
-            {modes.map((m) => (
-              <button
-                key={m}
-                type="button"
-                className={'nvr-seg__btn' + (p.mode === m ? ' nvr-seg__btn--active' : '')}
-                onClick={() => p.onMode(m)}
-                aria-pressed={p.mode === m}
-              >
-                {t(`nvr.settings.mode.${m}`)}
-              </button>
-            ))}
-          </div>
+          {glas ? (
+            seg(t('nvr.settings.mode'), modes, p.mode, 'nvr.settings.mode', p.onMode)
+          ) : (
+            <div className="nvr-seg" role="group" aria-label={t('nvr.settings.mode')}>
+              {modes.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={'nvr-seg__btn' + (p.mode === m ? ' nvr-seg__btn--active' : '')}
+                  onClick={() => p.onMode(m)}
+                  aria-pressed={p.mode === m}
+                >
+                  {t(`nvr.settings.mode.${m}`)}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="nvr-set__row nvr-set__row--inline">
           <span className="nvr-set__label">
