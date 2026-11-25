@@ -28,6 +28,7 @@ import { useSentinelUi } from '../context';
 import { fmtRelative } from '../format';
 import { drawLastTileSnapshot, hasLastTileSnapshot, rememberTileSnapshot } from '../snapshot-cache';
 import { eventLabel } from './ClassBadge';
+import { SnapshotImage } from './SnapshotImage';
 import { tileSnapshotWidth } from './CameraGrid';
 
 const RETRY_MS = 30_000;
@@ -77,19 +78,13 @@ function GlassSnapshot({ cam, tick, retry }: { cam: SentinelCamera; tick: number
   return url ? (
     <span className="nvr-camtile__pic">
       {last && <canvas className="nvr-camtile__img nvr-camtile__img--last" ref={drawLast} aria-hidden="true" />}
-      <img
+      <SnapshotImage
         className="nvr-camtile__img"
         src={url}
-        alt=""
-        crossOrigin="anonymous"
-        onLoad={(e) => {
-          const img = e.currentTarget;
+        onShown={(img) => {
           if (failed === 0) rememberTileSnapshot(cam.id, img);
-          if (!last) return;
-          // the last picture goes once this one can be shown without a gap
-          const drop = () => setLast(false);
-          if (typeof img.decode === 'function') img.decode().then(drop, drop);
-          else drop();
+          // the last picture goes once this one is shown (loaded and decoded, nothing in between shows)
+          setLast(false);
         }}
         onError={() => {
           // the placeholder comes next: the last picture goes with it

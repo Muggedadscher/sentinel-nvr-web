@@ -442,10 +442,13 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-/* the picture's box: the snapshot, and under it the camera's last picture until the snapshot is decoded */
+/* the picture's box: the snapshot, and under it the camera's last picture until the snapshot is decoded. The next
+   snapshot loads in a second <img> under the shown one (SnapshotImage, z-index): the box isolates, so their order
+   stays inside it */
 .nvr-camtile__pic {
   position: absolute;
   inset: 0;
+  isolation: isolate;
 }
 .nvr-camtile__img {
   position: absolute;

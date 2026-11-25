@@ -9,6 +9,7 @@ import { sentinelRecordingState, type SentinelCamera } from '../../api';
 import { useSentinelUi } from '../context';
 import { fmtRelative } from '../format';
 import { drawLastTileSnapshot, hasLastTileSnapshot, rememberTileSnapshot } from '../snapshot-cache';
+import { SnapshotImage } from './SnapshotImage';
 
 const SNAPSHOT_MS = 5000;
 /** Tile snapshot width: a tile is ~300–450 CSS px wide; the 5-MP original (~400 KB every 5 s per camera) only cost the
@@ -66,19 +67,13 @@ function CameraTile({ cam, tick, n }: { cam: SentinelCamera; tick: number; n: nu
       {src ? (
         <span className="nvr-camtile__pic">
           {last && <canvas className="nvr-camtile__img nvr-camtile__img--last" ref={drawLast} aria-hidden="true" />}
-          <img
+          <SnapshotImage
             className="nvr-camtile__img"
             src={src}
-            alt=""
-            crossOrigin="anonymous"
-            onLoad={(e) => {
-              const img = e.currentTarget;
+            onShown={(img) => {
               rememberTileSnapshot(cam.id, img);
-              if (!last) return;
               // the last picture goes once this one is decoded (it lies on top, nothing in between shows)
-              const drop = () => setLast(false);
-              if (typeof img.decode === 'function') img.decode().then(drop, drop);
-              else drop();
+              setLast(false);
             }}
             onError={() => {
               // the placeholder comes next: the last picture must not come back with a later retry

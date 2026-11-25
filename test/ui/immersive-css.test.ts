@@ -12,6 +12,8 @@
  * 0.19.2 changed the default rules on purpose: the camera tile's picture box (`.nvr-camtile__pic`).
  * 0.21.0 added two default rules on purpose: the settings row hint and the switch (`.nvr-set__hint`, `.nvr-switch`),
  * rendered only when the host passes AppearanceSection's style props.
+ * 0.22.1 changed a default rule on purpose: the camera tile's picture box isolates (`.nvr-camtile__pic`, the next
+ * snapshot loads under the shown one, SnapshotImage).
  */
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
@@ -20,8 +22,8 @@ import { resolve } from 'node:path';
 
 // vitest runs from the package root
 const CSS = readFileSync(resolve('src/ui/ui.css'));
-const DEFAULT_BYTES = 46417;
-const DEFAULT_SHA256 = '1ccf77e236dbeb5c962ce33b46743870b5639b8a6f75946d90c1f9cf492078aa';
+const DEFAULT_BYTES = 46583;
+const DEFAULT_SHA256 = '080c4ccbf84640625fef146ab671bd8b94fff59338cd83c2e1d8b6423b4b82c0';
 const SCOPE = "[data-nvr-appearance='immersive']";
 /** classes CameraTitle renders only with `live`/`at` */
 const NEW_PROP_CLASS = /^\.nvr-cam__(?:name|badge)(?:--[a-z]+)?(?![\w-])/;
