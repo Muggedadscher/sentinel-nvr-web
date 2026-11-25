@@ -117,12 +117,13 @@ describe('camera tile', () => {
     await act(async () => {
       img.dispatchEvent(new Event('load'));
     });
-    // loaded, not yet decoded: the last picture still lies under it
+    // loaded, not yet decoded: the last picture still lies under it, the tile does not show (or remember) its own yet
     expect(box(div, 'c1').querySelector('canvas')).not.toBeNull();
-    expect(lastTileSnapshot('c1')).toBe(img);
+    expect(lastTileSnapshot('c1')).not.toBe(img);
     await act(async () => decoded());
     expect(box(div, 'c1').querySelector('canvas')).toBeNull();
     expect(box(div, 'c1').querySelector('img')).toBe(img);
+    expect(lastTileSnapshot('c1')).toBe(img);
     done();
   });
 

@@ -4,6 +4,15 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## Unreleased
+
+- Camera tiles (classic and Glas) change their snapshot without a black flash: the next snapshot loads in a second
+  picture under the shown one and comes to the front only once it is loaded and decoded (`SnapshotImage`). Before,
+  the tile's one `<img>` changed its `src` every 5 s, and Safari at times painted nothing while the next snapshot
+  loaded (up to about a second on a Mac with a 960 px snapshot), so the tile's background flashed through: black in
+  Glas, light in Klassisch. A snapshot that fails keeps the shown picture until the fallback thumbnail has loaded.
+  The tile's picture box isolates (`isolation: isolate` on `.nvr-camtile__pic`).
+
 ## 0.22.0 — 2026-11-25
 
 - Glas: the settings section (`AppearanceSection` with `uiStyle="glas"`) looks like HAPulse's settings in Glas. The
