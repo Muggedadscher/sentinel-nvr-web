@@ -4,7 +4,7 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
-## Unreleased
+## 0.22.1 — 2026-11-25
 
 - Camera tiles (classic and Glas) change their snapshot without a black flash: the next snapshot loads in a second
   picture under the shown one and comes to the front only once it is loaded and decoded (`SnapshotImage`). Before,
