@@ -14,7 +14,8 @@ are listed in the README compatibility table.
   and that frame triggers a marked jump back to the start; the still stays until the start picture is on screen, as
   with a jump inside a running session. The picture comes about a second later than before. A jump or a scrub asked
   while connecting wins (no jump back). Telemetry `start-rewind` (`ms` since the request, `drift` = how far the server
-  had played). Client only, works with every server that has `relay-seek`.
+  had played). Client only. With a server that answers `relay-seek` without a marker width the still is lifted by the timer
+  (2.6 s) instead; a session rebuilt because the jump back itself failed plays on as it comes.
 
 ## 0.22.1 — 2026-11-25
 

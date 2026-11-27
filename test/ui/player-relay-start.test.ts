@@ -40,11 +40,13 @@ function setup() {
   const urls: string[] = [];
   vi.stubGlobal('RTCPeerConnection', class {});
   let pos = T; // what the server reports as its position
+  let seekOk = true;
   vi.stubGlobal(
     'fetch',
     vi.fn(async (u: string) => {
       urls.push(u);
-      if (u.includes('api/relay-seek')) return { ok: true, status: 200, json: async () => ({ w: 1264 }) };
+      if (u.includes('api/relay-seek'))
+        return seekOk ? { ok: true, status: 200, json: async () => ({ w: 1264 }) } : { ok: false, status: 404 };
       if (u.includes('api/relay-pos')) return { ok: true, status: 200, json: async () => ({ t: pos, r: 1, v: 1 }) };
       return { ok: true, status: 204, json: async () => ({}) };
     }),
@@ -85,7 +87,17 @@ function setup() {
     c.fz.classList.remove('hidden');
     c.freezeArm(true);
   };
-  return { ctl, c, states, frame, seeks, still, showStill, setPos: (t: number) => (pos = t) };
+  return {
+    ctl,
+    c,
+    states,
+    frame,
+    seeks,
+    still,
+    showStill,
+    setPos: (t: number) => (pos = t),
+    failSeeks: () => (seekOk = false),
+  };
 }
 
 beforeEach(() => {
@@ -132,16 +144,76 @@ describe('new relay session starts at its start position', () => {
     await vi.advanceTimersByTimeAsync(300);
     expect(h.still()).toBe(true); // frames of the old position do not lift it
     expect(h.c.label).toBe('loading');
-    expect(Math.abs(h.ctl.currentTs()! - T)).toBeLessThan(1000);
+    expect(h.ctl.currentTs()).toBe(T); // the clock still stands: the start picture is not on screen yet
 
     // the marker frame is the start position: now the still goes (2 frames + fade) and the label says playing
     h.frame(1264);
     expect(h.c.label).toBe('playing');
+    expect(h.ctl.currentTs()).toBe(T); // the clock starts with the start picture
     h.frame(1264);
     h.frame(1264);
     await vi.advanceTimersByTimeAsync(200);
     expect(h.still()).toBe(false);
+    expect(h.ctl.currentTs()).toBe(T + 200);
     expect(h.seeks()).toHaveLength(1); // once per session
+  });
+
+  it('a late frame of the previous stream is not the first frame of the new session', async () => {
+    const h = setup();
+    h.c.fcArm(); // the stream that played before (live, the old session)
+    h.frame(1280);
+    h.ctl.playAt(T, {});
+    const s = sessions[0];
+    h.showStill();
+    h.frame(1280); // still delivered after the new session was requested
+    h.frame(1280);
+    s.id = 'sid';
+    s.cb.onSessionId('sid');
+    await vi.advanceTimersByTimeAsync(700);
+    expect(h.seeks()).toEqual([]);
+    expect(h.ctl.currentTs()).toBe(T);
+    s.cb.onStream({} as MediaStream);
+    h.frame(1280);
+    expect(h.seeks()).toHaveLength(1);
+  });
+
+  it('the jump back fails: the session is rebuilt once and then plays on as it comes (no loop)', async () => {
+    const h = setup();
+    h.failSeeks();
+    h.ctl.playAt(T, {});
+    const s = sessions[0];
+    s.id = 'sid';
+    s.cb.onSessionId('sid');
+    s.cb.onStream({} as MediaStream);
+    h.frame(1280);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(h.seeks()).toHaveLength(1);
+    expect(sessions).toHaveLength(2); // recovered
+    const s2 = sessions[1];
+    expect(s2.o.startMs).toBe(T);
+    s2.id = 'sid2';
+    s2.cb.onSessionId('sid2');
+    s2.cb.onStream({} as MediaStream);
+    expect(h.c.label).toBe('playing');
+    h.frame(1280);
+    h.frame(1280);
+    await vi.advanceTimersByTimeAsync(700);
+    expect(h.seeks()).toHaveLength(1);
+    expect(sessions).toHaveLength(2);
+  });
+
+  it('a scrub that starts while connecting wins', async () => {
+    const h = setup();
+    h.ctl.playAt(T, {});
+    const s = sessions[0];
+    s.id = 'sid';
+    s.cb.onSessionId('sid');
+    s.cb.onStream({} as MediaStream);
+    h.ctl.scrubBegin();
+    h.ctl.scrubMove(T - 120_000, 0, 0);
+    h.frame(1280);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(h.seeks()).toEqual([]);
   });
 
   it('a frame before the session id waits for the id', async () => {
