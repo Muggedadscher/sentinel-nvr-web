@@ -106,6 +106,15 @@ export class PlayerController {
   // relay session (RW)
   private rw: WebRtcSession | undefined;
   private rwStartMs = 0;
+  /** A new relay session whose first picture is not on screen yet. The server plays from the start position while the
+   *  connection is still being set up (2–8 s, longer on a phone), so the first frame that arrives is that far INTO the
+   *  recording: an event opened from the overview or from live began in the middle (user 27.11.2026, iPhone). Until the
+   *  first presented frame the playhead stands on the start and the still stays; that frame then triggers a marked jump
+   *  back to the start (startAtFirstFrame). Cleared by anything that positions the stream itself (jump, scrub). */
+  private rwAwaitStart = false;
+  private rwStartAt = 0;
+  /** how far the server had played when the first frame arrived (telemetry `start-rewind`) */
+  private rwStartDrift: number | null = null;
   private rwBase: number | null = null;
   private rwPosTs: number | null = null;
   private rwPosAt = 0;
@@ -523,6 +532,7 @@ export class PlayerController {
   /** Wall-clock position of the picture on screen (Scrypted's getRecordingStreamCurrentTime). */
   currentTs(): number | null {
     if (this.rw?.active) {
+      if (this.rwAwaitStart) return this.rwStartMs; // nothing of this session on screen yet: the clock waits for the picture
       if (this.rwPosTs != null) {
         return relayPlayhead(
           this.rwPosTs,
@@ -563,6 +573,7 @@ export class PlayerController {
         this.shownW = w;
         this.markerCheck(w);
       }
+      if (this.rwAwaitStart) this.startAtFirstFrame();
       try {
         v.requestVideoFrameCallback(tick);
       } catch {
@@ -596,7 +607,8 @@ export class PlayerController {
       this.freezeTok = tok;
       try {
         v.requestVideoFrameCallback(() => {
-          if (this.freezeTok === tok && this.v.videoWidth) this.freezeLift();
+          // a new relay session's first frame is not the start position — its still waits for the jump back
+          if (this.freezeTok === tok && this.v.videoWidth && !this.rwAwaitStart) this.freezeLift();
         });
       } catch {
         /* ignore */
@@ -771,7 +783,8 @@ export class PlayerController {
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         if (this.camId !== cam || this.posterFor !== url || this.destroyed) return;
-        const firstFramePending = !!this.rw?.active && this.presentedFrames() <= this.sessFrames0;
+        const firstFramePending =
+          !!this.rw?.active && (this.presentedFrames() <= this.sessFrames0 || this.rwAwaitStart);
         if (this.swapPending)
           this.freezeFromImage(img, true, true, 'event'); // a jump is under way → until its picture
         else if (firstFramePending || !this.rw?.active) {
@@ -835,7 +848,8 @@ export class PlayerController {
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         if (this.camId !== cam || this.destroyed) return;
-        if (!this.posterUp()) this.freezeFromImage(img, true, false, 'thumb');
+        // loaded while the jump back to the session start is under way: until that picture, not the next frame
+        if (!this.posterUp()) this.freezeFromImage(img, true, this.swapPending, 'thumb');
       };
       img.src = this.api.url(`api/thumb?id=${encodeURIComponent(c.thumbnailId)}`);
     } catch {
@@ -1251,6 +1265,8 @@ export class PlayerController {
     this.rwTargetBusy = false;
     this.rwPendingTarget = null;
     this.rwLastTarget = 0;
+    this.rwAwaitStart = false;
+    this.rwStartDrift = null;
     this.stopRelayPoll();
     this.rw?.stop();
     this.rw = undefined;
@@ -1291,6 +1307,8 @@ export class PlayerController {
     this.setLabel('loading');
     // a new session starts at 1× on the server — the chosen speed is sent once the session id is known (onSessionId)
     this.rwStartMs = ts;
+    this.rwAwaitStart = true;
+    this.rwStartAt = Date.now();
     this.rwBase = null;
     this.rwRate = 1;
     this.rwSrate = 1;
@@ -1340,7 +1358,7 @@ export class PlayerController {
           this.fcArm();
           this.rwBase = null;
           this.safePlay();
-          this.setLabel('playing');
+          if (!this.rwAwaitStart) this.setLabel('playing'); // else "loading" until the start picture is on screen
         },
         onFail: () => {
           if (this.rw === s) this.recFallbackMse(ts);
@@ -1354,6 +1372,7 @@ export class PlayerController {
             this.recRelaySeek(p.ts, p.rate, p.srate, p.mark);
           } // carries the rate
           else if (this.rate !== 1) this.recRelaySpeed(this.rate); // pause/play, tab switch, recovery: keep the chosen speed
+          this.startAtFirstFrame(); // the first frame came before the session id
         },
       },
     );
@@ -1363,6 +1382,19 @@ export class PlayerController {
     s.start();
     this.startRelayPoll();
     this.emit();
+  }
+  /** First presented frame of a new relay session: the server has been playing since the session was requested, so this
+   *  picture lies the connection time after the start. Jump back to the start with a marked seek — the still stays until
+   *  the marker frame (stills.ts), exactly like a jump inside a running session. Needs the session id (relay-seek); a
+   *  frame before it waits for onSessionId. */
+  private startAtFirstFrame(): void {
+    const s = this.rw;
+    if (!this.rwAwaitStart || !s?.active || !s.id || this.live) return;
+    if (this.presentedFrames() <= this.sessFrames0) return;
+    this.rwAwaitStart = false;
+    rlog('start-rewind', { ms: Date.now() - this.rwStartAt, drift: this.rwStartDrift });
+    this.freezeCurrent(); // the still on screen now waits for the marker; without one the frame just shown stands
+    this.recRelaySeek(this.rwStartMs, this.rate || 1, 1, true);
   }
   /** Relay failed: retry the relay up to twice (transient WS/ICE hiccups), only then fall back to MSE for the rest of this camera. */
   private recFallbackMse(ts: number): void {
@@ -1415,6 +1447,7 @@ export class PlayerController {
       }
       this.scrubMoves = 0;
     } // the server leaves the scrub profile for a marked seek
+    this.rwAwaitStart = false; // this seek positions the stream — no jump back to the session start on top
     this.rwStartMs = ts;
     this.rwSrate = srate;
     this.rwRate = this.rwScrub ? srate : rate;
@@ -1515,6 +1548,7 @@ export class PlayerController {
       }, wait);
       return;
     }
+    this.rwAwaitStart = false; // the user steers — the session start is no longer where the picture should begin
     this.rwLastTarget = ts;
     this.rwLastTargetAt = Date.now(); // no cmdSeq bump: the position moves continuously, polls stay valid
     this.wdGrace = Date.now() + 8000;
@@ -1587,6 +1621,7 @@ export class PlayerController {
       const v = this.v;
       if (!s?.active || !s.id) return;
       const q = this.presentedFrames();
+      if (this.rwAwaitStart) this.startAtFirstFrame(); // browsers without requestVideoFrameCallback
       if (v.paused && !this.recPaused && !document.hidden) {
         if (!this.wdResumeLogged) {
           this.wdResumeLogged = true;
@@ -1599,8 +1634,8 @@ export class PlayerController {
           this.wdLastCt = q;
           this.wdLastAt = Date.now();
           this.recoveries = 0;
-          if (!this.posterUntilSeek) this.freezeLift();
-          if (this.label === 'loading' && !this.swapPending) this.setLabel('playing');
+          if (!this.posterUntilSeek && !this.rwAwaitStart) this.freezeLift();
+          if (this.label === 'loading' && !this.swapPending && !this.rwAwaitStart) this.setLabel('playing');
         } else if (this.rwScrub) this.wdLastAt = Date.now();
         else if (Date.now() - this.wdLastAt > 4000 && Date.now() > this.wdGrace) {
           this.wdLastAt = Date.now();
@@ -1657,7 +1692,11 @@ export class PlayerController {
             this.seekTarget,
           );
           if (verdict === 'stale' || verdict === 'pre-swap') return;
-          if (verdict === 'position') {
+          if (verdict === 'position' && this.rwAwaitStart) {
+            // the server already plays, the viewer sees nothing of it yet: the playhead stays on the start
+            this.wdDead = 0;
+            this.rwStartDrift = Math.round(d.t - this.rwStartMs);
+          } else if (verdict === 'position') {
             this.wdDead = 0;
             this.rwPosTs = d.t;
             this.rwPosAt = Date.now();

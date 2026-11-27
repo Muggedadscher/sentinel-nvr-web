@@ -4,6 +4,18 @@ Every published version has a git tag `v<version>` (v0.6.0–v0.9.0 were tagged 
 rebuilt from the tagged commit and is byte-identical to the npm tarball). Server features some versions rely on
 are listed in the README compatibility table.
 
+## 0.22.2 — 2026-11-28
+
+- Recorded playback over the relay starts at the position that was asked for. A new session (an event opened from the
+  overview or from live, resume after pause, back from another tab, recovery) is played by the server from the moment
+  it is requested, while the connection is still being set up; the first picture that arrived therefore lay the
+  connection time after the start (2–8 s, more on a phone), the event began in the middle, and the time display had
+  run on while the stage still said "loading". Now the playhead stands on the start until the first presented frame,
+  and that frame triggers a marked jump back to the start; the still stays until the start picture is on screen, as
+  with a jump inside a running session. The picture comes about a second later than before. A jump or a scrub asked
+  while connecting wins (no jump back). Telemetry `start-rewind` (`ms` since the request, `drift` = how far the server
+  had played). Client only, works with every server that has `relay-seek`.
+
 ## 0.22.1 — 2026-11-25
 
 - Camera tiles (classic and Glas) change their snapshot without a black flash: the next snapshot loads in a second
