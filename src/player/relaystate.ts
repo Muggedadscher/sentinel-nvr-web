@@ -60,3 +60,21 @@ export const RELAY_RETRIES = 2;
 export function relayFailure(n: number): 'retry' | 'mse' {
   return n <= RELAY_RETRIES ? 'retry' : 'mse';
 }
+
+/** A new relay session's first presented frame: where is that picture relative to the start that was asked for? The
+ *  server plays from the keyframe before the start (up to one camera GOP earlier) from the moment the session is
+ *  requested, so the first picture lies (connection time − that lead) after the start: around zero or before it on a
+ *  LAN (lab 27.11.2026: median −1.2 s at 2.1 s connection time), seconds after it on a slow connection. Only a picture
+ *  later than START_LATE_MS is worth the jump back (one marked seek, ~0.65 s). `drift` = last relay-pos answer minus the
+ *  start (null = none yet), `driftAge` = ms since that answer, `sinceFrame` = ms since the first presented frame. */
+export const START_LATE_MS = 1000;
+export const START_DRIFT_WAIT_MS = 1500;
+export function startVerdict(
+  drift: number | null,
+  driftAge: number,
+  sinceFrame: number,
+): { how: 'wait' | 'rewind' | 'play'; drift: number | null } {
+  if (drift == null) return { how: sinceFrame < START_DRIFT_WAIT_MS ? 'wait' : 'play', drift: null }; // no answer: as it comes
+  const d = Math.round(drift + Math.max(0, driftAge)); // the session plays at 1× until its speed is sent
+  return { how: d > START_LATE_MS ? 'rewind' : 'play', drift: d };
+}

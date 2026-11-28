@@ -17,6 +17,9 @@ import {
   relayFailure,
   relayPlayhead,
   relayPosVerdict,
+  START_DRIFT_WAIT_MS,
+  START_LATE_MS,
+  startVerdict,
 } from '../../src/player/relaystate';
 
 const NOW = 1_790_000_000_000;
@@ -153,5 +156,24 @@ describe('playhead between relay-pos answers', () => {
     expect(relayPlayhead(pos, NOW, NOW + 600, -3000, -3000, target)).toBe(target);
     expect(relayPlayhead(pos, NOW, NOW + 600, -40, -3000, target)).toBe(pos - 24_000);
     expect(relayPlayhead(pos, NOW, NOW + 600, 40, -3000, target)).toBe(pos); // picture still forwards: hold the answer
+  });
+});
+
+describe('first picture of a new relay session', () => {
+  it('more than a second after the start → jump back; at or before it → play on', () => {
+    expect(START_LATE_MS).toBe(1000);
+    expect(startVerdict(4000, 0, 0)).toEqual({ how: 'rewind', drift: 4000 });
+    expect(startVerdict(1001, 0, 0).how).toBe('rewind');
+    expect(startVerdict(1000, 0, 0).how).toBe('play');
+    expect(startVerdict(-1200, 0, 0)).toEqual({ how: 'play', drift: -1200 }); // LAN: the keyframe lead outweighs
+  });
+  it('the answer is as old as the last poll: the server has played on since', () => {
+    expect(startVerdict(600, 500, 0)).toEqual({ how: 'rewind', drift: 1100 });
+    expect(startVerdict(-1200, 600, 0)).toEqual({ how: 'play', drift: -600 });
+  });
+  it('no answer yet: wait for one, but not for long', () => {
+    expect(startVerdict(null, 0, 0).how).toBe('wait');
+    expect(startVerdict(null, 0, START_DRIFT_WAIT_MS - 1).how).toBe('wait');
+    expect(startVerdict(null, 0, START_DRIFT_WAIT_MS)).toEqual({ how: 'play', drift: null });
   });
 });
